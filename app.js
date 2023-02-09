@@ -376,10 +376,12 @@ async function listen() {
 
 //track last event and reset claims every 15 seconds
 listen();
+lastevent = Date.now();
+//kill process if no events have been received in 30 seconds
 setInterval(function() {
-    console.log(Date.now() - lastevent);
-    if (Date.now() - lastevent > 7500) {
-        console.log('Restarting stream');
-        listen();
+    console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
+    if (Date.now() - lastevent > 15000) {
+        console.log('No events received in 15 seconds, shutting down so pm2 can restart');
+        process.exit();
     }
 }, 1000);
