@@ -289,80 +289,97 @@ async function claim(username) {
 }
 
 
-
-hive.api.streamOperations(function(err, result) {
-
-    //listen for register event
-    if (result[0] == 'transfer' && result[1].to == 'terracore') {
-        console.log(result[1]);
-        //split memo at - and save first part as event second as hash
-        var memo = {
-            event: result[1].memo.split('-')[0],
-            hash: result[1].memo.split('-')[1]
-        }
-
-        if (result[1].to == 'terracore' && memo.event == 'register' && result[1].amount == '0.001 HIVE') {
-            var registered = register(result[1].from);
-            if (registered) {
-                storeHash(memo.hash, result[1].from);
-            }
-        }
-    
-    }
-
-    if (result[0] == 'custom_json' && result[1].id == 'claim') {
-        console.log(result);
-        //claim function
-        claim(result[1].required_auths[0]);
-    }
-
-
-    if (result[1].id == 'ssc-mainnet-hive'){
-        var from = result[1].required_auths[0];
-        var data = JSON.parse(result[1].json);
-
-        try{
-            var to = data.contractPayload.to;
-        } catch (err){}
-
-
-        if (to == 'terracore'){
-            console.log(data);
-            var quantity = data.contractPayload.quantity;
-            //make sure symbol is scrap
-            if (data.contractPayload.symbol != SYMBOL){
-                console.log('Not scrap');
-                return;
-            }
-
+var lastevent = Date.now();
+//aysncfunction to start listening for events
+async function listen() {
+    hive.api.streamOperations(function(err, result) {
+        //timestamp of last event
+        lastevent = Date.now();
+        //listen for register event
+        if (result[0] == 'transfer' && result[1].to == 'terracore') {
+            console.log(result[1]);
             //split memo at - and save first part as event second as hash
             var memo = {
-                event: data.contractPayload.memo.split('-')[0],
-                hash: data.contractPayload.memo.split('-')[1]
-            }
-            
-            //check if memo is engineering
-            if (memo.event == 'engineering'){
-                engineering(from, quantity);
-            }
-            else if (memo.event == 'health'){
-                health(from, quantity);
-            }
-            else if (memo.event == 'damage'){
-                damage(from, quantity);
-            }
-            else if (memo.event == 'defense'){
-                defense(from, quantity);
-            }
-            else if (memo.event == 'contribute'){
-                contribute(from, quantity);
-            }
-            else{
-                console.log('Unknown event');
+                event: result[1].memo.split('-')[0],
+                hash: result[1].memo.split('-')[1]
             }
 
+            if (result[1].to == 'terracore' && memo.event == 'register' && result[1].amount == '0.001 HIVE') {
+                var registered = register(result[1].from);
+                if (registered) {
+                    storeHash(memo.hash, result[1].from);
+                }
+            }
+        
         }
 
-            
+        if (result[0] == 'custom_json' && result[1].id == 'claim') {
+            console.log(result);
+            //claim function
+            claim(result[1].required_auths[0]);
+        }
+
+
+        if (result[1].id == 'ssc-mainnet-hive'){
+            var from = result[1].required_auths[0];
+            var data = JSON.parse(result[1].json);
+
+            try{
+                var to = data.contractPayload.to;
+            } catch (err){}
+
+
+            if (to == 'terracore'){
+                console.log(data);
+                var quantity = data.contractPayload.quantity;
+                //make sure symbol is scrap
+                if (data.contractPayload.symbol != SYMBOL){
+                    console.log('Not scrap');
+                    return;
+                }
+
+                //split memo at - and save first part as event second as hash
+                var memo = {
+                    event: data.contractPayload.memo.split('-')[0],
+                    hash: data.contractPayload.memo.split('-')[1]
+                }
+                
+                //check if memo is engineering
+                if (memo.event == 'engineering'){
+                    engineering(from, quantity);
+                }
+                else if (memo.event == 'health'){
+                    health(from, quantity);
+                }
+                else if (memo.event == 'damage'){
+                    damage(from, quantity);
+                }
+                else if (memo.event == 'defense'){
+                    defense(from, quantity);
+                }
+                else if (memo.event == 'contribute'){
+                    contribute(from, quantity);
+                }
+                else{
+                    console.log('Unknown event');
+                }
+
+            }
+
+                
+        }
+    });
+}
+
+
+
+
+//track last event and reset claims every 15 seconds
+listen();
+setInterval(function() {
+    console.log(Date.now() - lastevent);
+    if (Date.now() - lastevent > 7500) {
+        console.log('Restarting stream');
+        listen();
     }
-});
+}, 1000);
