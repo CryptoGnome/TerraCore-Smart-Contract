@@ -290,6 +290,7 @@ async function claim(username) {
 
 
 var lastevent = Date.now();
+const mintPrice = '1 HIVE'
 //aysncfunction to start listening for events
 async function listen() {
     hive.api.streamOperations(function(err, result) {
@@ -304,7 +305,7 @@ async function listen() {
                 hash: result[1].memo.split('-')[1]
             }
 
-            if (result[1].to == 'terracore' && memo.event == 'register' && result[1].amount == '0.001 HIVE') {
+            if (result[1].to == 'terracore' && memo.event == 'register' && result[1].amount == mintPrice) {
                 var registered = register(result[1].from);
                 if (registered) {
                     storeHash(memo.hash, result[1].from);
