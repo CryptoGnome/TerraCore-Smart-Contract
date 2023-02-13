@@ -144,7 +144,7 @@ async function register(username) {
 }
 
 //store hash in mongo collection that stores all regsitration hashes
-async function storeHash(hash, username) {
+async function storeRegistration(hash, username) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('registrations');
@@ -152,6 +152,13 @@ async function storeHash(hash, username) {
     console.log('Hash ' + hash + ' stored');
 }
 
+async function storeHash(hash, username) {
+    let client = await MongoClient.connect(url, { useNewUrlParser: true });
+    let db = client.db(dbName);
+    let collection = db.collection('hashes');
+    let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
+    console.log('Hash ' + hash + ' stored');
+}
 //engineering upgrade
 async function engineering(username, quantity) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
@@ -376,14 +383,14 @@ async function battle(username, _target) {
     //check if user exists
     if (!user) {
         console.log('User ' + username + ' does not exist');
-        return;
+        return false;
     }
     //load target 
     let target = await collection.findOne({ username : _target });
     //check if target exists
     if (!target) {
         console.log('Target ' + target + ' does not exist');
-        return;
+        return false;
     }
 
     //check uf user has more damage than target defense and attacks > 0
@@ -410,6 +417,7 @@ async function battle(username, _target) {
 
         //send webhook with red color
         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target, '#f55a42');
+        return true;
 
 
     }
@@ -419,9 +427,11 @@ async function battle(username, _target) {
         //check if user has attacks left
         if (user.attacks > 0) {
             await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
+            return true;
         }
         else {
             console.log('User ' + username + ' has no attacks left');
+            return false;
         }
         
     }
@@ -448,7 +458,7 @@ async function listen() {
             if (result[1].to == 'terracore' && memo.event == 'register' && result[1].amount == mintPrice) {
                 var registered = register(result[1].from);
                 if (registered) {
-                    storeHash(memo.hash, result[1].from);
+                    storeRegistration(memo.hash, result[1].from);
                 }
             }
         
@@ -466,9 +476,12 @@ async function listen() {
             //get target from data
             var target = data.target;
             //battle function
-            battle(result[1].required_auths[0], target);
+            var b = battle(result[1].required_auths[0], target);
+            //if battle is successfull register it
+            if (b) {
+                storeHash(data.hash, result[1].required_auths[0]);
+            }
         }
-
 
         if (result[1].id == 'ssc-mainnet-hive'){
             var from = result[1].required_auths[0];
@@ -509,6 +522,9 @@ async function listen() {
                 }
                 else if (memo.event == 'contribute'){
                     contribute(from, quantity);
+                }
+                else if (memo.event == 'stake'){
+                    webhook('Scrap Staked', 'User ' + from + ' staked ' + data.contractPayload.quantity + ' scrap', '#fafc81');
                 }
                 else{
                     console.log('Unknown event');
