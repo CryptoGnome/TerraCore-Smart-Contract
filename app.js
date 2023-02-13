@@ -523,7 +523,7 @@ async function listen() {
                 else if (memo.event == 'contribute'){
                     contribute(from, quantity);
                 }
-                else if (memo.event == 'stake'){
+                else if (data.contractAction == 'stake'){
                     webhook('Scrap Staked', 'User ' + from + ' staked ' + data.contractPayload.quantity + ' scrap', '#fafc81');
                 }
                 else{
