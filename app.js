@@ -1,15 +1,35 @@
 var hive = require('@hiveio/hive-js');
 const mongodb = require('mongodb');
 const fetch = require('node-fetch');
+const { Webhook, MessageBuilder } = require('discord-webhook-node');
 require('dotenv').config();
+
+//connect to Webhook
+const hook = new Webhook(process.env.DISCORD_WEBHOOK);
+
 
 //connect to mongodb
 const MongoClient = mongodb.MongoClient;
 const url = process.env.MONGO_URL;
 const dbName = 'terracore';
 const SYMBOL = 'SCRAP';
-
 const wif = process.env.ACTIVE_KEY;
+
+async function webhook(title, message, color) {
+    
+    const embed = new MessageBuilder()
+        .setTitle(title)
+        .addField('Message: ', message, true)
+        .setColor(color)
+        .setTimestamp();
+    try {
+        hook.send(embed);
+    }
+    catch (err) {
+        console.log(chalk.red("Discord Webhook Error"));
+    }
+    
+}
 
 
 async function engineBalance(username) {
@@ -59,6 +79,53 @@ async function engineBalance(username) {
     }
 }
 
+async function scrapStaked(username) {
+    //make a list of nodes to try
+    const nodes = ["https://engine.rishipanthee.com", "https://herpc.dtools.dev", "https://api.primersion.com"];
+    var node;
+
+    //try each node until one works, just try for a response
+    for (let i = 0; i < nodes.length; i++) {
+        try {
+            const response = await fetch(nodes[i], {
+                method: "GET",
+                headers:{'Content-type' : 'application/json'},
+            });
+            const data = await response.json()
+            node = nodes[i];
+            break;
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+                
+
+    const response = await fetch(node + "/contracts", {
+      method: "POST",
+      headers:{'Content-type' : 'application/json'},
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "find",
+        params: {
+          contract: "tokens",
+          table: "balances",
+          query: {
+            "account":username,
+            "symbol":SYMBOL    
+          }
+        },
+        "id": 1,
+      })
+    });
+    const data = await response.json()
+    if (data.result.length > 0) {
+        return parseFloat(data.result[0].stake);
+    } else {
+        return 0;
+    }
+}
+
 
 async function register(username) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
@@ -69,8 +136,9 @@ async function register(username) {
         console.log(username + ' already exists');
         return false;
     }
-    let result = await collection.insertOne({username: username , favor: 0, scrap: 0, health: 10, damage: 1, defense: 1, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now()});
+    let result = await collection.insertOne({username: username , favor: 0, scrap: 0, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now()});
     console.log('New User ' + username + ' now registered');
+    webhook('New User', username + ' has registered', '#86fc86');
     return true;
 
 }
@@ -137,10 +205,10 @@ async function damage(username, quantity) {
         return;
     }
 
-    let cost = Math.pow(user.damage, 2);
+    let cost = Math.pow(user.damage/10, 2);
 
     if (quantity == cost){
-        let result = await collection.updateOne({username: username}, {$inc: {damage: 1}});
+        let result = await collection.updateOne({username: username}, {$inc: {damage: 10}});
     }
 }
 
@@ -155,10 +223,10 @@ async function defense(username, quantity) {
     if (!user) {
         return;
     }
-    let cost = Math.pow(user.defense, 2);
+    let cost = Math.pow(user.defense/10, 2);
 
     if (quantity == cost){
-        let result = await collection.updateOne({username : username}, {$inc: {defense: 1}});
+        let result = await collection.updateOne({username : username}, {$inc: {defense: 10}});
     }
 }
 
@@ -185,16 +253,18 @@ async function contribute(username, quantity) {
     //add qty to current favor
     await stats.updateOne({date: date}, {$inc: {currentFavor: qty}});
 
+    //webhook
+    webhook("New Contribution", "User " + username + " contributed " + qty.toString() + " favor", '#c94ce6')
+
 
 }
-
 
 //claim reset function
 async function resetClaims(username) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('players');
-    await collection.updateOne({ username: username }, { $inc: { claims: -1 }, $set: { cooldown: Date.now(), scrap: 0 } });
+    await collection.updateOne({ username: username }, { $inc: { claims: -1 }, $set: { cooldown: Date.now(), lastclaim: Date.now(), scrap: 0 } });
     console.log('claims reset for ' + username);
 }
 
@@ -214,9 +284,9 @@ async function claim(username) {
         console.log('User ' + username + ' has no claims left');
         return;
     }
-    //make sure last claim was longer than 30 seconds ago
-    if (Date.now() - user.lastclaim < 30000) {
-        console.log('User ' + username + ' has to wait 30 seconds between claims');
+    //make sure last claim was longer than 120 seconds ago
+    if (Date.now() - user.lastclaim < 120000) {
+        console.log('User ' + username + ' has to wait 120 seconds between claims');
         return;
     }
 
@@ -251,6 +321,10 @@ async function claim(username) {
         //broadcast operation to hive blockchain
         hive.broadcast.customJson(wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json, function(err, result) {
             console.log(err, result);
+            //if successful, update user scrap to 0
+            if (!err) {
+                webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
+            }
         });
     
     } 
@@ -261,7 +335,6 @@ async function claim(username) {
 
         //make sure qty has no more than 8 decimals
         let qty = user.scrap.toFixed(8);
-   
 
         var op = ['custom_json', {
             required_auths: ['terracore'],
@@ -282,15 +355,82 @@ async function claim(username) {
         //broadcast operation to hive blockchain
         hive.broadcast.customJson(wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json, function(err, result) {
             console.log(err, result);
+            //if success
+            if (!err) {
+                webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
+            }
         });
 
     }
 
 }
 
+//battle function
+async function battle(username, _target) {
+    let client = await MongoClient.connect(url, { useNewUrlParser: true });
+    let db = client.db(dbName);
+    let collection = db.collection('players');
+    
+    //load target user
+    let user = await collection.findOne({ username : username });
+    //check if user exists
+    if (!user) {
+        console.log('User ' + username + ' does not exist');
+        return;
+    }
+    //load target 
+    let target = await collection.findOne({ username : _target });
+    //check if target exists
+    if (!target) {
+        console.log('Target ' + target + ' does not exist');
+        return;
+    }
+
+    //check uf user has more damage than target defense and attacks > 0
+    if (user.damage > target.defense && user.attacks > 0) {
+        //check the amount of scrap users has staked
+        var staked = await scrapStaked(username);
+        //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage
+        let scrapToSteal = user.damage - target.defense;
+        if (scrapToSteal > target.scrap) {
+            //check if current scrap of user + scrap to steal is more than staked scrap
+            scrapToSteal = target.scrap;
+            if (user.scrap + scrapToSteal > staked) {
+                scrapToSteal = staked - user.scrap;
+            }
+            else {
+                scrapToSteal = target.scrap;
+            }
+        }
+        //add scrap to user  & subtract attacks from user
+        console.log('User ' + username + ' stole ' + scrapToSteal + ' scrap from ' + _target);
+        await collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 } });
+        //remove scrap from target
+        await collection.updateOne({ username: _target }, { $inc: { scrap: -scrapToSteal } });
+
+        //send webhook with red color
+        webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target, '#f55a42');
+
+
+    }
+    else{
+        //remove one from user attacks
+        console.log('User ' + username + ' failed to steal scrap from ' + _target);
+        //check if user has attacks left
+        if (user.attacks > 0) {
+            await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
+        }
+        else {
+            console.log('User ' + username + ' has no attacks left');
+        }
+        
+    }
+}
+
+ 
 
 var lastevent = Date.now();
-const mintPrice = '1 HIVE'
+const mintPrice = '10.000 HIVE'
 //aysncfunction to start listening for events
 async function listen() {
     hive.api.streamOperations(function(err, result) {
@@ -318,6 +458,15 @@ async function listen() {
             console.log(result);
             //claim function
             claim(result[1].required_auths[0]);
+        }
+        else if (result[0] == 'custom_json' && result[1].id == 'battle') {
+            console.log(result);
+            //convert result[1].json[0] to object
+            var data = JSON.parse(result[1].json);
+            //get target from data
+            var target = data.target;
+            //battle function
+            battle(result[1].required_auths[0], target);
         }
 
 
