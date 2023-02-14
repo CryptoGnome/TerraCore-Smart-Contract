@@ -260,6 +260,11 @@ async function contribute(username, quantity) {
     //add qty to current favor
     await stats.updateOne({date: date}, {$inc: {currentFavor: qty}});
 
+    //update date glboal in stats collection and increment current favor
+    let collection2 = db.collection('stats');
+    await collection2.updateOne({date: "global"}, {$inc: {currentFavor: qty}});
+
+
     //webhook
     webhook("New Contribution", "User " + username + " contributed " + qty.toString() + " favor", '#c94ce6')
 
