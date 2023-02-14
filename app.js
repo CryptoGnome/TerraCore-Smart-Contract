@@ -159,27 +159,59 @@ async function storeHash(hash, username) {
     let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
     console.log('Hash ' + hash + ' stored');
 }
+//defense upgrade
+async function defense(username, quantity) {
+    let client = await MongoClient.connect(url, { useNewUrlParser: true });
+    let db = client.db(dbName);
+    let collection = db.collection('players');
+
+    //create loop to run until update is successful
+    let user = await collection.findOne({ username : username });
+    if (!user) {
+        return;
+    }
+    while (true) {
+        let cost = Math.pow(user.defense/10, 2);
+        if (quantity == cost){
+            await collection.updateOne({username : username}, {$inc: {defense: 10}});
+        }
+
+        //check if update was successful
+        let userCheck = await collection.findOne({ username : username });
+        if (userCheck.defense == user.defense + 10) {
+            break;
+        }
+     
+    }
+}
 //engineering upgrade
 async function engineering(username, quantity) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('players');
-    let user = await collection.findOne({ username : username });
 
-    //check if user exists
+    //create loop to run until update is successful
+    let user = await collection.findOne({ username : username });
     if (!user) {
         return;
     }
+    while (true) {
+        let cost = Math.pow(user.engineering, 2);
+        //new minerate is old minerate + 10% of old minerate
+        var newrate = user.minerate + (user.minerate * 0.1);
 
-    let cost = Math.pow(user.engineering, 2);
+        if (quantity == cost){
+            await collection.updateOne({username: username}, {$inc: {engineering: 1}});
+            await collection.updateOne({username: username }, {$set: {minerate: newrate}});
+        }
 
-    //new minerate is old minerate + 10% of old minerate
-    var newrate = user.minerate + (user.minerate * 0.1);
-
-    if (quantity == cost){
-        await collection.updateOne({username: username}, {$inc: {engineering: 1}});
-        await collection.updateOne({username: username }, {$set: {minerate: newrate}});
+        //check if update was successful
+        let userCheck = await collection.findOne({ username : username });
+        if (userCheck.engineering == user.engineering + 1 && userCheck.minerate == newrate) {
+            break;
+        }
     }
+
 }
 
 //health upgrade
@@ -219,23 +251,6 @@ async function damage(username, quantity) {
     }
 }
 
-//defense upgrade
-async function defense(username, quantity) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
-    let db = client.db(dbName);
-    let collection = db.collection('players');
-    let user = await collection.findOne({ username : username });
-
-    //check if user exists
-    if (!user) {
-        return;
-    }
-    let cost = Math.pow(user.defense/10, 2);
-
-    if (quantity == cost){
-        let result = await collection.updateOne({username : username}, {$inc: {defense: 10}});
-    }
-}
 
 //contributor upgrade
 async function contribute(username, quantity) {
@@ -271,27 +286,30 @@ async function contribute(username, quantity) {
 
 }
 
-
-
 //function to make sure scrap is set to 0
 async function resetScrap(username, claims) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('players');
-    //loop checking and resetting scrap until it is 0 and claims == claims
-    while (true) {
-        await collection.findOne({ username: username }, async function (err, result) {
-            if (err) throw err;
-            if (result.scrap == 0 && result.claims == claims) {
-                return;
-            }
-            else {
-                await collection.updateOne({ username: username }, { $set: { scrap: 0 } });
-            }
-        });
+    //find user in collection
+    let user = await collection.findOne({ username : username });
+    //check if user exists
+    if (!user) {
+        return true;
+    }
+    else if(user.claims == claims){
+        return true;
+    }
+    else if(user.scrap == 0){
+        return true;
+    }
+    else{
+        //set scrap to 0 and update claims
+        await collection.updateOne({username: username}, {$set: {scrap: 0, claims: claims, lastclaim: Date.now()}});
+        return false;
+
     }
 }
-
 
 //claim favor
 async function claim(username) {
@@ -315,7 +333,11 @@ async function claim(username) {
         return;
     }
 
-    await resetScrap(username, user.claims - 1);
+    //call resetScrap function until it returns true
+    while (await resetScrap(username, (user.claims - 1)) == false) {
+        console.log('Resetting scrap for ' + username);
+    }
+    
 
     //get engine balance of terracore
     let balance = await engineBalance('terracore');
