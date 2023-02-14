@@ -271,14 +271,27 @@ async function contribute(username, quantity) {
 
 }
 
-//claim reset function
-async function resetClaims(username) {
+
+
+//function to make sure scrap is set to 0
+async function resetScrap(username, claims) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('players');
-    await collection.updateOne({ username: username }, { $inc: { claims: -1 }, $set: { cooldown: Date.now(), lastclaim: Date.now(), scrap: 0 } });
-    console.log('claims reset for ' + username);
+    //loop checking and resetting scrap until it is 0 and claims == claims
+    while (true) {
+        await collection.findOne({ username: username }, async function (err, result) {
+            if (err) throw err;
+            if (result.scrap == 0 && result.claims == claims) {
+                return;
+            }
+            else {
+                await collection.updateOne({ username: username }, { $set: { scrap: 0 } });
+            }
+        });
+    }
 }
+
 
 //claim favor
 async function claim(username) {
@@ -302,7 +315,7 @@ async function claim(username) {
         return;
     }
 
-    await resetClaims(username);
+    await resetScrap(username, user.claims - 1);
 
     //get engine balance of terracore
     let balance = await engineBalance('terracore');
