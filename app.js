@@ -232,6 +232,7 @@ async function health(username, quantity) {
     }
 }
 
+
 //damage upgrade
 async function damage(username, quantity) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
@@ -576,7 +577,7 @@ async function listen() {
 
 
 
-
+//test
 //track last event and reset claims every 15 seconds
 listen();
 lastevent = Date.now();
