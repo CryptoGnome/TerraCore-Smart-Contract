@@ -174,6 +174,7 @@ async function defense(username, quantity) {
         let cost = Math.pow(user.defense/10, 2);
         if (quantity == cost){
             await collection.updateOne({username : username}, {$inc: {defense: 10}});
+            webhook('Upgrade', username + ' upgraded defense to ' + (user.defense + 10), '#86fc86');
         }
 
         //check if update was successful
@@ -203,6 +204,7 @@ async function engineering(username, quantity) {
         if (quantity == cost){
             await collection.updateOne({username: username}, {$inc: {engineering: 1}});
             await collection.updateOne({username: username }, {$set: {minerate: newrate}});
+            webhook('Engineering Upgrade', username + ' has upgraded their engineering to ' + user.engineering + 1, '#86fc86')
         }
 
         //check if update was successful
@@ -229,9 +231,9 @@ async function health(username, quantity) {
 
     if (quantity == cost){
         let result = await collection.updateOne({username: username}, {$inc: {health: 10}});
+        webhook('Health Upgrade', username + ' has upgraded their health to ' + user.health + 10, '#86fc86');
     }
 }
-
 
 //damage upgrade
 async function damage(username, quantity) {
@@ -249,6 +251,7 @@ async function damage(username, quantity) {
 
     if (quantity == cost){
         let result = await collection.updateOne({username: username}, {$inc: {damage: 10}});
+        webhook('Damage Upgrade', username + ' has upgraded their damage to ' + user.damage + 10, '#86fc86');
     }
 }
 
@@ -518,10 +521,6 @@ async function listen() {
             var target = data.target;
             //battle function
             var b = battle(result[1].required_auths[0], target);
-            //if battle is successfull register it
-            if (b) {
-                storeHash(data.hash, result[1].required_auths[0]);
-            }
         }
 
         if (result[1].id == 'ssc-mainnet-hive'){
