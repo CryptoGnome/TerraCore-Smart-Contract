@@ -331,17 +331,13 @@ async function claim(username) {
         console.log('User ' + username + ' has no claims left');
         return;
     }
-    //make sure last claim was longer than 120 seconds ago
-    if (Date.now() - user.lastclaim < 120000) {
-        console.log('User ' + username + ' has to wait 120 seconds between claims');
+    //make sure last claim was longer than 15 seconds ago
+    if (Date.now() - user.lastclaim < 15000) {
+        console.log('User ' + username + ' has to wait 15 seconds between claims');
         return;
     }
 
-    //call resetScrap function until it returns true
-    while (await resetScrap(username, (user.claims - 1)) == false) {
-        console.log('Resetting scrap for ' + username);
-    }
-    
+ 
 
     //get engine balance of terracore
     let balance = await engineBalance('terracore');
@@ -375,6 +371,7 @@ async function claim(username) {
             //if successful, update user scrap to 0
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
+                
             }
         });
     
@@ -411,7 +408,13 @@ async function claim(username) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
             }
         });
+        
 
+    }
+
+    //call resetScrap function until it returns true
+    while (await resetScrap(username, (user.claims - 1)) == false) {
+        console.log('Resetting scrap for ' + username);
     }
 
 }
