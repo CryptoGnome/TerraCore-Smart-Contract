@@ -15,6 +15,7 @@ const dbName = 'terracore';
 const SYMBOL = 'SCRAP';
 const wif = process.env.ACTIVE_KEY;
 
+
 async function webhook(title, message, color) {
     
     const embed = new MessageBuilder()
@@ -30,7 +31,6 @@ async function webhook(title, message, color) {
     }
     
 }
-
 
 async function engineBalance(username) {
     //make a list of nodes to try
@@ -126,7 +126,6 @@ async function scrapStaked(username) {
     }
 }
 
-
 async function register(username) {
     let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
@@ -158,136 +157,6 @@ async function storeHash(hash, username) {
     let collection = db.collection('hashes');
     let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
     console.log('Hash ' + hash + ' stored');
-}
-//defense upgrade
-async function defense(username, quantity) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
-    let db = client.db(dbName);
-    let collection = db.collection('players');
-
-    //create loop to run until update is successful
-    let user = await collection.findOne({ username : username });
-    if (!user) {
-        return;
-    }
-    while (true) {
-        let cost = Math.pow(user.defense/10, 2);
-        if (quantity == cost){
-            await collection.updateOne({username : username}, {$inc: {defense: 10}});
-            webhook('Upgrade', username + ' upgraded defense to ' + (user.defense + 10), '#86fc86');
-        }
-
-        //check if update was successful
-        let userCheck = await collection.findOne({ username : username });
-        if (userCheck.defense == user.defense + 10) {
-            break;
-        }
-     
-    }
-}
-//engineering upgrade
-async function engineering(username, quantity) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
-    let db = client.db(dbName);
-    let collection = db.collection('players');
-
-    //create loop to run until update is successful
-    let user = await collection.findOne({ username : username });
-    if (!user) {
-        return;
-    }
-    while (true) {
-        let cost = Math.pow(user.engineering, 2);
-        //new minerate is old minerate + 10% of old minerate
-        var newrate = user.minerate + (user.minerate * 0.1);
-
-        if (quantity == cost){
-            await collection.updateOne({username: username}, {$inc: {engineering: 1}});
-            await collection.updateOne({username: username }, {$set: {minerate: newrate}});
-            webhook('Engineering Upgrade', username + ' has upgraded their engineering to ' + (user.engineering + 1), '#86fc86')
-        }
-
-        //check if update was successful
-        let userCheck = await collection.findOne({ username : username });
-        if (userCheck.engineering == user.engineering + 1 && userCheck.minerate == newrate) {
-            break;
-        }
-    }
-
-}
-
-//health upgrade
-async function health(username, quantity) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
-    let db = client.db(dbName);
-    let collection = db.collection('players');
-    let user = await collection.findOne({ username : username });
-
-    //check if user exists
-    if (!user) {
-        return;
-    }
-    let cost = Math.pow(user.health/10, 2);
-
-    if (quantity == cost){
-        let result = await collection.updateOne({username: username}, {$inc: {health: 10}});
-        webhook('Health Upgrade', username + ' has upgraded their health to ' + (user.health + 10), '#86fc86');
-    }
-}
-
-//damage upgrade
-async function damage(username, quantity) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
-    let db = client.db(dbName);
-    let collection = db.collection('players');
-    let user = await collection.findOne({ username : username });
-
-    //check if user exists
-    if (!user) {
-        return;
-    }
-
-    let cost = Math.pow(user.damage/10, 2);
-
-    if (quantity == cost){
-        let result = await collection.updateOne({username: username}, {$inc: {damage: 10}});
-        webhook('Damage Upgrade', username + ' has upgraded their damage to ' + (user.damage + 10), '#86fc86');
-    }
-}
-
-
-//contributor upgrade
-async function contribute(username, quantity) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
-    let db = client.db(dbName);
-    let collection = db.collection('players');
-    let user = await collection.findOne({username: username});
-
-    //check if user exists
-    if (!user) {
-        return;
-    }
-
-    let qty = parseFloat(quantity);
-    //add quantity to favor
-    await collection.updateOne({username: username}, {$inc: {favor: qty}});
-    //load stats collection
-    let stats = db.collection('stats');
-    //todays date
-    var date = new Date().toISOString().slice(0, 10);
-
-    //add qty to current favor
-    await stats.updateOne({date: date}, {$inc: {currentFavor: qty}});
-
-    //update date glboal in stats collection and increment current favor
-    let collection2 = db.collection('stats');
-    await collection2.updateOne({date: "global"}, {$inc: {currentFavor: qty}});
-
-
-    //webhook
-    webhook("New Contribution", "User " + username + " contributed " + qty.toString() + " favor", '#c94ce6')
-
-
 }
 
 //function to make sure scrap is set to 0
@@ -524,56 +393,7 @@ async function listen() {
             var target = data.target;
             //battle function
             var b = battle(result[1].required_auths[0], target);
-        }
-
-        if (result[1].id == 'ssc-mainnet-hive'){
-            var from = result[1].required_auths[0];
-            var data = JSON.parse(result[1].json);
-
-            try{
-                var to = data.contractPayload.to;
-            } catch (err){}
-
-
-            if (to == 'terracore'){
-                console.log(data);
-                var quantity = data.contractPayload.quantity;
-                //make sure symbol is scrap
-                if (data.contractPayload.symbol != SYMBOL){
-                    console.log('Not scrap');
-                    return;
-                }
-
-                //split memo at - and save first part as event second as hash
-                var memo = {
-                    event: data.contractPayload.memo.split('-')[0],
-                    hash: data.contractPayload.memo.split('-')[1]
-                }
-                
-                //check if memo is engineering
-                if (memo.event == 'engineering'){
-                    engineering(from, quantity);
-                }
-                else if (memo.event == 'health'){
-                    health(from, quantity);
-                }
-                else if (memo.event == 'damage'){
-                    damage(from, quantity);
-                }
-                else if (memo.event == 'defense'){
-                    defense(from, quantity);
-                }
-                else if (memo.event == 'contribute'){
-                    contribute(from, quantity);
-                }
-                else{
-                    console.log('Unknown event');
-                }
-
-            }
-
-                
-        }
+        }       
     });
 }
 
