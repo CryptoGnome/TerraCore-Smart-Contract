@@ -216,24 +216,6 @@ async function engineering(username, quantity) {
 
 }
 
-//health upgrade
-async function health(username, quantity) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
-    let db = client.db(dbName);
-    let collection = db.collection('players');
-    let user = await collection.findOne({ username : username });
-
-    //check if user exists
-    if (!user) {
-        return;
-    }
-    let cost = Math.pow(user.health/10, 2);
-
-    if (quantity == cost){
-        let result = await collection.updateOne({username: username}, {$inc: {health: 10}});
-        webhook('Health Upgrade', username + ' has upgraded their health to ' + (user.health + 10), '#86fc86');
-    }
-}
 
 //damage upgrade
 async function damage(username, quantity) {
@@ -553,9 +535,6 @@ async function listen() {
                 //check if memo is engineering
                 if (memo.event == 'engineering'){
                     engineering(from, quantity);
-                }
-                else if (memo.event == 'health'){
-                    health(from, quantity);
                 }
                 else if (memo.event == 'damage'){
                     damage(from, quantity);
