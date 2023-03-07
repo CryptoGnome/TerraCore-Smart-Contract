@@ -1,5 +1,5 @@
 var hive = require('@hiveio/hive-js');
-const mongodb = require('mongodb');
+const { MongoClient } = require('mongodb');
 const fetch = require('node-fetch');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
 require('dotenv').config();
@@ -7,13 +7,13 @@ require('dotenv').config();
 //connect to Webhook
 const hook = new Webhook(process.env.DISCORD_WEBHOOK);
 
-
-//connect to mongodb
-const MongoClient = mongodb.MongoClient;
 const url = process.env.MONGO_URL;
 const dbName = 'terracore';
 const SYMBOL = 'SCRAP';
 const wif = process.env.ACTIVE_KEY;
+
+var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 7000 });
+
 
 
 async function webhook(title, message, color) {
@@ -127,7 +127,6 @@ async function scrapStaked(username) {
 }
 
 async function register(username) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('players');
     let user = await collection.findOne({ username: username });
@@ -144,7 +143,6 @@ async function register(username) {
 
 //store hash in mongo collection that stores all regsitration hashes
 async function storeRegistration(hash, username) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('registrations');
     let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
@@ -152,7 +150,6 @@ async function storeRegistration(hash, username) {
 }
 
 async function storeHash(hash, username) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('hashes');
     let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
@@ -161,7 +158,6 @@ async function storeHash(hash, username) {
 
 //function to make sure scrap is set to 0
 async function resetScrap(username, claims) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('players');
     //find user in collection
@@ -186,7 +182,6 @@ async function resetScrap(username, claims) {
 
 //claim favor
 async function claim(username) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('players');
 
@@ -289,7 +284,6 @@ async function claim(username) {
 
 //battle function
 async function battle(username, _target) {
-    let client = await MongoClient.connect(url, { useNewUrlParser: true });
     let db = client.db(dbName);
     let collection = db.collection('players');
     
