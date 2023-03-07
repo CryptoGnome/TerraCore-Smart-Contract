@@ -371,7 +371,7 @@ async function listen() {
                 hash: result[1].memo.split('-')[1]
             }
 
-            if (result[1].to == 'terracore' && memo.event == 'register' && result[1].amount == mintPrice) {
+            if (result[1].to == 'terracore' && memo.event == 'terracore_register' && result[1].amount == mintPrice) {
                 var registered = register(result[1].from);
                 if (registered) {
                     storeRegistration(memo.hash, result[1].from);
@@ -380,12 +380,12 @@ async function listen() {
         
         }
 
-        if (result[0] == 'custom_json' && result[1].id == 'claim') {
+        if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
             console.log(result);
             //claim function
             claim(result[1].required_auths[0]);
         }
-        else if (result[0] == 'custom_json' && result[1].id == 'battle') {
+        else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
             console.log(result);
             //convert result[1].json[0] to object
             var data = JSON.parse(result[1].json);
