@@ -206,7 +206,6 @@ async function claim(username) {
         return;
     }
 
- 
 
     //get engine balance of terracore
     let balance = await engineBalance('terracore');
@@ -309,7 +308,7 @@ async function battle(username, _target) {
         return false;
     }
 
-    //check uf user has more damage than target defense and attacks > 0
+    //check if user has more damage than target defense and attacks > 0
     if (user.damage > target.defense && user.attacks > 0) {
         //check the amount of scrap users has staked
         var staked = await scrapStaked(username);
@@ -319,7 +318,7 @@ async function battle(username, _target) {
             //check if current scrap of user + scrap to steal is more than staked scrap
             scrapToSteal = target.scrap;
             if (user.scrap + scrapToSteal > staked) {
-                scrapToSteal = staked - user.scrap;
+                scrapToSteal = (staked + 1) - user.scrap;
             }
             else {
                 scrapToSteal = target.scrap;
