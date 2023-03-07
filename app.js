@@ -137,6 +137,9 @@ async function register(username) {
     let result = await collection.insertOne({username: username , favor: 0, scrap: 0, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now()});
     console.log('New User ' + username + ' now registered');
     webhook('New User', username + ' has registered', '#86fc86');
+
+    let count = await collection.countDocuments();
+    await collection.updateOne({ username: 'global' }, { $set: { players: count } });
     return true;
 
 }
