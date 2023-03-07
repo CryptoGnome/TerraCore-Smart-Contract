@@ -313,6 +313,11 @@ async function battle(username, _target) {
             scrapToSteal = target.scrap;
             if (user.scrap + scrapToSteal > staked) {
                 scrapToSteal = (staked + 1) - user.scrap;
+                //make sure scrap to steal is not moe than target scrap
+                if (scrapToSteal > target.scrap) {
+                    scrapToSteal = target.scrap;
+                }
+
             }
             else {
                 scrapToSteal = target.scrap;
