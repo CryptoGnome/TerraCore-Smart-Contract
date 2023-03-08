@@ -156,7 +156,7 @@ async function storeRegistration(hash, username) {
 
 async function storeHash(hash, username) {
     let db = client.db(dbName);
-    let collection = db.collection('hashes');
+    let collection = db.collection('hiveHashes');
     let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
     console.log('Hash ' + hash + ' stored');
 }
@@ -186,7 +186,7 @@ async function resetScrap(username, claims) {
 }
 
 //claim favor
-async function claim(username) {
+async function claim(username, memo) {
     let db = client.db(dbName);
     let collection = db.collection('players');
 
@@ -239,6 +239,7 @@ async function claim(username) {
             //if successful, update user scrap to 0
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
+                storeHash(memo, username);
                 
             }
         });
@@ -274,6 +275,7 @@ async function claim(username) {
             //if success
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
+                storeHash(memo, username);
             }
         });
         
@@ -288,7 +290,7 @@ async function claim(username) {
 }
 
 //battle function
-async function battle(username, _target) {
+async function battle(username, _target, memo) {
     let db = client.db(dbName);
     let collection = db.collection('players');
     
@@ -311,8 +313,23 @@ async function battle(username, _target) {
     if (user.damage > target.defense && user.attacks > 0) {
         //check the amount of scrap users has staked
         var staked = await scrapStaked(username);
+
+
+        let roll;
+        //check who has a higher favor
+        if (user.favor > target.favor) {
+            //roll a number between 1 and 100
+            roll = Math.floor(Math.random() * 100) + 1;
+        }
+        else if (user.favor < target.favor) {
+            //roll a number between 1 and 50
+            roll = Math.floor(Math.random() * 50) + 1;
+        }
+
         //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage
         let scrapToSteal = user.damage - target.defense;
+        //modidfy this by the roll
+        scrapToSteal = scrapToSteal * (roll / 100);
         if (scrapToSteal > target.scrap) {
             //check if current scrap of user + scrap to steal is more than staked scrap
             scrapToSteal = target.scrap;
@@ -322,7 +339,6 @@ async function battle(username, _target) {
                 if (scrapToSteal > target.scrap) {
                     scrapToSteal = target.scrap;
                 }
-
             }
             else {
                 scrapToSteal = target.scrap;
@@ -336,6 +352,7 @@ async function battle(username, _target) {
 
         //send webhook with red color
         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target, '#f55a42');
+        storeHash(memo, username);
         return true;
 
 
@@ -442,7 +459,7 @@ async function listen() {
         if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
             console.log(result);
             //claim function
-            claim(result[1].required_auths[0]);
+            claim(result[1].required_auths[0], memo);
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
             console.log(result);
@@ -451,7 +468,7 @@ async function listen() {
             //get target from data
             var target = data.target;
             //battle function
-            var b = battle(result[1].required_auths[0], target);
+            var b = battle(result[1].required_auths[0], target, memo);
         }       
     });
 }
