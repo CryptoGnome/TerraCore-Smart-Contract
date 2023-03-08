@@ -316,8 +316,8 @@ async function battle(username, _target, memo) {
         var roll;
         //check who has a higher favor
         if (user.favor > target.favor) {
-            //roll a number between 1 and 100 ints
-            roll = Math.floor(Math.random() * 100) + 1;
+            //roll a number between 25 and 100 ints
+            roll = Math.floor(Math.random() * 75) + 25;
         }
         else if (user.favor < target.favor) {
             //roll a number between 1 and 50
