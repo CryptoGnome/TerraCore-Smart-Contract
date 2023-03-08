@@ -291,18 +291,18 @@ async function claim(username, memo) {
 
 //battle function
 async function battle(username, _target, memo) {
-    let db = client.db(dbName);
-    let collection = db.collection('players');
+    var db = client.db(dbName);
+    var collection = db.collection('players');
     
     //load target user
-    let user = await collection.findOne({ username : username });
+    var user = await collection.findOne({ username : username });
     //check if user exists
     if (!user) {
         console.log('User ' + username + ' does not exist');
         return false;
     }
     //load target 
-    let target = await collection.findOne({ username : _target });
+    var target = await collection.findOne({ username : _target });
     //check if target exists
     if (!target) {
         console.log('Target ' + target + ' does not exist');
@@ -313,9 +313,7 @@ async function battle(username, _target, memo) {
     if (user.damage > target.defense && user.attacks > 0) {
         //check the amount of scrap users has staked
         var staked = await scrapStaked(username);
-
-
-        let roll;
+        var roll;
         //check who has a higher favor
         if (user.favor > target.favor) {
             //roll a number between 1 and 100 ints
@@ -327,13 +325,15 @@ async function battle(username, _target, memo) {
         }
 
         //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage
-        let scrapToSteal = user.damage - target.defense;
+        var scrapToSteal = user.damage - target.defense;
         //modidfy this by the roll
         scrapToSteal = scrapToSteal * (roll / 100);
 
         //make sure not NaN
         if (isNaN(scrapToSteal)) {
             scrapToSteal = 0;
+            //send hook stating that scrap to steal is NaN and username
+            webhook("NaN Scrap", "User " + username + " tried to steal NaN scrap from " + _target, '#ff0000')
         }
 
         if (scrapToSteal > target.scrap) {
@@ -368,7 +368,9 @@ async function battle(username, _target, memo) {
         console.log('User ' + username + ' stole ' + scrapToSteal + ' scrap from ' + _target);
 
         //adjust scrap & set attacks to new value
-        collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal } }, { $set: { attacks: (user.attacks - 1) } });
+        collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal } });
+        //remove one from user attacks
+        collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
         //remove scrap from target
         collection.updateOne({ username: _target }, { $inc: { scrap: -scrapToSteal } });
 
