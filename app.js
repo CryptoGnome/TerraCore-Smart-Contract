@@ -179,7 +179,7 @@ async function resetScrap(username, claims) {
     }
     else{
         //set scrap to 0 and update claims
-        await collection.updateOne({username: username}, {$set: {scrap: 0, claims: claims, lastclaim: Date.now()}});
+        await collection.updateOne({username: username}, {$set: {scrap: 0, claims: claims, lastPayout: Date.now()}});
         return false;
 
     }
@@ -201,7 +201,7 @@ async function claim(username) {
         return;
     }
     //make sure last claim was longer than 15 seconds ago
-    if (Date.now() - user.lastclaim < 15000) {
+    if (Date.now() - user.lastPayout < 15000) {
         console.log('User ' + username + ' has to wait 15 seconds between claims');
         return;
     }
