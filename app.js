@@ -324,6 +324,12 @@ async function battle(username, _target, memo) {
             roll = Math.floor(Math.random() * 50) + 1;
         }
 
+        //if attacker has zero favor
+        if (user.favor == 0) {
+            //roll a number between 1 and 25
+            roll = Math.floor(Math.random() * 25) + 1;
+        }
+
         //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage
         var scrapToSteal = user.damage - target.defense;
 
