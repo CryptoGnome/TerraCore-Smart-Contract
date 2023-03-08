@@ -134,7 +134,7 @@ async function register(username) {
         console.log(username + ' already exists');
         return false;
     }
-    let result = await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now()});
+    let result = await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now()});
     console.log('New User ' + username + ' now registered');
     webhook('New User', username + ' has registered', '#5EEEDA');
 
@@ -299,17 +299,29 @@ async function battle(username, _target, memo) {
     //check if user exists
     if (!user) {
         console.log('User ' + username + ' does not exist');
-        return false;
+        return;
     }
     //load target 
     var target = await collection.findOne({ username : _target });
     //check if target exists
     if (!target) {
         console.log('Target ' + target + ' does not exist');
-        return false;
+        return;
     }
 
-    //check if user has more damage than target defense and attacks > 0
+    //check if targer.registrationTime exists
+    if (target.registrationTime) {
+        //check if target registrationTime is less than 24 hours ago
+        if (Date.now() - target.registrationTime < 86400000) {
+            //send webhook stating target is has new user protection
+            webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#6385ff')
+            return;
+        }
+    }
+
+
+
+    //check if user has more damage than target defense and attacks > 0 and has defense > 10
     if (user.damage > target.defense && user.attacks > 0) {
         //check the amount of scrap users has staked
         var staked = await scrapStaked(username);
@@ -378,11 +390,12 @@ async function battle(username, _target, memo) {
         //send webhook with red color
         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target, '#f55a42');
         storeHash(memo, username);
-        return true;
+        return;
 
 
     }
     else{
+
         //remove one from user attacks
         console.log('User ' + username + ' failed to steal scrap from ' + _target);
         //check if user has attacks left
@@ -390,11 +403,11 @@ async function battle(username, _target, memo) {
             await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
             //send webhook with red color
             webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
-            return true;
+            return;
         }
         else {
             console.log('User ' + username + ' has no attacks left');
-            return false;
+            return;
         }
         
     }
@@ -497,7 +510,7 @@ async function listen() {
             //get target from data
             var target = data.target;
             //battle function
-            var b = battle(result[1].required_auths[0], target, data["tx-hash"]);
+            battle(result[1].required_auths[0], target, data["tx-hash"]);
         }       
     });
 }
