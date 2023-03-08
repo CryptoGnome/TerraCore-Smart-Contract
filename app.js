@@ -318,7 +318,7 @@ async function battle(username, _target, memo) {
         let roll;
         //check who has a higher favor
         if (user.favor > target.favor) {
-            //roll a number between 1 and 100
+            //roll a number between 1 and 100 ints
             roll = Math.floor(Math.random() * 100) + 1;
         }
         else if (user.favor < target.favor) {
@@ -330,6 +330,7 @@ async function battle(username, _target, memo) {
         let scrapToSteal = user.damage - target.defense;
         //modidfy this by the roll
         scrapToSteal = scrapToSteal * (roll / 100);
+
         if (scrapToSteal > target.scrap) {
             //check if current scrap of user + scrap to steal is more than staked scrap
             scrapToSteal = target.scrap;
@@ -344,6 +345,20 @@ async function battle(username, _target, memo) {
                 scrapToSteal = target.scrap;
             }
         }
+        else {
+            //check if current scrap of user + scrap to steal is more than staked scrap
+            if (user.scrap + scrapToSteal > staked) {
+                scrapToSteal = (staked + 1) - user.scrap;
+                //make sure scrap to steal is not moe than target scrap
+                if (scrapToSteal > target.scrap) {
+                    scrapToSteal = target.scrap;
+                }
+            }
+            else {
+                scrapToSteal = scrapToSteal;
+            }
+        }
+
         //add scrap to user  & subtract attacks from user
         console.log('User ' + username + ' stole ' + scrapToSteal + ' scrap from ' + _target);
         await collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 } });
@@ -363,6 +378,8 @@ async function battle(username, _target, memo) {
         //check if user has attacks left
         if (user.attacks > 0) {
             await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
+            //send webhook with red color
+            webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target, '#f55a42');
             return true;
         }
         else {
@@ -459,7 +476,7 @@ async function listen() {
         if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
             console.log(result);
             //claim function
-            claim(result[1].required_auths[0], memo);
+            claim(result[1].required_auths[0], memo.hash);
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
             console.log(result);
@@ -468,7 +485,7 @@ async function listen() {
             //get target from data
             var target = data.target;
             //battle function
-            var b = battle(result[1].required_auths[0], target, memo);
+            var b = battle(result[1].required_auths[0], target, memo.hash);
         }       
     });
 }
