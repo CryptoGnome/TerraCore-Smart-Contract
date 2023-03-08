@@ -477,8 +477,10 @@ async function listen() {
 
         if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
             console.log(result);
+            //grab the json from result[1].json
+            var data = JSON.parse(result[1].json);
             //claim function
-            claim(result[1].required_auths[0], result[1].memo);
+            claim(result[1].required_auths[0], data["tx-hash"]);
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
             console.log(result);
@@ -487,7 +489,7 @@ async function listen() {
             //get target from data
             var target = data.target;
             //battle function
-            var b = battle(result[1].required_auths[0], target, result[1].memo);
+            var b = battle(result[1].required_auths[0], target, data["tx-hash"]);
         }       
     });
 }
