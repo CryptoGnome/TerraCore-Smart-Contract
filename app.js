@@ -326,9 +326,10 @@ async function battle(username, _target, memo) {
             roll = Math.floor(Math.random() * 50) + 1;
         }
 
-        //allow use to seatl target scrap * percentage of roll
-        let scrapToSteal = target.scrap * (roll / 100);
-
+        //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage
+        let scrapToSteal = user.damage - target.defense;
+        //modidfy this by the roll
+        scrapToSteal = scrapToSteal * (roll / 100);
         if (scrapToSteal > target.scrap) {
             //check if current scrap of user + scrap to steal is more than staked scrap
             scrapToSteal = target.scrap;
