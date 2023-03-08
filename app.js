@@ -326,19 +326,11 @@ async function battle(username, _target, memo) {
 
         //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage
         var scrapToSteal = user.damage - target.defense;
-        //modidfy this by the roll
-        scrapToSteal = scrapToSteal * (roll / 100);
-
-        //make sure not NaN
-        if (isNaN(scrapToSteal)) {
-            scrapToSteal = 0;
-            //send hook stating that scrap to steal is NaN and username
-            webhook("NaN Scrap", "User " + username + " tried to steal NaN scrap from " + _target, '#ff0000')
-        }
 
         if (scrapToSteal > target.scrap) {
             //check if current scrap of user + scrap to steal is more than staked scrap
             scrapToSteal = target.scrap;
+            scrapToSteal = scrapToSteal * (roll / 100);
             if (user.scrap + scrapToSteal > staked) {
                 scrapToSteal = (staked + 1) - user.scrap;
                 //make sure scrap to steal is not moe than target scrap
@@ -348,12 +340,14 @@ async function battle(username, _target, memo) {
             }
             else {
                 scrapToSteal = target.scrap;
+                scrapToSteal = scrapToSteal * (roll / 100);
             }
         }
         else {
             //check if current scrap of user + scrap to steal is more than staked scrap
             if (user.scrap + scrapToSteal > staked) {
                 scrapToSteal = (staked + 1) - user.scrap;
+                scrapToSteal = scrapToSteal * (roll / 100);
                 //make sure scrap to steal is not moe than target scrap
                 if (scrapToSteal > target.scrap) {
                     scrapToSteal = target.scrap;
@@ -361,6 +355,7 @@ async function battle(username, _target, memo) {
             }
             else {
                 scrapToSteal = scrapToSteal;
+                scrapToSteal = scrapToSteal * (roll / 100);
             }
         }
 
