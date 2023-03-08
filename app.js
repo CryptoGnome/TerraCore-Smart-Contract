@@ -361,9 +361,11 @@ async function battle(username, _target, memo) {
 
         //add scrap to user  & subtract attacks from user
         console.log('User ' + username + ' stole ' + scrapToSteal + ' scrap from ' + _target);
-        await collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 } });
+
+        //adjust scrap & set attacks to new value
+        collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal } }, { $set: { attacks: (user.attacks - 1) } });
         //remove scrap from target
-        await collection.updateOne({ username: _target }, { $inc: { scrap: -scrapToSteal } });
+        collection.updateOne({ username: _target }, { $inc: { scrap: -scrapToSteal } });
 
         //send webhook with red color
         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target, '#f55a42');
@@ -379,7 +381,7 @@ async function battle(username, _target, memo) {
         if (user.attacks > 0) {
             await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
             //send webhook with red color
-            webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target, '#f55a42');
+            webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
             return true;
         }
         else {
