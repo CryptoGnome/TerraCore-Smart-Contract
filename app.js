@@ -331,6 +331,11 @@ async function battle(username, _target, memo) {
         //modidfy this by the roll
         scrapToSteal = scrapToSteal * (roll / 100);
 
+        //make sure not NaN
+        if (isNaN(scrapToSteal)) {
+            scrapToSteal = 0;
+        }
+
         if (scrapToSteal > target.scrap) {
             //check if current scrap of user + scrap to steal is more than staked scrap
             scrapToSteal = target.scrap;
