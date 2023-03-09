@@ -171,16 +171,23 @@ async function resetScrap(username, claims) {
     if (!user) {
         return true;
     }
-    else if(user.claims == claims){
-        return true;
-    }
     else if(user.scrap == 0){
         return true;
     }
     else{
-        //set scrap to 0 and update claims
-        await collection.updateOne({username: username}, {$set: {scrap: 0, claims: claims, lastPayout: Date.now()}});
-        return false;
+
+        //while loop and check if user has 0 scrap
+        while(true){
+            //set last payout to now
+            await collection.updateOne({ username: username }, { $set: { lastPayout: Date.now()}});
+            //set scrap to 0 and update claims and upsert
+            await collection.updateOne({username: username}, {$set: {scrap: 0, claims: claims, lastPayout: Date.now()}}, {upsert: true});
+            //check if user has 0 scrap
+            var userCheck = await collection.findOne({ username : username });
+            if(userCheck.scrap == 0){
+                return true;
+            }
+        }
 
     }
 }
