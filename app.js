@@ -156,7 +156,7 @@ async function storeRegistration(hash, username) {
 
 async function storeHash(hash, username) {
     let db = client.db(dbName);
-    let collection = db.collection('hiveHashes');
+    let collection = db.collection(type);
     let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
     console.log('Hash ' + hash + ' stored');
 }
@@ -239,7 +239,6 @@ async function claim(username, memo) {
             //if successful, update user scrap to 0
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
-                storeHash(memo, username);
                 
             }
         });
@@ -275,7 +274,6 @@ async function claim(username, memo) {
             //if success
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
-                storeHash(memo, username);
             }
         });
         
@@ -389,7 +387,9 @@ async function battle(username, _target, memo) {
 
         //send webhook with red color
         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target, '#f55a42');
-        storeHash(memo, username);
+        //store battle in db
+        collection = db.collection('battle_logs');
+        await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
         return;
 
 
