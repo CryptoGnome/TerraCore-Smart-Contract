@@ -1,1 +1,7 @@
 .env
+.idea/vcs.xml
+.idea/TerraCore-Smart-Contract.iml
+.idea/modules.xml
+.idea/misc.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/encodings.xml

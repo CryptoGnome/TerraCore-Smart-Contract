@@ -382,6 +382,14 @@ async function battle(username, _target, memo) {
             }
         }
 
+
+        //make sure scrapToSteal is not NaN
+        if (isNaN(scrapToSteal)) {
+            //shoot error webhook
+            webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is NaN, please try again", '#6385ff')
+            return;
+        }
+
         //add scrap to user  & subtract attacks from user
         console.log('User ' + username + ' stole ' + scrapToSteal + ' scrap from ' + _target);
 
