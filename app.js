@@ -156,9 +156,9 @@ async function storeRegistration(hash, username) {
 
 async function storeHash(hash, username) {
     let db = client.db(dbName);
-    let collection = db.collection(type);
+    let collection = db.collection('claims');
     let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
-    console.log('Hash ' + hash + ' stored');
+    console.log('Claim Hash ' + hash + ' stored');
 }
 
 //function to make sure scrap is set to 0
@@ -246,6 +246,7 @@ async function claim(username, memo) {
             //if successful, update user scrap to 0
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
+                storeHash(memo, username);
                 
             }
         });
@@ -295,7 +296,7 @@ async function claim(username, memo) {
 }
 
 //battle function
-async function battle(username, _target, memo) {
+async function battle(username, _target) {
     var db = client.db(dbName);
     var collection = db.collection('players');
     
@@ -525,7 +526,7 @@ async function listen() {
             //get target from data
             var target = data.target;
             //battle function
-            battle(result[1].required_auths[0], target, data["tx-hash"]);
+            battle(result[1].required_auths[0], target);
         }       
     });
 }
