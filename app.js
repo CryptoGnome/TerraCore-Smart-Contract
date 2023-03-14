@@ -26,7 +26,8 @@ async function webhook(title, message, color) {
         .setColor(color)
         .setTimestamp();
     try {
-        hook.send(embed);
+        hook.send(embed).then(() => console.log('Sent webhook successfully!'))
+        .catch(err => console.log(err.message));
     }
     catch (err) {
         console.log(chalk.red("Discord Webhook Error"));
