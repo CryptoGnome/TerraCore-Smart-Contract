@@ -184,7 +184,7 @@ async function resetScrap(username, claims) {
             await collection.updateOne({username: username}, {$set: {scrap: 0, claims: claims, lastPayout: Date.now()}});
             //check if user has 0 scrap
             var userCheck = await collection.findOne({ username : username });
-            if(userCheck.scrap == 0){
+            if(userCheck.scrap == 0 && userCheck.claims == claims){
                 return true;
             }
         }
