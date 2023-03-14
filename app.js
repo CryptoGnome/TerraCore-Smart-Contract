@@ -484,7 +484,7 @@ async function scrapData(){
 
 
 var lastevent = Date.now();
-const mintPrice = '10.000 HIVE'
+const mintPrice = '50.000 HIVE'
 //aysncfunction to start listening for events
 async function listen() {
     hive.api.streamOperations(function(err, result) {
