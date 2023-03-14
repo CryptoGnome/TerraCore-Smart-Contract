@@ -16,3 +16,7 @@ cd TerraCore-Smart-Contract
 git stash
 
 git pull
+
+#dev
+---------
+cd TerraCore-Smart-Contract; git pull; sleep 1; pm2 start 0
