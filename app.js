@@ -216,6 +216,7 @@ async function claim(username, memo) {
 
     //get engine balance of terracore
     let balance = await engineBalance('terracore');
+    var txSent = false;
 
     if(balance > user.scrap) {
         //transfer scrap to user from terracore
@@ -248,6 +249,7 @@ async function claim(username, memo) {
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
                 storeHash(memo, username);
+                txSent = true;
             }
         });
     
@@ -283,15 +285,17 @@ async function claim(username, memo) {
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
                 storeHash(memo, username);
+                txSent = true;
             }
         });
-        
 
     }
 
     //call resetScrap function until it returns true
-    while (await resetScrap(username, (user.claims - 1)) == false) {
-        console.log('Resetting scrap for ' + username);
+    if (txSent) {
+        while (await resetScrap(username, (user.claims - 1)) == false) {
+            console.log('Resetting scrap for ' + username);
+        }
     }
 
 }
