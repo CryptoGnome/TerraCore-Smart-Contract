@@ -14,6 +14,8 @@ const wif = process.env.ACTIVE_KEY;
 
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 7000 });
 
+//last claim time
+var lastClaim = Date.now();
 
 
 async function webhook(title, message, color) {
@@ -181,7 +183,7 @@ async function resetScrap(username, claims) {
             //set last payout to now
             await collection.updateOne({ username: username }, { $set: { lastPayout: Date.now()}});
             //set scrap to 0 and update claims and upsert
-            await collection.updateOne({username: username}, {$set: {scrap: 0, claims: claims, lastPayout: Date.now()}}, {upsert: true});
+            await collection.updateOne({username: username}, {$set: {scrap: 0, claims: claims, lastPayout: Date.now()}});
             //check if user has 0 scrap
             var userCheck = await collection.findOne({ username : username });
             if(userCheck.scrap == 0){
@@ -240,6 +242,13 @@ async function claim(username, memo) {
                 }
             })
         }];
+
+        //make sure lastClaim time was more than 1 second ago
+        while (Date.now() - lastClaim < 1000) {
+            console.log('Waiting for last claim to be more than 1 second ago');
+        }
+        lastClaim = Date.now();
+        
         //broadcast operation to hive blockchain
         hive.broadcast.customJson(wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json, function(err, result) {
             console.log(err, result);
@@ -247,7 +256,6 @@ async function claim(username, memo) {
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
                 storeHash(memo, username);
-                
             }
         });
     
@@ -276,12 +284,19 @@ async function claim(username, memo) {
             })
         }];
 
+        //make sure lastClaim time was more than 1 second ago
+        while (Date.now() - lastClaim < 1000) {
+            console.log('Waiting for last claim to be more than 1 second ago');
+        }
+        lastClaim = Date.now();
+
         //broadcast operation to hive blockchain
         hive.broadcast.customJson(wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json, function(err, result) {
             console.log(err, result);
             //if success
             if (!err) {
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
+                storeHash(memo, username);
             }
         });
         
@@ -485,7 +500,6 @@ async function scrapData(){
     await collection.updateOne({ date: 'global' }, { $set: { totalScrap: (circulating + staked), totalStaked: staked } });
 }
 
- 
 
 var lastevent = Date.now();
 const mintPrice = '10.000 HIVE'
