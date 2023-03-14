@@ -4,7 +4,7 @@ const fetch = require('node-fetch');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
 require('dotenv').config();
 
-//connect to Webhook
+//connect to Webhook using retry on limit
 const hook = new Webhook(process.env.DISCORD_WEBHOOK);
 
 const url = process.env.MONGO_URL;
@@ -13,9 +13,6 @@ const SYMBOL = 'SCRAP';
 const wif = process.env.ACTIVE_KEY;
 
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 7000 });
-
-//last claim time
-var lastClaim = Date.now();
 
 
 async function webhook(title, message, color) {
@@ -244,12 +241,6 @@ async function claim(username, memo) {
             })
         }];
 
-        //make sure lastClaim time was more than 1 second ago
-        while (Date.now() - lastClaim < 1000) {
-            console.log('Waiting for last claim to be more than 1 second ago');
-        }
-        lastClaim = Date.now();
-        
         //broadcast operation to hive blockchain
         hive.broadcast.customJson(wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json, function(err, result) {
             console.log(err, result);
@@ -284,12 +275,6 @@ async function claim(username, memo) {
                 }
             })
         }];
-
-        //make sure lastClaim time was more than 1 second ago
-        while (Date.now() - lastClaim < 1000) {
-            console.log('Waiting for last claim to be more than 1 second ago');
-        }
-        lastClaim = Date.now();
 
         //broadcast operation to hive blockchain
         hive.broadcast.customJson(wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json, function(err, result) {
