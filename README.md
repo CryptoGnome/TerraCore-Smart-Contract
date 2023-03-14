@@ -19,4 +19,4 @@ git pull
 
 #dev
 ---------
-cd TerraCore-Smart-Contract; pm2 stop 0; git pull; sleep 1; pm2 start 0; pm2 logs;
+cd TerraCore-Smart-Contract; pm2 stop 0; git pull; sleep 0.25; pm2 start 0; pm2 logs;
