@@ -229,6 +229,21 @@ async function resetScrap(username, claims) {
     }
 }
 
+async function broadcastCustomJson(wif, requiredAuths, requiredPostingAuths, id, json, memo, username) {
+    try {
+      const result = await hive.broadcast.customJsonAsync(wif, requiredAuths, requiredPostingAuths, id, json);
+      // Success case
+      webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff');
+      storeHash(memo, username);
+      return result;
+    } catch (error) {
+      console.error(error);
+      // Handle error case
+      return null;
+    }
+  }
+  
+
 
 //claim favor
 async function claim(username, memo) {
@@ -280,22 +295,24 @@ async function claim(username, memo) {
                 })
             }];
             await resetScrap(username, (user.claims - 1));
-            //broadcast operation to hive blockchain
-            hive.broadcast.customJson(wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json, function(err, result) {
-                console.log(err, result);
-                //if successful, update user scrap to 0
-                if (!err) {
-                    webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
-                    storeHash(memo, username);
-                }
-            });
+  
+            try{
+                var result = await hive.broadcast.customJsonAsync((wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json));
+                await resetScrap(username, (user.claims - 1));
+                await storeHash(memo, username);
+                webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff');
+            }
+            catch (err) {
+                console.log(err);
+                //send error webhook
+                webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+            }
         
         } 
         else {
             //transfer scrap to user from terracore
             console.log("MINTING SCRAP TO USER FOR CLAIM");
             //create custom_json operation that issues scrap to user
-
             //make sure qty has no more than 8 decimals
             let qty = user.scrap.toFixed(8);
 
@@ -314,16 +331,18 @@ async function claim(username, memo) {
                     }
                 })
             }];
-            await resetScrap(username, (user.claims - 1));
-            //broadcast operation to hive blockchain
-            hive.broadcast.customJson(wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json, function(err, result) {
-                console.log(err, result);
-                //if success
-                if (!err) {
-                    webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff')
-                    storeHash(memo, username);
-                }
-            });
+            
+            try{
+                var result = await hive.broadcast.customJsonAsync((wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json));
+                await resetScrap(username, (user.claims - 1));
+                await storeHash(memo, username);
+                webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff');
+            }
+            catch (err) {
+                console.log(err);
+                //send error webhook
+                webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+            }
 
         }
     }
@@ -548,7 +567,7 @@ const mintPrice = '50.000 HIVE'
 async function listen() {
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
-        lastevent = Date.now();
+        lastevent = Date.now(); 
         //listen for register event
         if (result[0] == 'transfer' && result[1].to == 'terracore') {
             console.log(result[1]);
