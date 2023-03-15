@@ -229,22 +229,6 @@ async function resetScrap(username, claims) {
     }
 }
 
-async function broadcastCustomJson(wif, requiredAuths, requiredPostingAuths, id, json, memo, username) {
-    try {
-      const result = await hive.broadcast.customJsonAsync(wif, requiredAuths, requiredPostingAuths, id, json);
-      // Success case
-      webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff');
-      storeHash(memo, username);
-      return result;
-    } catch (error) {
-      console.error(error);
-      // Handle error case
-      return null;
-    }
-  }
-  
-
-
 //claim favor
 async function claim(username, memo) {
     try{
@@ -294,10 +278,9 @@ async function claim(username, memo) {
                     }
                 })
             }];
-            await resetScrap(username, (user.claims - 1));
-  
+
             try{
-                var result = await hive.broadcast.customJsonAsync((wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json));
+                await hive.broadcast.customJson((wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json));
                 await resetScrap(username, (user.claims - 1));
                 await storeHash(memo, username);
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff');
@@ -333,7 +316,7 @@ async function claim(username, memo) {
             }];
             
             try{
-                var result = await hive.broadcast.customJsonAsync((wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json));
+                await hive.broadcast.customJson((wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json));
                 await resetScrap(username, (user.claims - 1));
                 await storeHash(memo, username);
                 webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff');
@@ -456,6 +439,13 @@ async function battle(username, _target) {
                 return;
             }
 
+            //make sure scrapToSteal is not less than 0
+            if (scrapToSteal < 0) {
+                //shoot error webhook
+                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than 0, please try again", '#6385ff')
+                return;
+            }
+
             //add scrap to user  & subtract attacks from user
             console.log('User ' + username + ' stole ' + scrapToSteal + ' scrap from ' + _target);
 
@@ -463,6 +453,7 @@ async function battle(username, _target) {
             collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal } });
             //remove one from user attacks
             collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
+            
             //remove scrap from target
             collection.updateOne({ username: _target }, { $inc: { scrap: -scrapToSteal } });
 
