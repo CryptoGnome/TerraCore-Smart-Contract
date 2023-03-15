@@ -327,7 +327,7 @@ async function claim(username, memo) {
                         }
                         resetScrap(username, user.claims - 1);
                         storeHash(result.id, username);
-                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#87FB65');
+                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                     }
                 });
 
@@ -375,7 +375,7 @@ async function claim(username, memo) {
                         }
                         resetScrap(username, user.claims - 1);
                         storeHash(result.id, username);
-                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#87FB65');
+                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                     }
                 });
 
