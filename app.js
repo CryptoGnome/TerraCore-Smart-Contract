@@ -15,6 +15,7 @@ const wif = process.env.ACTIVE_KEY;
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 });
 
 
+
 async function webhook(title, message, color) {
     
     const embed = new MessageBuilder()
@@ -229,6 +230,42 @@ async function resetScrap(username, claims) {
     }
 }
 
+//set last payout time to now
+async function setLastPayout(username) {
+    try{
+        let db = client.db(dbName);
+        let collection = db.collection('players');
+        //find user in collection
+        let user = collection.find({ username : username });
+        //check if user exists
+        if (!user) {
+            return true;
+        }
+        else if(user.scrap == 0){
+            return true;
+        }
+        else{
+            //loop and ensure last payout is set
+            while(true){
+                var done = await collection.updateOne({ username: username }, { $set: { lastPayout: Date.now() } });
+                if(done.modifiedCount == 1){
+                    return true;
+                }
+            }     
+        }
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+        }
+    }
+}
+
+
 //claim favor
 async function claim(username, memo) {
     try{
@@ -251,39 +288,49 @@ async function claim(username, memo) {
             return;
         }
 
-
         //get engine balance of terracore
         let balance = await engineBalance('terracore');
+
 
         if(balance > user.scrap) {
             //transfer scrap to user from terracore
             console.log("Transfering SCRAP from terracore to " + username);
-
             //make sure qty has no more than 8 decimals
             let qty = user.scrap.toFixed(8);
 
             //create custom_json to transfer scrap to user
-            var op = ['custom_json', {
-                required_auths: ['terracore'],
-                required_posting_auths: [],
-                id: 'ssc-mainnet-hive',
-                json: JSON.stringify({
-                    contractName: 'tokens',
-                    contractAction: 'transfer',
-                    contractPayload: {
-                        symbol: 'SCRAP',
-                        to: username,
-                        quantity: qty.toString(),
-                        memo: 'terracore_claim_xfer'
-                    }
-                })
-            }];
+            var data = {
+                contractName: 'tokens',
+                contractAction: 'transfer',
+                contractPayload: {
+                    symbol: 'SCRAP',
+                    to: username,
+                    quantity: qty.toString(),
+                    memo: 'terracore_claim_xfer'
+                }
+            };
+
 
             try{
-                await hive.broadcast.customJson((wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json));
-                await resetScrap(username, (user.claims - 1));
-                await storeHash(memo, username);
-                webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff');
+                //reset payout time
+                await setLastPayout(username);
+                hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data), function (err, result) {
+                    if (err) {
+                        //send error webhook
+                        webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+                    }
+                    else {
+                        if (!result.id) {
+                            console.log("No result id");
+                            webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+                            return;
+                        }
+                        resetScrap(username, user.claims - 1);
+                        storeHash(result.id, username);
+                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#87FB65');
+                    }
+                });
+
             }
             catch (err) {
                 console.log(err);
@@ -299,34 +346,46 @@ async function claim(username, memo) {
             //make sure qty has no more than 8 decimals
             let qty = user.scrap.toFixed(8);
 
-            var op = ['custom_json', {
-                required_auths: ['terracore'],
-                required_posting_auths: [],
-                id: 'ssc-mainnet-hive',
-                json: JSON.stringify({
-                    contractName: 'tokens',
-                    contractAction: 'issue',
-                    contractPayload: {
-                        symbol: 'SCRAP',
-                        to: username,
-                        quantity: qty.toString(),
-                        memo: 'terracore_claim_mint'
-                    }
-                })
-            }];
+            //create custom_json to issue scrap to user
+            var data = {
+                contractName: 'tokens',
+                contractAction: 'issue',
+                contractPayload: {
+                    symbol: 'SCRAP',
+                    to: username,
+                    quantity: qty.toString(),
+                    memo: 'terracore_claim_mint'
+                }
+            };
+
             
             try{
-                await hive.broadcast.customJson((wif, op[1].required_auths, op[1].required_posting_auths, op[1].id, op[1].json));
-                await resetScrap(username, (user.claims - 1));
-                await storeHash(memo, username);
-                webhook("New Claim", "User " + username + " claimed " + user.scrap.toFixed(8).toString() + " scrap", '#6385ff');
+                //reset payout time
+                await setLastPayout(username);
+                hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data), function (err, result) {
+                    if (err) {
+                        //send error webhook
+                        webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+                    }
+                    else {
+                        if (!result.id) {
+                            console.log("No result id");
+                            webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+                            return;
+                        }
+                        resetScrap(username, user.claims - 1);
+                        storeHash(result.id, username);
+                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#87FB65');
+                    }
+                });
+
             }
             catch (err) {
                 console.log(err);
                 //send error webhook
                 webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
             }
-
+                            
         }
     }
     catch (err) {
@@ -578,14 +637,14 @@ async function listen() {
         }
 
         if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
-            console.log(result);
+            //console.log(result);
             //grab the json from result[1].json
             var data = JSON.parse(result[1].json);
             //claim function
             claim(result[1].required_auths[0], data["tx-hash"]);
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
-            console.log(result);
+            //console.log(result);
             //convert result[1].json[0] to object
             var data = JSON.parse(result[1].json);
             //get target from data
