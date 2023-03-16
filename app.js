@@ -10,7 +10,7 @@ const hook = new Webhook(process.env.DISCORD_WEBHOOK);
 const dbName = 'terracore';
 const SYMBOL = 'SCRAP';
 const wif = process.env.ACTIVE_KEY;
-
+var QUE_SET = false;
 
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 });
 
@@ -265,9 +265,67 @@ async function setLastPayout(username) {
     }
 }
 
+//create a function where you can send transactions to be queued to be sent
+async function sendTransaction(username, type, target) {
+    //create a que where new transactions are added and then sent in order 1 by 1
+    try{
+        let db = client.db(dbName);
+        let collection = db.collection('transactions');
+        let result = await collection.insertOne({username: username, type: type, target: target, time: Date.now()});
+        console.log('Transaction ' + result.insertedId + ' added to queue');
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+        }
+    }
+}
+
+//create a function that can be called to send all transactions in the queue
+async function sendTransactions() {
+    try{
+        let db = client.db(dbName);
+        let collection = db.collection('transactions');
+        let transactions = await collection.find({}).toArray();
+        for (let i = 0; i < transactions.length; i++) {
+            let transaction = transactions[i];
+            if(transaction.type == 'claim') {
+                await claim(transaction.username);
+            }
+            else if(transaction.type == 'battle') {
+                await battle(transaction.username, transaction.target);
+            }
+        }
+        await collection.deleteMany({});
+        return true;
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+            return true;
+        }
+    }
+}
+
+//call send transactions and wait for it to return true then call check transactions
+async function checkTransactions() {
+    console.log('Checking transactions');
+    let done = await sendTransactions();
+    if(done) {
+        setTimeout(checkTransactions, 1000);
+    }
+}
 
 //claim favor
-async function claim(username, memo) {
+async function claim(username) {
     try{
         let db = client.db(dbName);
         let collection = db.collection('players');
@@ -326,7 +384,7 @@ async function claim(username, memo) {
                             return;
                         }
                         resetScrap(username, user.claims - 1);
-                        storeHash(result.id, username);
+                        //storeHash(memo, username);
                         webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                     }
                 });
@@ -374,7 +432,7 @@ async function claim(username, memo) {
                             return;
                         }
                         resetScrap(username, user.claims - 1);
-                        storeHash(result.id, username);
+                        //storeHash(result.id, username);
                         webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                     }
                 });
@@ -431,7 +489,6 @@ async function battle(username, _target) {
                 return;
             }
         }
-
 
 
         //check if user has more damage than target defense and attacks > 0 and has defense > 10
@@ -538,6 +595,8 @@ async function battle(username, _target) {
             }
             else {
                 console.log('User ' + username + ' has no attacks left');
+                //send webhook with red color
+                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
                 return;
             }
             
@@ -612,9 +671,10 @@ async function scrapData(){
 
 
 var lastevent = Date.now();
-const mintPrice = '50.000 HIVE'
+const mintPrice = '20.000 HIVE'
 //aysncfunction to start listening for events
 async function listen() {
+    checkTransactions();
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
@@ -641,7 +701,7 @@ async function listen() {
             //grab the json from result[1].json
             var data = JSON.parse(result[1].json);
             //claim function
-            claim(result[1].required_auths[0], data["tx-hash"]);
+            sendTransaction(result[1].required_auths[0], 'claim', 'none');
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
             //console.log(result);
@@ -650,7 +710,7 @@ async function listen() {
             //get target from data
             var target = data.target;
             //battle function
-            battle(result[1].required_auths[0], target);
+            sendTransaction(result[1].required_auths[0], 'battle', target);
         }       
     });
 }
@@ -672,10 +732,10 @@ setInterval(function() {
     scrapData();
 }, 900000);
 
-//kill process if no events have been received in 30 seconds
+
 setInterval(function() {
     console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
-    if (Date.now() - lastevent > 15000) {
+    if (Date.now() - lastevent > 10000) {
         console.log('No events received in 15 seconds, shutting down so pm2 can restart');
         process.exit();
     }
