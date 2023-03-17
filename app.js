@@ -336,7 +336,7 @@ async function sendTransactions() {
 
 //call send transactions and wait for it to return true then call check transactions
 async function checkTransactions() {
-    console.log('Checking transactions');
+    //console.log('Checking transactions');
     let done = await sendTransactions();
     if(done) {
         setTimeout(checkTransactions, 1000);
