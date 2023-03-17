@@ -40,10 +40,20 @@ async function webhook2(title, message, color) {
     let db = client.db(dbName);
     let collection = db.collection('players');
     let totalPlayers = await collection.countDocuments();
+
+    //from stats collection, find the total players registered today
+    collection = db.collection('stats');
+    let todaysPlayers = await collection.findOne({ date: new Date().toISOString().slice(0, 10) });
+    if (todaysPlayers) {
+        todaysPlayers = todaysPlayers.players;
+    } else {
+        todaysPlayers = 0;
+    }
     const embed = new MessageBuilder()
         .setTitle(title)
         .addField('New Citizen: ', message, true)
         .addField('Total Citizens: ', totalPlayers.toString(), true)
+        .addField('New Citizens Today: ', todaysPlayers.toString(), true)
         .setColor(color)
         .setTimestamp();
     try {
