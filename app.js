@@ -509,7 +509,7 @@ async function battle(username, _target) {
             //check if target registrationTime is less than 24 hours ago
             if (Date.now() - target.registrationTime < 86400000) {
                 //send webhook stating target is has new user protection
-                webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#6385ff')
+                webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
                 return;
             }
         }
