@@ -520,6 +520,7 @@ async function battle(username, _target) {
             if (Date.now() - target.registrationTime < 86400000) {
                 //send webhook stating target is has new user protection
                 webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
+                collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
                 return;
             }
         }
