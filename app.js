@@ -6,6 +6,8 @@ require('dotenv').config();
 
 //connect to Webhook using retry on limit
 const hook = new Webhook(process.env.DISCORD_WEBHOOK);
+//seciondary webhook for registrations
+const hook2 = new Webhook(process.env.DISCORD_WEBHOOK_2);
 
 const dbName = 'terracore';
 const SYMBOL = 'SCRAP';
@@ -25,6 +27,22 @@ async function webhook(title, message, color) {
         .setTimestamp();
     try {
         hook.send(embed).then(() => console.log('Sent webhook successfully!'))
+        .catch(err => console.log(err.message));
+    }
+    catch (err) {
+        console.log(chalk.red("Discord Webhook Error"));
+    }
+    
+}
+async function webhook2(title, message, color) {
+    
+    const embed = new MessageBuilder()
+        .setTitle(title)
+        .addField('Message: ', message, true)
+        .setColor(color)
+        .setTimestamp();
+    try {
+        hook2.send(embed).then(() => console.log('Sent webhook successfully!'))
         .catch(err => console.log(err.message));
     }
     catch (err) {
@@ -138,7 +156,7 @@ async function register(username) {
         }
         await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now()});
         console.log('New User ' + username + ' now registered');
-        webhook('New User', username + ' has registered', '#5EEEDA');
+        webhook2('New User Registered', username, 0x00ff00);
         
         collection = db.collection('stats');
         //increment global player count
