@@ -35,10 +35,15 @@ async function webhook(title, message, color) {
     
 }
 async function webhook2(title, message, color) {
-    
+
+    //find total players in database
+    let db = client.db(dbName);
+    let collection = db.collection('players');
+    let totalPlayers = await collection.countDocuments();
     const embed = new MessageBuilder()
         .setTitle(title)
-        .addField('Message: ', message, true)
+        .addField('New Citizen: ', message, true)
+        .addField('Total Citizens: ', totalPlayers.toString(), true)
         .setColor(color)
         .setTimestamp();
     try {
@@ -156,7 +161,7 @@ async function register(username) {
         }
         await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now()});
         console.log('New User ' + username + ' now registered');
-        webhook2('New User Registered', username, 0x00ff00);
+        webhook2('A New Citizen of Terracore has Registered', username, 0x00ff00);
         
         collection = db.collection('stats');
         //increment global player count
@@ -182,7 +187,7 @@ async function storeRegistration(hash, username) {
     try{
         let db = client.db(dbName);
         let collection = db.collection('registrations');
-        let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
+        await collection.insertOne({hash: hash, username: username, time: Date.now()});
         console.log('Hash ' + hash + ' stored');
     }
     catch (err) {
