@@ -45,7 +45,7 @@ async function webhook2(title, message, color) {
     collection = db.collection('stats');
     let todaysPlayers = await collection.findOne({ date: new Date().toISOString().slice(0, 10) });
     if (todaysPlayers) {
-        todaysPlayers = todaysPlayers.players;
+        todaysPlayers = todaysPlayers.players + 1;
     } else {
         todaysPlayers = 0;
     }
@@ -493,6 +493,77 @@ async function claim(username) {
 
 }
 
+//calculate dodge
+function checkDoge(_target) {
+    // Calculate player's toughness based on scrap staked
+    var toughness = 0.001 * _target.hiveEngineStake;
+    // Generate random number between 1 and 100
+    var dodgeRoll = Math.floor(Math.random() * 100) + 1;
+    // Check if toughness is greater than 25%
+    if (toughness > 25) {
+        // Calculate the excess toughness and make it 2x harder to gain more toughness
+        var excessToughness = toughness - 25;
+        dodgeRoll = 25 + (dodgeRoll * (1 + (excessToughness / 2)));
+        // Check if toughness is greater than 50%
+        if (toughness > 50) {
+            // Calculate the excess toughness and make it 4x harder to gain more toughness
+            excessToughness = toughness - 50;
+            dodgeRoll = 50 + (dodgeRoll * (1 + (excessToughness / 2)));
+        }
+        // Check if toughness is greater than 75%
+        if (toughness > 75) {
+            // Calculate the excess toughness and make it 6x harder to gain more toughness
+            excessToughness = toughness - 75;
+            dodgeRoll = 75 + (dodgeRoll * (1 + (excessToughness / 2)));
+        }
+    }
+
+    // Check if dodge roll is less than toughness
+    //log to console
+    //console.log("Dodge Roll: " + dodgeRoll + " Toughness: " + toughness);
+    if (dodgeRoll < toughness) {
+        console.log("Dodge Successful");
+        return true;
+    } else {
+        console.log("Dodge Failed");
+        return false;
+    }
+}
+//calculate favor roll
+async function rollAttack(_player) {
+    var favor = 0.001 * _player.favor;
+    console.log("Favor: " + favor);
+    // Check if favor is greater than 25%
+    if (favor > 25) {
+        // Calculate the excess favor and make it 2x harder to gain more favor
+        var excessFavor = favor - 25;
+        favor = 25 + (favor * (1 + (excessFavor / 2)));
+        // Check if favor is greater than 50%
+        if (favor > 50) {
+            // Calculate the excess favor and make it 4x harder to gain more favor
+            excessFavor = favor - 50;
+            favor = 50 + (favor * (1 + (excessFavor / 2)));
+        }
+        // Check if favor is greater than 75%
+        if (favor > 75) {
+            // Calculate the excess favor and make it 6x harder to gain more favor
+            excessFavor = favor - 75;
+            favor = 75 + (favor * (1 + (excessFavor / 2)));
+        }
+    }
+
+    
+    //roll a random number between favor and 100
+    var steal = Math.floor(Math.random() * (100 - favor + 1) + favor);
+    console.log("Steal Roll: " + steal + " Favor: " + favor);
+    //check if steal is greater than 100
+    if (steal > 100) {
+        steal = 100;
+    }
+    //return steal
+    return steal;
+}
+
 //battle function
 async function battle(username, _target) {
     try{
@@ -530,28 +601,21 @@ async function battle(username, _target) {
         if (user.damage > target.defense && user.attacks > 0) {
             //check the amount of scrap users has staked
             var staked = await scrapStaked(username);
-            var roll;
-            //check who has a higher favor
-            if (user.favor > target.favor) {
-                //roll a number between 25 and 100 ints
-                roll = Math.floor(Math.random() * 75) + 25;
-            }
-            else if (user.favor < target.favor) {
-                //roll a number between 1 and 50
-                roll = Math.floor(Math.random() * 50) + 1;
-            }
-            else if (user.favor == 0) {
-                //roll a number between 1 and 25
-                roll = Math.floor(Math.random() * 25) + 1;
-            }
-            else {
-                //roll a number between 1 and 100
-                roll = Math.floor(Math.random() * 100) + 1;
-            }
-
+            var roll = await rollAttack(user);
+            //log roles to console
+            console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
 
             //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage
-            var scrapToSteal = user.damage - target.defense;
+            var scrapToSteal = (user.damage - target.defense)/10;
+
+            //give target a chance to ddodge based on toughness
+            if (checkDoge(target)) {
+                //send webhook stating target dodged attack
+                webhook("Dodge", "User " + _target + " dodged " + username + "'s attack", '#636263')
+                collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
+                return;
+            }
+                
 
             if (scrapToSteal > target.scrap) {
                 //check if current scrap of user + scrap to steal is more than staked scrap
@@ -601,18 +665,13 @@ async function battle(username, _target) {
             }
 
             //add scrap to user  & subtract attacks from user
-            console.log('User ' + username + ' stole ' + scrapToSteal + ' scrap from ' + _target);
-
-            //adjust scrap & set attacks to new value
-            collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal } });
-            //remove one from user attacks
-            collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
-            
+            console.log('User ' + username + ' stole ' + scrapToSteal + ' SCRAP from ' + _target);
+            //adjust scrap & set attacks to new value remove one from user attacks
+            collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 } });
             //remove scrap from target
             collection.updateOne({ username: _target }, { $inc: { scrap: -scrapToSteal } });
-
-            //send webhook with red color
-            webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target, '#f55a42');
+            //send webhook with red color add roll to message and round roll to 2 decimal places
+            webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
             //store battle in db
             collection = db.collection('battle_logs');
             await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
