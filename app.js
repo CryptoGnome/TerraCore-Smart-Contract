@@ -12,7 +12,7 @@ const hook2 = new Webhook(process.env.DISCORD_WEBHOOK_2);
 const dbName = 'terracore';
 const SYMBOL = 'SCRAP';
 const wif = process.env.ACTIVE_KEY;
-var QUE_SET = false;
+
 
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 });
 
@@ -596,6 +596,13 @@ async function battle(username, _target) {
             }
         }
 
+        //make sure target is not getting attacked withing 30 seconds of last payout
+        if (Date.now() - target.lastPayout < 30000) {
+            //send webhook stating target is has new user protection
+            webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
+            return;
+        }
+
 
         //check if user has more damage than target defense and attacks > 0 and has defense > 10
         if (user.damage > target.defense && user.attacks > 0) {
@@ -616,22 +623,8 @@ async function battle(username, _target) {
                 return;
             }
                 
-
             if (scrapToSteal > target.scrap) {
-                //check if current scrap of user + scrap to steal is more than staked scrap
                 scrapToSteal = target.scrap;
-                scrapToSteal = scrapToSteal * (roll / 100);
-                if (user.scrap + scrapToSteal > staked) {
-                    scrapToSteal = (staked + 1) - user.scrap;
-                    //make sure scrap to steal is not moe than target scrap
-                    if (scrapToSteal > target.scrap) {
-                        scrapToSteal = target.scrap;
-                    }
-                }
-                else {
-                    scrapToSteal = target.scrap;
-                    scrapToSteal = scrapToSteal * (roll / 100);
-                }
             }
             else {
                 //check if current scrap of user + scrap to steal is more than staked scrap
@@ -649,7 +642,6 @@ async function battle(username, _target) {
                 }
             }
 
-
             //make sure scrapToSteal is not NaN
             if (isNaN(scrapToSteal)) {
                 //shoot error webhook
@@ -664,19 +656,22 @@ async function battle(username, _target) {
                 return;
             }
 
-            //add scrap to user  & subtract attacks from user
-            console.log('User ' + username + ' stole ' + scrapToSteal + ' SCRAP from ' + _target);
-            //adjust scrap & set attacks to new value remove one from user attacks
-            collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 } });
-            //remove scrap from target
-            collection.updateOne({ username: _target }, { $inc: { scrap: -scrapToSteal } });
-            //send webhook with red color add roll to message and round roll to 2 decimal places
-            webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
-            //store battle in db
-            collection = db.collection('battle_logs');
-            await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
-            return;
-
+            //try to modify target scrap first
+            var result = await collection.updateOne({username: _target,scrap: {$gte: scrapToSteal}}, {$inc: {scrap: -scrapToSteal}});
+            if (result.modifiedCount === 1) {
+                console.log('User ' + username + ' stole ' + scrapToSteal + ' SCRAP from ' + _target);
+                collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 } });
+                //send webhook with red color add roll to message and round roll to 2 decimal places
+                webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
+                //store battle in db
+                collection = db.collection('battle_logs');
+                await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
+                return;
+            } else {
+                console.log("Update failed!");
+                //send webhook with red color
+                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than 0, please try again", '#6385ff')
+            }
 
         }
         else{
