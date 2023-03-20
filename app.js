@@ -619,18 +619,6 @@ async function battle(username, _target) {
             //log roles to console
             console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
 
-            //create base damage to steal based on the level difference between user and target
-            if(user.level > target.level) {
-                var baseDamage = user.level - target.level;
-                if (baseDamage > 10) {
-                    baseDamage = 10;
-                }
-                else {
-                    baseDamage = baseDamage;
-                }
-            }
-
-
             var scrapToSteal = (user.damage - target.defense);
 
 
