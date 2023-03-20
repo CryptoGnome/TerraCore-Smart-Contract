@@ -632,10 +632,14 @@ async function battle(username, _target) {
                 
             if (scrapToSteal > target.scrap) {
                 scrapToSteal = target.scrap;
+                //check if scrap to steal is more than staked scrap + 1
+                if (user.scrap + scrapToSteal > staked + 1) {
+                    scrapToSteal = (staked + 1) - user.scrap;
+                }  
             }
             else {
                 //check if current scrap of user + scrap to steal is more than staked scrap
-                if (user.scrap + scrapToSteal > staked) {
+                if (user.scrap + scrapToSteal > staked + 1) {
                     scrapToSteal = (staked + 1) - user.scrap;
                     scrapToSteal = scrapToSteal * (roll / 100);
                     //make sure scrap to steal is not moe than target scrap
