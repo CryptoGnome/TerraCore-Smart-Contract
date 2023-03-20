@@ -619,8 +619,8 @@ async function battle(username, _target) {
             //log roles to console
             console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
 
-            //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage
-            var scrapToSteal = (user.damage - target.defense);
+            //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage use /10 for balance
+            var scrapToSteal = (user.damage - target.defense)/10;
 
             //give target a chance to ddodge based on toughness
             if (checkDoge(target)) {
