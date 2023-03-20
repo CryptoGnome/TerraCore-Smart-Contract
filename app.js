@@ -538,7 +538,7 @@ async function battle(username, _target) {
             if (Date.now() - target.registrationTime < 86400000) {
                 //send webhook stating target is has new user protection
                 webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
-                collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
+                collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
                 return;
             }
         }
@@ -608,7 +608,7 @@ async function battle(username, _target) {
             var result = await collection.updateOne({username: _target,scrap: {$gte: scrapToSteal}}, {$inc: {scrap: -scrapToSteal}});
             if (result.modifiedCount === 1) {
                 console.log('User ' + username + ' stole ' + scrapToSteal + ' SCRAP from ' + _target);
-                collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 } });
+                collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 }, $set: { lastBattle: Date.now() } });
                 //send webhook with red color add roll to message and round roll to 2 decimal places
                 webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
                 //store battle in db
@@ -628,7 +628,7 @@ async function battle(username, _target) {
             console.log('User ' + username + ' failed to steal scrap from ' + _target);
             //check if user has attacks left
             if (user.attacks > 0) {
-                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } ,  $set: { lastBattle: Date.now() } });
                 //send webhook with red color
                 webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
                 return;
