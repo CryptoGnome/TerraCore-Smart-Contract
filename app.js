@@ -380,105 +380,52 @@ async function claim(username) {
             return;
         }
 
-        //get engine balance of terracore
-        let balance = await engineBalance('terracore');
+        //transfer scrap to user from terracore
+        console.log("MINTING SCRAP TO USER FOR CLAIM");
+        //create custom_json operation that issues scrap to user
+        //make sure qty has no more than 8 decimals
+        let qty = user.scrap.toFixed(8);
 
-
-        if(balance > user.scrap) {
-            //transfer scrap to user from terracore
-            console.log("Transfering SCRAP from terracore to " + username);
-            //make sure qty has no more than 8 decimals
-            let qty = user.scrap.toFixed(8);
-
-            //create custom_json to transfer scrap to user
-            var data = {
-                contractName: 'tokens',
-                contractAction: 'transfer',
-                contractPayload: {
-                    symbol: 'SCRAP',
-                    to: username,
-                    quantity: qty.toString(),
-                    memo: 'terracore_claim_xfer'
-                }
-            };
-
-
-            try{
-                //reset payout time
-                await setLastPayout(username);
-                hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data), function (err, result) {
-                    if (err) {
-                        //send error webhook
-                        webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-                    }
-                    else {
-                        if (!result.id) {
-                            console.log("No result id");
-                            webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-                            return;
-                        }
-                        resetScrap(username, user.claims - 1);
-                        //storeHash(memo, username);
-                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
-                    }
-                });
-
+        //create custom_json to issue scrap to user
+        var data = {
+            contractName: 'tokens',
+            contractAction: 'issue',
+            contractPayload: {
+                symbol: 'SCRAP',
+                to: username,
+                quantity: qty.toString(),
+                memo: 'terracore_claim_mint'
             }
-            catch (err) {
-                console.log(err);
-                //send error webhook
-                webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-            }
+        };
+
         
-        } 
-        else {
-            //transfer scrap to user from terracore
-            console.log("MINTING SCRAP TO USER FOR CLAIM");
-            //create custom_json operation that issues scrap to user
-            //make sure qty has no more than 8 decimals
-            let qty = user.scrap.toFixed(8);
-
-            //create custom_json to issue scrap to user
-            var data = {
-                contractName: 'tokens',
-                contractAction: 'issue',
-                contractPayload: {
-                    symbol: 'SCRAP',
-                    to: username,
-                    quantity: qty.toString(),
-                    memo: 'terracore_claim_mint'
+        try{
+            //reset payout time
+            await setLastPayout(username);
+            hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data), function (err, result) {
+                if (err) {
+                    //send error webhook
+                    webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
                 }
-            };
-
-            
-            try{
-                //reset payout time
-                await setLastPayout(username);
-                hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data), function (err, result) {
-                    if (err) {
-                        //send error webhook
+                else {
+                    if (!result.id) {
+                        console.log("No result id");
                         webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+                        return;
                     }
-                    else {
-                        if (!result.id) {
-                            console.log("No result id");
-                            webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-                            return;
-                        }
-                        resetScrap(username, user.claims - 1);
-                        //storeHash(result.id, username);
-                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
-                    }
-                });
+                    resetScrap(username, user.claims - 1);
+                    //storeHash(result.id, username);
+                    webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
+                }
+            });
 
-            }
-            catch (err) {
-                console.log(err);
-                //send error webhook
-                webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-            }
-                            
         }
+        catch (err) {
+            console.log(err);
+            webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+        }
+                            
+        
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
