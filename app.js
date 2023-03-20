@@ -596,8 +596,15 @@ async function battle(username, _target) {
             }
         }
 
+        //check if targer.lastBattle does not exist
+        if (!target.lastBattle) {
+            //set to now - 60 seconds
+            target.lastBattle = Date.now() - 60000;
+            await collection.updateOne({ username: _target }, { $set: { lastBattle: target.lastBattle } });
+        }
+
         //make sure target is not getting attacked withing 30 seconds of last payout
-        if (Date.now() - target.lastPayout < 30000) {
+        if (Date.now() - target.lastBattle < 30000) {
             //send webhook stating target is has new user protection
             webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
             return;
