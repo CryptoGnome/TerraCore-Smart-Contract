@@ -619,8 +619,20 @@ async function battle(username, _target) {
             //log roles to console
             console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
 
-            //allow user to take target scrap up to the amount of damage left after target defense and add it to user damage use /10 for balance
-            var scrapToSteal = (user.damage - target.defense)/10;
+            //create base damage to steal based on the level difference between user and target
+            if(user.level > target.level) {
+                var baseDamage = user.level - target.level;
+                if (baseDamage > 10) {
+                    baseDamage = 10;
+                }
+                else {
+                    baseDamage = baseDamage;
+                }
+            }
+
+
+            var scrapToSteal = (user.damage - target.defense);
+
 
             //give target a chance to ddodge based on toughness
             if (checkDoge(target)) {
@@ -629,28 +641,18 @@ async function battle(username, _target) {
                 collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
                 return;
             }
-                
+
+            //use roll to adjust scrap to steal
+            scrapToSteal = scrapToSteal * (roll / 100);
+
+            //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
             if (scrapToSteal > target.scrap) {
                 scrapToSteal = target.scrap;
-                //check if scrap to steal is more than staked scrap + 1
-                if (user.scrap + scrapToSteal > staked + 1) {
-                    scrapToSteal = (staked + 1) - user.scrap;
-                }  
             }
-            else {
-                //check if current scrap of user + scrap to steal is more than staked scrap
-                if (user.scrap + scrapToSteal > staked + 1) {
-                    scrapToSteal = (staked + 1) - user.scrap;
-                    scrapToSteal = scrapToSteal * (roll / 100);
-                    //make sure scrap to steal is not moe than target scrap
-                    if (scrapToSteal > target.scrap) {
-                        scrapToSteal = target.scrap;
-                    }
-                }
-                else {
-                    scrapToSteal = scrapToSteal;
-                    scrapToSteal = scrapToSteal * (roll / 100);
-                }
+
+            //check if current scrap of user + scrap to steal is more than staked scrap
+            if (user.scrap + scrapToSteal > staked + 1) {
+                scrapToSteal = (staked + 1) - user.scrap;
             }
 
             //make sure scrapToSteal is not NaN
