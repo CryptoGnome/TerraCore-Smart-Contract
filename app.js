@@ -440,69 +440,46 @@ async function claim(username) {
 
 }
 
-//calculate dodge
 function checkDoge(_target) {
-    // Calculate player's toughness based on scrap staked
-    var toughness = 0.001 * _target.hiveEngineStake;
-    // Generate random number between 1 and 100
-    var dodgeRoll = Math.floor(Math.random() * 100) + 1;
-    // Check if toughness is greater than 25%
-    if (toughness > 25) {
-        // Calculate the excess toughness and make it 2x harder to gain more toughness
-        var excessToughness = toughness - 25;
-        dodgeRoll = 25 + (dodgeRoll * (1 + (excessToughness / 2)));
-        // Check if toughness is greater than 50%
-        if (toughness > 50) {
-            // Calculate the excess toughness and make it 4x harder to gain more toughness
-            excessToughness = toughness - 50;
-            dodgeRoll = 50 + (dodgeRoll * (1 + (excessToughness / 2)));
-        }
-        // Check if toughness is greater than 75%
-        if (toughness > 75) {
-            // Calculate the excess toughness and make it 6x harder to gain more toughness
-            excessToughness = toughness - 75;
-            dodgeRoll = 75 + (dodgeRoll * (1 + (excessToughness / 2)));
+    var k = 0.025;
+    var toughness = k * _target.hiveEngineStake;
+
+    // Adjust toughness based on stake
+    var values = [3, 5, 10, 20, 30, 40, 50, 60, 75];
+    for (var i = 0; i < values.length; i++) {
+        if (toughness > values[i]) {
+            var scrapNeeded = (values[i] / k);
+            k = k / 2;
+            toughness = values[i] + k * (_target.hiveEngineStake - scrapNeeded);
         }
     }
-
-    // Check if dodge roll is less than toughness
-    //log to console
-    //console.log("Dodge Roll: " + dodgeRoll + " Toughness: " + toughness);
-    if (dodgeRoll < toughness) {
-        console.log("Dodge Successful");
+    // Check if attack is dodged
+    var roll = Math.floor(Math.random() * 100) + 1;
+    if (roll < toughness) {
+        console.log("Dodge!");
         return true;
-    } else {
-        console.log("Dodge Failed");
+    }
+    else {
+        console.log("Hit!");
         return false;
     }
 }
-//calculate favor roll
+
 async function rollAttack(_player) {
-    var favor = 0.001 * _player.favor;
-    console.log("Favor: " + favor);
-    // Check if favor is greater than 25%
-    if (favor > 25) {
-        // Calculate the excess favor and make it 2x harder to gain more favor
-        var excessFavor = favor - 25;
-        favor = 25 + (favor * (1 + (excessFavor / 2)));
-        // Check if favor is greater than 50%
-        if (favor > 50) {
-            // Calculate the excess favor and make it 4x harder to gain more favor
-            excessFavor = favor - 50;
-            favor = 50 + (favor * (1 + (excessFavor / 2)));
-        }
-        // Check if favor is greater than 75%
-        if (favor > 75) {
-            // Calculate the excess favor and make it 6x harder to gain more favor
-            excessFavor = favor - 75;
-            favor = 75 + (favor * (1 + (excessFavor / 2)));
+    var k = 0.025;
+    var favor = k * _player.favor;
+    var values = [3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75];
+
+    for (var i = 0; i < values.length; i++) {
+        if (favor > values[i]) {
+            var scrapNeeded = (values[i] / k);
+            k = k / 2;
+            favor = values[i] + k * (_player.favor - scrapNeeded);
         }
     }
 
-    
     //roll a random number between favor and 100
-    var steal = Math.floor(Math.random() * (100 - favor + 1) + favor);
-    console.log("Steal Roll: " + steal + " Favor: " + favor);
+    var steal = Math.floor(Math.random() * (100 - favor + 1)) + favor;
     //check if steal is greater than 100
     if (steal > 100) {
         steal = 100;
