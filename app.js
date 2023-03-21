@@ -543,7 +543,7 @@ async function battle(username, _target) {
             //log roles to console
             console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
 
-            var scrapToSteal = (user.damage - target.defense);
+            var scrapToSteal = target.scrap * (roll / 100);
 
 
             //give target a chance to ddodge based on toughness
@@ -553,9 +553,6 @@ async function battle(username, _target) {
                 collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
                 return;
             }
-
-            //use roll to adjust scrap to steal
-            scrapToSteal = scrapToSteal * (roll / 100);
 
             //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
             if (scrapToSteal > target.scrap) {
