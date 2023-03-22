@@ -199,7 +199,7 @@ async function register(username, referrer) {
         await collection.updateOne({ date: new Date().toISOString().slice(0, 10) }, { $inc: { players: 1 } }, { upsert: true });
 
 
-        if (referrer != 'terracore') {
+        if (referrer != 'terracore' && referrer != username) {
             webhook2('A New Citizen of Terracore has Registered', username + ' was invited by ' + referrer, 0x00ff00);
             payReferrer(referrer, username);
         }
