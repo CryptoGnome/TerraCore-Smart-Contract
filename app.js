@@ -160,7 +160,28 @@ async function scrapStaked(username) {
     }
 }
 
-async function register(username) {
+//pay 1 HIVE to refferrer
+async function payReferrer(referrer, username) {
+    try {
+        const xfer = new Object();
+        xfer.from = "terracore";
+        xfer.to = referrer;
+        xfer.amount = "1.000 HIVE";
+        xfer.memo = 'Here is your Refferal Bonus for inviting ' + username + ' to TerraCore!';
+        await hive.broadcast.transfer(wif, xfer.from, xfer.to, xfer.amount, xfer.memo, function (err, result) {
+            if (err) {
+                console.log(err);
+            } else {
+                console.log(result);
+            }
+        });
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+
+async function register(username, referrer) {
     try{
         let db = client.db(dbName);
         let collection = db.collection('players');
