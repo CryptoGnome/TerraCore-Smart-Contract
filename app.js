@@ -192,7 +192,6 @@ async function register(username, referrer) {
         }
         await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now()});
         console.log('New User ' + username + ' now registered');
-        webhook2('A New Citizen of Terracore has Registered', username, 0x00ff00);
         collection = db.collection('stats');
         //increment global player count
         await collection.updateOne({ date: 'global' }, { $inc: { players: 1 } });
@@ -201,7 +200,11 @@ async function register(username, referrer) {
 
 
         if (referrer != 'terracore') {
+            webhook2('A New Citizen of Terracore has Registered', username + ' was invited by ' + referrer, 0x00ff00);
             payReferrer(referrer, username);
+        }
+        else{
+            webhook2('A New Citizen of Terracore has Registered', username, 0x00ff00);
         }
         return true;
     }
