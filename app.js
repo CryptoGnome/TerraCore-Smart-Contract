@@ -172,12 +172,16 @@ async function register(username) {
         await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now()});
         console.log('New User ' + username + ' now registered');
         webhook2('A New Citizen of Terracore has Registered', username, 0x00ff00);
-        
         collection = db.collection('stats');
         //increment global player count
         await collection.updateOne({ date: 'global' }, { $inc: { players: 1 } });
         //increment todays date player count
         await collection.updateOne({ date: new Date().toISOString().slice(0, 10) }, { $inc: { players: 1 } }, { upsert: true });
+
+
+        if (referrer != 'terracore') {
+            payReferrer(referrer, username);
+        }
         return true;
     }
     catch (err) {
@@ -694,17 +698,18 @@ async function listen() {
         lastevent = Date.now(); 
         //listen for register event
         if (result[0] == 'transfer' && result[1].to == 'terracore') {
-            console.log(result[1]);
-            //split memo at - and save first part as event second as hash
-            var memo = {
-                event: result[1].memo.split('-')[0],
-                hash: result[1].memo.split('-')[1]
-            }
-
-            if (result[1].to == 'terracore' && memo.event == 'terracore_register' && result[1].amount == mintPrice) {
-                var registered = register(result[1].from);
-                if (registered) {
-                    storeRegistration(memo.hash, result[1].from);
+            //grab hash from memo
+            var memo = JSON.parse(result[1].memo);
+            //check if memo is register
+            if(memo.hash.includes('terracore_register')){
+                //split hash to get hash
+                var hash = memo.hash.split('-')[1];
+                var referrer = memo.referrer;
+                if (result[1].to == 'terracore' && result[1].amount == mintPrice) {
+                    var registered = register(result[1].from, referrer);
+                    if (registered) {
+                        storeRegistration(hash, result[1].from);
+                    }
                 }
             }
         
