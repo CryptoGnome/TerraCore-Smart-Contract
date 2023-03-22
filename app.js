@@ -655,63 +655,6 @@ async function battle(username, _target) {
     }
 }
 
-//calculte the total scrap circulating and staked on the network
-async function scrapData(){
-    //make a list of nodes to try
-    const nodes = ["https://engine.rishipanthee.com", "https://herpc.dtools.dev", "https://api.primersion.com"];
-    var node;
-
-    //try each node until one works, just try for a response
-    for (let i = 0; i < nodes.length; i++) {
-        try {
-            const response = await fetch(nodes[i], {
-                method: "GET",
-                headers:{'Content-type' : 'application/json'},
-            });
-            const data = await response.json()
-            node = nodes[i];
-            break;
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-                
-
-    const response = await fetch(node + "/contracts", {
-      method: "POST",
-      headers:{'Content-type' : 'application/json'},
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "find",
-        params: {
-          contract: "tokens",
-          table: "balances",
-          query: {
-            "symbol":SYMBOL    
-          }
-        },
-        "id": 1,
-      })
-    });
-    const data = await response.json()
-    //loop through all balances and add them to create total circulating supply and total staked supply
-    var circulating = 0;
-    var staked = 0;
-    for (let i = 0; i < data.result.length; i++) {
-        //convert to float
-        circulating += parseFloat(data.result[i].balance);
-        staked += parseFloat(data.result[i].stake);
-    }
-    //return circulating and staked supply
-    console.log('Circulating: ' + (circulating + staked) + ' Staked: ' + staked);
-    let db = client.db(dbName);
-    let collection = db.collection('stats');
-    //update global stats
-    await collection.updateOne({ date: 'global' }, { $set: { totalScrap: (circulating + staked), totalStaked: staked } });
-}
-
-
 var lastevent = Date.now();
 const mintPrice = '20.000 HIVE'
 //aysncfunction to start listening for events
@@ -765,16 +708,11 @@ try{
     listen();
 }
 catch(err){
-    process.exit();
+    console.log(err);
 }
 
 
 lastevent = Date.now();
-//check supply every 15 minutes
-setInterval(function() {
-    scrapData();
-}, 900000);
-
 
 setInterval(function() {
     console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
