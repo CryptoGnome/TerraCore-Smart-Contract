@@ -180,7 +180,6 @@ async function payReferrer(referrer, username) {
     }
 }
 
-
 async function register(username, referrer) {
     try{
         let db = client.db(dbName);
@@ -361,8 +360,9 @@ async function sendTransactions() {
             else if(transaction.type == 'battle') {
                 await battle(transaction.username, transaction.target);
             }
+            //remove transaction from queue
+            await collection.deleteOne({ _id: transaction._id });
         }
-        await collection.deleteMany({});
         return true;
     }
     catch (err) {
@@ -402,9 +402,9 @@ async function claim(username) {
             console.log('User ' + username + ' has no claims left');
             return;
         }
-        //make sure last claim was longer than 15 seconds ago
-        if (Date.now() - user.lastPayout < 15000) {
-            console.log('User ' + username + ' has to wait 15 seconds between claims');
+        //make sure more than 30 secs have passed since user.lastPayout
+        if (Date.now() - user.lastPayout < 30000) {
+            console.log('User ' + username + ' has to wait 30 seconds between claims');
             return;
         }
 
