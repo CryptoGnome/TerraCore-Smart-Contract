@@ -189,7 +189,7 @@ async function register(username, referrer) {
             console.log(username + ' already exists');
             return false;
         }
-        await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now()});
+        await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now(), lastBattle: Date.now()});
         console.log('New User ' + username + ' now registered');
         collection = db.collection('stats');
         //increment global player count
@@ -556,7 +556,7 @@ async function battle(username, _target) {
         }
 
         //make sure target is not getting attacked withing 30 seconds of last payout
-        if (Date.now() - target.lastBattle < 30000) {
+        if (Date.now() - target.lastBattle < 60000) {
             //send webhook stating target is has new user protection
             webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
             return;
