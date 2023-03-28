@@ -361,7 +361,7 @@ async function sendTransactions() {
             let transaction = transactions[i];
             for (let j = 0; j < transactions.length; j++) {
                 let transaction2 = transactions[j];
-                if(transaction.username == transaction2.username && transaction.type == transaction2.type && transaction._id != transaction2._id) {
+                if(transaction.username == transaction2.username && transaction.type == transaction2.type && transaction.target == transaction2.target) {
                     await collection.deleteOne({ _id: transaction2._id });
                 }
             }
@@ -735,20 +735,35 @@ async function listen() {
         }
 
         if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
-            //console.log(result);
+            console.log(result);
             //grab the json from result[1].json
             var data = JSON.parse(result[1].json);
+            var user;
+            //check if required_auths[0] is empty
+            if (result[1].required_auths[0] == '') {
+                user = result[1].required_posting_auths[0];
+            }
+            else {
+                user = result[1].required_auths[0];
+            }
+
             //claim function
-            sendTransaction(result[1].required_auths[0], 'claim', 'none');
+            sendTransaction(user, 'claim', 'none');
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
-            //console.log(result);
-            //convert result[1].json[0] to object
+            console.log(result);
             var data = JSON.parse(result[1].json);
             //get target from data
             var target = data.target;
-            //battle function
-            sendTransaction(result[1].required_auths[0], 'battle', target);
+            var user;
+            //check if required_auths[0] is empty
+            if (result[1].required_auths[0] == '') {
+                user = result[1].required_posting_auths[0];
+            }
+            else {
+                user = result[1].required_auths[0];
+            }
+            sendTransaction(user, 'battle', target);
         }       
     });
 }
