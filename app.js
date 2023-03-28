@@ -738,8 +738,8 @@ async function listen() {
             //grab the json from result[1].json
             var data = JSON.parse(result[1].json);
             var user;
-            //check if required_auths[0] is empty
-            if (result[1].required_auths[0] == '') {
+            //check if required_auths[0] is []
+            if (result[1].required_auths[0] == undefined) {
                 user = result[1].required_posting_auths[0];
             }
             else {
@@ -755,8 +755,8 @@ async function listen() {
             //get target from data
             var target = data.target;
             var user;
-            //check if required_auths[0] is empty
-            if (result[1].required_auths[0] == '') {
+            //check if required_auths[0] is []
+            if (result[1].required_auths[0] == undefined) {
                 user = result[1].required_posting_auths[0];
             }
             else {
