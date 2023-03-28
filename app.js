@@ -361,7 +361,7 @@ async function sendTransactions() {
             let transaction = transactions[i];
             for (let j = 0; j < transactions.length; j++) {
                 let transaction2 = transactions[j];
-                if(transaction.username == transaction2.username && transaction.type == transaction2.type && transaction.target == transaction2.target) {
+                if(transaction.username == transaction2.username && transaction.type == transaction2.type && transaction.target == transaction2.target && transaction._id != transaction2._id) {
                     await collection.deleteOne({ _id: transaction2._id });
                 }
             }
@@ -735,7 +735,6 @@ async function listen() {
         }
 
         if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
-            console.log(result);
             //grab the json from result[1].json
             var data = JSON.parse(result[1].json);
             var user;
