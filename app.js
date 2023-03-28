@@ -405,7 +405,7 @@ async function checkTransactions() {
 
 //broadcast claim
 async function broadcastClaim(username, data, user, qty) {
-    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data), function (err, result) {
+    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', data, function (err, result) {
         if (err) {
             //send error webhook
             webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
