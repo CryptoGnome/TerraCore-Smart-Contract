@@ -17,6 +17,9 @@ const wif = process.env.ACTIVE_KEY;
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 });
 
 
+const timeout = (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+};
 
 async function webhook(title, message, color) {
     
@@ -351,7 +354,21 @@ async function sendTransactions() {
     try{
         let db = client.db(dbName);
         let collection = db.collection('transactions');
+        //before starting make sure there are no transactions in the queue from the same username with the same type if so remove all but one, this will help prevents spamming
         let transactions = await collection.find({}).toArray();
+        //loop through transactions and remove any that are the same type and username
+        for (let i = 0; i < transactions.length; i++) {
+            let transaction = transactions[i];
+            for (let j = 0; j < transactions.length; j++) {
+                let transaction2 = transactions[j];
+                if(transaction.username == transaction2.username && transaction.type == transaction2.type && transaction._id != transaction2._id) {
+                    await collection.deleteOne({ _id: transaction2._id });
+                }
+            }
+        }   
+        //get all transactions in the queue
+        transactions = await collection.find({}).toArray();
+        console.log('Sending ' + transactions.length + ' transactions');
         for (let i = 0; i < transactions.length; i++) {
             let transaction = transactions[i];
             if(transaction.type == 'claim') {
@@ -386,6 +403,27 @@ async function checkTransactions() {
     }
 }
 
+//broadcast claim
+async function broadcastClaim(username, data, user, qty) {
+    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data), function (err, result) {
+        if (err) {
+            //send error webhook
+            webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+            return;
+        }
+        else {
+            if (!result.id) {
+                console.log("No result id");
+                webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+                return;
+            }
+            resetScrap(username, user.claims - 1);
+            webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
+            return;
+        }
+    });
+}
+
 //claim favor
 async function claim(username) {
     try{
@@ -410,10 +448,7 @@ async function claim(username) {
 
         //transfer scrap to user from terracore
         console.log("MINTING SCRAP TO USER FOR CLAIM");
-        //create custom_json operation that issues scrap to user
-        //make sure qty has no more than 8 decimals
         let qty = user.scrap.toFixed(8);
-
         //create custom_json to issue scrap to user
         var data = {
             contractName: 'tokens',
@@ -430,21 +465,15 @@ async function claim(username) {
         try{
             //reset payout time
             await setLastPayout(username);
-            hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data), function (err, result) {
-                if (err) {
-                    //send error webhook
-                    webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-                }
-                else {
-                    if (!result.id) {
-                        console.log("No result id");
-                        webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-                        return;
-                    }
-                    resetScrap(username, user.claims - 1);
-                    //storeHash(result.id, username);
-                    webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
-                }
+            //call boradcast claim function with a timeout of 10 seconds if
+            Promise.race([
+                broadcastClaim(username, JSON.stringify(data), user, qty),
+                timeout(5000)
+            ]).then((result) => {
+                console.log('Claimed ' + qty + ' SCRAP for user ' + username);
+            }).catch((err) => {
+                webhook("TimeoutError", "Timeout Erorr claiming scrap for user " + username + " Error: " + err, '#ff0000');
+                process.exit(1);
             });
 
         }
@@ -484,11 +513,9 @@ function checkDoge(_target) {
     // Check if attack is dodged
     var roll = Math.floor(Math.random() * 100) + 1;
     if (roll < toughness) {
-        console.log("Dodge!");
         return true;
     }
     else {
-        console.log("Hit!");
         return false;
     }
 }
@@ -655,11 +682,36 @@ async function battle(username, _target) {
     }
 }
 
+//async function to clear transactions from queue
+async function clearTransactions() {
+    //connect to db
+    try{
+        let db = client.db(dbName);
+        let collection = db.collection('transactions');
+        //delete all transactions
+        await collection.deleteMany({});
+        return;
+
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+        }
+    }
+}
+
+
 var lastevent = Date.now();
 const mintPrice = '20.000 HIVE'
 //aysncfunction to start listening for events
 async function listen() {
+    await clearTransactions();
     checkTransactions();
+    hive.config.set('alternative_api_endpoints', ['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me', 'https://rpc.ecency.com']);
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
