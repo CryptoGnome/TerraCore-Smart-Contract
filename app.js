@@ -511,6 +511,12 @@ function checkDodge(_target) {
             toughness = values[i] + k * (_target.hiveEngineStake - scrapNeeded);
         }
     }
+
+    //check that _target.stats.dodge exists
+    if(_target.stats.dodge != undefined) {
+        toughness = toughness + _target.stats.dodge;
+    }
+
     // Check if attack is dodged
     var roll = Math.floor(Math.random() * 100) + 1;
     if (roll < toughness) {
@@ -532,6 +538,11 @@ async function rollAttack(_player) {
             k = k / 2;
             favor = values[i] + k * (_player.favor - scrapNeeded);
         }
+    }
+
+    //check that _player.stats.crit exists
+    if(_player.stats.crit != undefined) {
+        favor = favor + _player.stats.crit;
     }
 
     //roll a random number between favor and 100
