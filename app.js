@@ -241,12 +241,11 @@ async function storeRegistration(hash, username) {
     }
 }
 
-async function storeHash(hash, username) {
+async function storeClaim(username, qty) {
     try{
         let db = client.db(dbName);
         let collection = db.collection('claims');
-        let result = await collection.insertOne({hash: hash, username: username, time: Date.now()});
-        console.log('Claim Hash ' + hash + ' stored');
+        let result = await collection.insertOne({username: username, qty: qty, time: Date.now()});
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
@@ -424,7 +423,7 @@ async function broadcastClaim(username, data, user, qty) {
     });
 }
 
-//claim favor
+//claim favorcheckDodge
 async function claim(username) {
     try{
         let db = client.db(dbName);
@@ -471,6 +470,8 @@ async function claim(username) {
                 timeout(5000)
             ]).then((result) => {
                 console.log('Claimed ' + qty + ' SCRAP for user ' + username);
+                //store claim 
+                storeClaim(username, qty);
             }).catch((err) => {
                 webhook("TimeoutError", "Timeout Erorr claiming scrap for user " + username + " Error: " + err, '#ff0000');
                 process.exit(1);
@@ -497,7 +498,7 @@ async function claim(username) {
 
 }
 
-function checkDoge(_target) {
+function checkDodge(_target) {
     var k = 0.025;
     var toughness = k * _target.hiveEngineStake;
 
@@ -602,7 +603,7 @@ async function battle(username, _target) {
 
 
             //give target a chance to ddodge based on toughness
-            if (checkDoge(target)) {
+            if (checkDodge(target)) {
                 //send webhook stating target dodged attack
                 webhook("Dodge", "User " + _target + " dodged " + username + "'s attack", '#636263')
                 collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
