@@ -365,8 +365,10 @@ async function sendTransactions() {
                 }
             }
         }   
-        //get all transactions in the queue
-        transactions = await collection.find({}).toArray();
+        //get all transactions in the queue sort so that battles are sent first then claims
+        transactions = await collection.find({})
+        .sort({ type: 1 })
+        .toArray();
         console.log('Sending ' + transactions.length + ' transactions');
         for (let i = 0; i < transactions.length; i++) {
             let transaction = transactions[i];
@@ -763,7 +765,7 @@ async function listen() {
             sendTransaction(user, 'claim', 'none');
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
-            console.log(result);
+            //console.log(result);
             var data = JSON.parse(result[1].json);
             //get target from data
             var target = data.target;
