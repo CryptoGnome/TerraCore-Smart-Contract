@@ -372,7 +372,6 @@ async function sendTransactions() {
             let transaction = transactions[i];
             if(transaction.type == 'claim') {
                 await claim(transaction.username);
-                await resetScrap(transaction.username, 0);
             }
             else if(transaction.type == 'battle') {
                 await battle(transaction.username, transaction.target);
