@@ -304,13 +304,10 @@ async function setLastPayout(username) {
         if (!user) {
             return true;
         }
-        else if(user.scrap == 0){
-            return true;
-        }
         else{
-            //loop and ensure last payout is set
+            //loop and ensure last payout is set and set scrap to 0
             while(true){
-                var done = await collection.updateOne({ username: username }, { $set: { lastPayout: Date.now() } });
+                var done = await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
                 if(done.modifiedCount == 1){
                     return true;
                 }
@@ -353,8 +350,11 @@ async function sendTransactions() {
     try{
         let db = client.db(dbName);
         let collection = db.collection('transactions');
-        //before starting make sure there are no transactions in the queue from the same username with the same type if so remove all but one, this will help prevents spamming
-        let transactions = await collection.find({}).toArray();
+        //before starting make sure there are no transactions in the queue from the same username with the same type if so remove all but one, this will help prevents spamming, filter by tim received
+        let transactions = await collection.find({})
+        .sort({ time: 1 })
+        .toArray()
+
         //loop through transactions and remove any that are the same type and username
         for (let i = 0; i < transactions.length; i++) {
             let transaction = transactions[i];
@@ -372,6 +372,7 @@ async function sendTransactions() {
             let transaction = transactions[i];
             if(transaction.type == 'claim') {
                 await claim(transaction.username);
+                await resetScrap(transaction.username, 0);
             }
             else if(transaction.type == 'battle') {
                 await battle(transaction.username, transaction.target);
@@ -472,6 +473,7 @@ async function claim(username) {
                 console.log('Claimed ' + qty + ' SCRAP for user ' + username);
                 //store claim 
                 storeClaim(username, qty);
+                setLastPayout(username);
             }).catch((err) => {
                 webhook("TimeoutError", "Timeout Erorr claiming scrap for user " + username + " Error: " + err, '#ff0000');
                 process.exit(1);
@@ -649,7 +651,7 @@ async function battle(username, _target) {
             var result = await collection.updateOne({username: _target,scrap: {$gte: scrapToSteal}}, {$inc: {scrap: -scrapToSteal}});
             if (result.modifiedCount === 1) {
                 console.log('User ' + username + ' stole ' + scrapToSteal + ' SCRAP from ' + _target);
-                collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 }, $set: { lastBattle: Date.now() } });
+                await collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 }, $set: { lastBattle: Date.now() } });
                 //send webhook with red color add roll to message and round roll to 2 decimal places
                 webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
                 //store battle in db
