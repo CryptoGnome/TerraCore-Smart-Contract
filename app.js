@@ -29,8 +29,7 @@ async function webhook(title, message, color) {
         .setColor(color)
         .setTimestamp();
     try {
-        hook.send(embed).then(() => console.log('Sent webhook successfully!'))
-        .catch(err => console.log(err.message));
+        hook.send(embed).catch(err => console.log(err.message));    
     }
     catch (err) {
         console.log(chalk.red("Discord Webhook Error"));
@@ -323,6 +322,7 @@ async function setLastPayout(username) {
             console.log(err);
         }
     }
+
 }
 
 //create a function where you can send transactions to be queued to be sent
@@ -428,6 +428,11 @@ async function broadcastClaim(username, data, user, qty) {
 //claim favorcheckDodge
 async function claim(username) {
     try{
+        var cache  = await cacheUser(username);
+        if(cache) {
+            console.log('Claim User: ' + username + ' is cached');
+            return;
+        }
         let db = client.db(dbName);
         let collection = db.collection('players');
 
@@ -448,7 +453,6 @@ async function claim(username) {
         }
 
         //transfer scrap to user from terracore
-        console.log("MINTING SCRAP TO USER FOR CLAIM");
         let qty = user.scrap.toFixed(8);
         //create custom_json to issue scrap to user
         var data = {
@@ -468,7 +472,7 @@ async function claim(username) {
             await setLastPayout(username);
             //call boradcast claim function with a timeout of 10 seconds if
             Promise.race([
-                broadcastClaim(username, JSON.stringify(data), user, qty),
+                await broadcastClaim(username, JSON.stringify(data), user, qty),
                 timeout(5000)
             ]).then((result) => {
                 console.log('Claimed ' + qty + ' SCRAP for user ' + username);
@@ -497,8 +501,156 @@ async function claim(username) {
             console.log(err);
         }
     }
+    finally {
+        await clearCache(username);
+    }
 
 
+}
+
+//battle function
+async function battle(username, _target) {
+    try{
+        var cache  = await cacheUser(username);
+        if(cache) {
+            console.log('Battle User: ' + username + ' is cached');
+            return;
+        }
+        var db = client.db(dbName);
+        var collection = db.collection('players');
+        //load target user
+        var user = await collection.findOne({ username : username });
+        //check if user exists
+        if (!user) {
+            console.log('User ' + username + ' does not exist');
+            return;
+        }
+        //load target 
+        var target = await collection.findOne({ username : _target });
+        //check if target exists
+        if (!target) {
+            console.log('Target ' + target + ' does not exist');
+            return;
+        }
+
+        //check if targer.registrationTime exists
+        if (target.registrationTime) {
+            //check if target registrationTime is less than 24 hours ago
+            if (Date.now() - target.registrationTime < 86400000) {
+                //send webhook stating target is has new user protection
+                webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
+                return;
+            }
+        }
+
+        //check if targer.lastBattle does not exist
+        if (!target.lastBattle) {
+            //set to now - 60 seconds
+            target.lastBattle = Date.now() - 60000;
+            await collection.updateOne({ username: _target }, { $set: { lastBattle: target.lastBattle } });
+        }
+
+        //make sure target is not getting attacked withing 60 seconds of last payout
+        if (Date.now() - target.lastBattle < 60000) {
+            //send webhook stating target is has new user protection
+            webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
+            return;
+        }
+
+
+        //check if user has more damage than target defense and attacks > 0 and has defense > 10
+        if (user.damage > target.defense && user.attacks > 0) {
+            //check the amount of scrap users has staked
+            var staked = await scrapStaked(username);
+            var roll = await rollAttack(user);
+            //log roles to console
+            //console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
+
+            var scrapToSteal = target.scrap * (roll / 100);
+
+
+            //give target a chance to ddodge based on toughness
+            if (checkDodge(target)) {
+                //send webhook stating target dodged attack
+                webhook("Dodge", "User " + _target + " dodged " + username + "'s attack", '#636263')
+                collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
+                return;
+            }
+
+            //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
+            if (scrapToSteal > target.scrap) {
+                scrapToSteal = target.scrap;
+            }
+
+            //check if current scrap of user + scrap to steal is more than staked scrap
+            if (user.scrap + scrapToSteal > staked + 1) {
+                scrapToSteal = (staked + 1) - user.scrap;
+            }
+
+            //make sure scrapToSteal is not NaN
+            if (isNaN(scrapToSteal)) {
+                //shoot error webhook
+                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is NaN, please try again", '#6385ff')
+                return;
+            }
+
+            //make sure scrapToSteal is not less than 0
+            if (scrapToSteal < 0) {
+                //shoot error webhook
+                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than 0, please try again", '#6385ff')
+                return;
+            }
+
+            //try to modify target scrap first
+            var result = await collection.updateOne({username: _target, scrap: {$gte: scrapToSteal}}, {$inc: {scrap: -scrapToSteal}});
+            if (result.modifiedCount === 1) {
+                console.log('User ' + username + ' stole ' + scrapToSteal + ' SCRAP from ' + _target);
+                await collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 }, $set: { lastBattle: Date.now() } });
+                //send webhook with red color add roll to message and round roll to 2 decimal places
+                webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
+                //store battle in db
+                collection = db.collection('battle_logs');
+                await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
+                return;
+            } else {
+                //send webhook with red color
+                webhook("New Error", "User " + username + " tried to attack " + _target + " but there was a Database Error... No Attacks were lost. Please Try again!", '#6385ff')
+            }
+
+        }
+        else{
+
+            //remove one from user attacks
+            console.log('User ' + username + ' failed to steal scrap from ' + _target);
+            //check if user has attacks left
+            if (user.attacks > 0) {
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } ,  $set: { lastBattle: Date.now() } });
+                //send webhook with red color
+                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
+                return;
+            }
+            else {
+                console.log('User ' + username + ' has no attacks left');
+                //send webhook with red color
+                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
+                return;
+            }
+            
+        }
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+        }
+    }
+    finally {
+        await clearCache(username);
+    }
 }
 
 function checkDodge(_target) {
@@ -558,133 +710,41 @@ async function rollAttack(_player) {
     return steal;
 }
 
-//battle function
-async function battle(username, _target) {
+//creatre function to cache a user
+async function cacheUser(username) {
     try{
         var db = client.db(dbName);
-        var collection = db.collection('players');
-        
-        //load target user
-        var user = await collection.findOne({ username : username });
-        //check if user exists
-        if (!user) {
-            console.log('User ' + username + ' does not exist');
-            return;
+        const cache = await db.collection('cached').find({username: username}).limit(1).next();
+        if (cache) {
+            //check to see if user has been in cache for more than 5 seconds
+            if (cache.timestamp < (Date.now() - 5000)) {
+                //remove user from cache
+                await db.collection('cached').deleteOne({username: username});
+            }
+            console.log("User in Cache...Skipping");
+            return true;
+        } 
+        //add username to cache
+        await db.collection('cached').updateOne({username: username}, {$set: {username: username, timestamp: Date.now()}}, {upsert: true})
+        return false;
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            process.exit(1);
         }
-        //load target 
-        var target = await collection.findOne({ username : _target });
-        //check if target exists
-        if (!target) {
-            console.log('Target ' + target + ' does not exist');
-            return;
+        else {
+            console.log(err);
+            return false;
         }
+    }
+}
 
-        //check if targer.registrationTime exists
-        if (target.registrationTime) {
-            //check if target registrationTime is less than 24 hours ago
-            if (Date.now() - target.registrationTime < 86400000) {
-                //send webhook stating target is has new user protection
-                webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
-                collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
-                return;
-            }
-        }
-
-        //check if targer.lastBattle does not exist
-        if (!target.lastBattle) {
-            //set to now - 60 seconds
-            target.lastBattle = Date.now() - 60000;
-            await collection.updateOne({ username: _target }, { $set: { lastBattle: target.lastBattle } });
-        }
-
-        //make sure target is not getting attacked withing 30 seconds of last payout
-        if (Date.now() - target.lastBattle < 60000) {
-            //send webhook stating target is has new user protection
-            webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
-            return;
-        }
-
-
-        //check if user has more damage than target defense and attacks > 0 and has defense > 10
-        if (user.damage > target.defense && user.attacks > 0) {
-            //check the amount of scrap users has staked
-            var staked = await scrapStaked(username);
-            var roll = await rollAttack(user);
-            //log roles to console
-            console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
-
-            var scrapToSteal = target.scrap * (roll / 100);
-
-
-            //give target a chance to ddodge based on toughness
-            if (checkDodge(target)) {
-                //send webhook stating target dodged attack
-                webhook("Dodge", "User " + _target + " dodged " + username + "'s attack", '#636263')
-                collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
-                return;
-            }
-
-            //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
-            if (scrapToSteal > target.scrap) {
-                scrapToSteal = target.scrap;
-            }
-
-            //check if current scrap of user + scrap to steal is more than staked scrap
-            if (user.scrap + scrapToSteal > staked + 1) {
-                scrapToSteal = (staked + 1) - user.scrap;
-            }
-
-            //make sure scrapToSteal is not NaN
-            if (isNaN(scrapToSteal)) {
-                //shoot error webhook
-                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is NaN, please try again", '#6385ff')
-                return;
-            }
-
-            //make sure scrapToSteal is not less than 0
-            if (scrapToSteal < 0) {
-                //shoot error webhook
-                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than 0, please try again", '#6385ff')
-                return;
-            }
-
-            //try to modify target scrap first
-            var result = await collection.updateOne({username: _target,scrap: {$gte: scrapToSteal}}, {$inc: {scrap: -scrapToSteal}});
-            if (result.modifiedCount === 1) {
-                console.log('User ' + username + ' stole ' + scrapToSteal + ' SCRAP from ' + _target);
-                await collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 }, $set: { lastBattle: Date.now() } });
-                //send webhook with red color add roll to message and round roll to 2 decimal places
-                webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
-                //store battle in db
-                collection = db.collection('battle_logs');
-                await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
-                return;
-            } else {
-                console.log("Update failed!");
-                //send webhook with red color
-                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than 0, please try again", '#6385ff')
-            }
-
-        }
-        else{
-
-            //remove one from user attacks
-            console.log('User ' + username + ' failed to steal scrap from ' + _target);
-            //check if user has attacks left
-            if (user.attacks > 0) {
-                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } ,  $set: { lastBattle: Date.now() } });
-                //send webhook with red color
-                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
-                return;
-            }
-            else {
-                console.log('User ' + username + ' has no attacks left');
-                //send webhook with red color
-                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
-                return;
-            }
-            
-        }
+//create a function to clear user from cache
+async function clearCache(username) {
+    try{
+        var db = client.db(dbName);
+        await db.collection('cached').deleteOne({username: username});
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
