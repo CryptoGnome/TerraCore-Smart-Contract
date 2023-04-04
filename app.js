@@ -431,6 +431,8 @@ async function claim(username) {
         var cache  = await cacheUser(username);
         if(cache) {
             console.log('Claim User: ' + username + ' is cached');
+            //sendwebhook to say claim failed
+            webhook("Error", "Error claiming scrap for user " + username + " Error: User is cached, please try again", '#ff0000');
             return;
         }
         let db = client.db(dbName);
@@ -514,6 +516,8 @@ async function battle(username, _target) {
         var cache  = await cacheUser(username);
         if(cache) {
             console.log('Battle User: ' + username + ' is cached');
+            //sendwebhook to say battle failed
+            webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
             return;
         }
         var db = client.db(dbName);
