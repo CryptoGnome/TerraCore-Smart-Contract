@@ -406,24 +406,23 @@ async function checkTransactions() {
 
 //broadcast claim
 async function broadcastClaim(username, data, user, qty) {
-    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', data, function (err, result) {
-        if (err) {
-            //send error webhook
+    try {
+        const result = await hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', data);
+        if (!result.id) {
+            console.log("No result id");
             webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
             return false;
         }
-        else {
-            if (!result.id) {
-                console.log("No result id");
-                webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-                false;
-            }
-            resetScrap(username, user.claims - 1);
-            webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
-            return true;
-        }
-    });
+        await resetScrap(username, user.claims - 1);
+        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
+        return true;
+    } catch (err) {
+        //send error webhook
+        webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+        return false;
+    }
 }
+
 
 //claim favorcheckDodge
 async function claim(username) {
@@ -474,6 +473,7 @@ async function claim(username) {
             //reset payout time
             await setLastPayout(username);
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
+            console.log('---------------------------------------Claim: ' + claim);
             if(claim) {
                 await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
                 await storeClaim(username, qty);
