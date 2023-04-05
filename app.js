@@ -377,9 +377,12 @@ async function sendTransactions() {
 
         //check if there are any transactions to send
         if(transactions.length != 0) {
+            console.log('-------------------------------------------------------')
             console.log('Sending ' + transactions.length + ' transactions');
+            console.log('-------------------------------------------------------')
             for (let i = 0; i < transactions.length; i++) {
                 let transaction = transactions[i];
+                console.log('Sending transaction ' + (i+ 1).toString() + ' of ' + transactions.length.toString());
                 if(transaction.type == 'claim') {
                     var result = await claim(transaction.username);
                     if(result) {
@@ -395,6 +398,7 @@ async function sendTransactions() {
                 }
 
             }
+            console.log('fin.')
             return true;
         }
         else {
@@ -535,6 +539,13 @@ async function claim(username) {
 //battle function
 async function battle(username, _target) {
     try{
+
+        //check if user is trying to battle themselves
+        if(username == _target) {
+            console.log('Battle User: ' + username + ' tried to battle themselves');
+            return true;
+        }
+
         var cache  = await cacheUser(username);
         if(cache) {
             console.log('Battle User: ' + username + ' is cached');
@@ -899,6 +910,9 @@ async function listen() {
 
 //track last event and reset claims every 15 seconds
 try{
+    console.log('-------------------------------------------------------')
+    console.log('Starting to Listening for events on HIVE...');
+    console.log('-------------------------------------------------------')
     listen();
 }
 catch(err){
@@ -906,21 +920,25 @@ catch(err){
 }
 
 
-lastevent = Date.now();
 
 setInterval(function() {
-    console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
+    //console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
     if (Date.now() - lastevent > 30000) {
         console.log('No events received in 30 seconds, shutting down so pm2 can restart');
         process.exit();
     }
 }, 1000);
 
-
+var heartbeat = 0;
 setInterval(function() {
-    console.log('Last Check: ' + (Date.now() - lastCheck) + ' ms ago');
-    if (Date.now() - lastCheck > 5000) {
-        console.log('No events received in 5 seconds, shutting down so pm2 can restart');
+    //console.log('Last Transaction Check: ' + (Date.now() - lastCheck) + ' ms ago');
+    heartbeat++;
+    if (heartbeat == 5) {
+        console.log('.');
+        heartbeat = 0;
+    }
+    if (Date.now() - lastCheck > 30000) {
+        console.log('No events received in 30 seconds, shutting down so pm2 can restart');
         process.exit();
     }
 }, 1000);
