@@ -634,11 +634,8 @@ async function battle(username, _target) {
             }
 
             try{
-                //calculate the new scrap of the user
                 var newScrap = user.scrap + scrapToSteal;
-                //calculate the new scrap of the target
                 var newTargetScrap = target.scrap - scrapToSteal;
-                //calculate the new amount of attacks the user has
                 var newAttacks = user.attacks - 1;
 
                 //modify target scrap first loop until success
@@ -649,9 +646,9 @@ async function battle(username, _target) {
                     }
                 }
 
-                //modify user scrap first loop until success
+                //modify user scrap first loop until success also set last battle to now
                 while(true) {
-                    var result = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks } });
+                    var result = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
                     if (result.modifiedCount === 1) {
                         break;
                     }
