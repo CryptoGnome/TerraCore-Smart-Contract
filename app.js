@@ -410,17 +410,17 @@ async function broadcastClaim(username, data, user, qty) {
         if (err) {
             //send error webhook
             webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-            return;
+            return false;
         }
         else {
             if (!result.id) {
                 console.log("No result id");
                 webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-                return;
+                false;
             }
             resetScrap(username, user.claims - 1);
             webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
-            return;
+            return true;
         }
     });
 }
@@ -435,6 +435,7 @@ async function claim(username) {
             webhook("Error", "Error claiming scrap for user " + username + " Error: User is cached, please try again", '#ff0000');
             return;
         }
+
         let db = client.db(dbName);
         let collection = db.collection('players');
 
@@ -472,19 +473,15 @@ async function claim(username) {
         try{
             //reset payout time
             await setLastPayout(username);
-            //call boradcast claim function with a timeout of 10 seconds if
-            Promise.race([
-                await broadcastClaim(username, JSON.stringify(data), user, qty),
-                timeout(5000)
-            ]).then((result) => {
-                console.log('Claimed ' + qty + ' SCRAP for user ' + username);
-                //store claim 
-                storeClaim(username, qty);
-                setLastPayout(username);
-            }).catch((err) => {
-                webhook("TimeoutError", "Timeout Erorr claiming scrap for user " + username + " Error: " + err, '#ff0000');
-                process.exit(1);
-            });
+            var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
+            if(claim) {
+                await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
+                await storeClaim(username, qty);
+                await setLastPayout(username);
+            }
+            else {
+                webhook("Error", "Error claiming scrap for user " + username + " Please try again", '#ff0000');
+            }
 
         }
         catch (err) {
