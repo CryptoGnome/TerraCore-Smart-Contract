@@ -177,6 +177,7 @@ async function payReferrer(referrer, username) {
                 console.log(result);
             }
         });
+        return;
     } catch (error) {
         console.log(error);
     }
@@ -216,6 +217,7 @@ async function register(username, referrer) {
         }
         else {
             console.log(err);
+            return false;
         }
     }
 
@@ -228,6 +230,7 @@ async function storeRegistration(hash, username) {
         let collection = db.collection('registrations');
         await collection.insertOne({hash: hash, username: username, time: Date.now()});
         console.log('Hash ' + hash + ' stored');
+        return;
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
@@ -236,6 +239,7 @@ async function storeRegistration(hash, username) {
         }
         else {
             console.log(err);
+            return;
         }
     }
 }
@@ -245,6 +249,7 @@ async function storeClaim(username, qty) {
         let db = client.db(dbName);
         let collection = db.collection('claims');
         let result = await collection.insertOne({username: username, qty: qty, time: Date.now()});
+        return;
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
@@ -253,6 +258,7 @@ async function storeClaim(username, qty) {
         }
         else {
             console.log(err);
+            return;
         }
     }
 }
@@ -369,6 +375,7 @@ async function sendTransactions() {
         transactions = await collection.find({})
         .sort({ type: 1 })
         .toArray();
+
         console.log('Sending ' + transactions.length + ' transactions');
         for (let i = 0; i < transactions.length; i++) {
             let transaction = transactions[i];
@@ -397,10 +404,14 @@ async function sendTransactions() {
 
 //call send transactions and wait for it to return true then call check transactions
 async function checkTransactions() {
-    //console.log('Checking transactions');
-    let done = await sendTransactions();
-    if(done) {
-        setTimeout(checkTransactions, 1000);
+    try{
+        let done = await sendTransactions();
+        if(done) {
+            setTimeout(checkTransactions, 1000);
+        }
+    }
+    catch (err) {
+        process.exit(1);
     }
 }
 
@@ -892,8 +903,8 @@ lastevent = Date.now();
 
 setInterval(function() {
     console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
-    if (Date.now() - lastevent > 10000) {
-        console.log('No events received in 15 seconds, shutting down so pm2 can restart');
+    if (Date.now() - lastevent > 30000) {
+        console.log('No events received in 30 seconds, shutting down so pm2 can restart');
         process.exit();
     }
 }, 1000);
