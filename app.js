@@ -678,6 +678,7 @@ async function battle(username, _target) {
         }
         else {
             console.log(err);
+            webhook("New Error", " Line: 681 Error: " + err, '#6385ff');
             return;
         }
     }
