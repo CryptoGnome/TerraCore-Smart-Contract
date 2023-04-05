@@ -520,6 +520,14 @@ async function battle(username, _target) {
             webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
             return;
         }
+        var cache  = await cacheUser(_target);
+        if(cache) {
+            console.log('Battle User: ' + _target + ' is cached');
+            //sendwebhook to say battle failed
+            webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
+            return;
+        }
+        
         var db = client.db(dbName);
         var collection = db.collection('players');
         //load target user
@@ -654,6 +662,7 @@ async function battle(username, _target) {
     }
     finally {
         await clearCache(username);
+        await clearCache(_target);
     }
 }
 
