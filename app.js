@@ -473,7 +473,6 @@ async function claim(username) {
             //reset payout time
             await setLastPayout(username);
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
-            console.log('---------------------------------------Claim: ' + claim);
             if(claim) {
                 await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
                 await storeClaim(username, qty);
@@ -611,20 +610,40 @@ async function battle(username, _target) {
                 return;
             }
 
-            //try to modify target scrap first
-            var result = await collection.updateOne({username: _target, scrap: {$gte: scrapToSteal}}, {$inc: {scrap: -scrapToSteal}});
-            if (result.modifiedCount === 1) {
-                console.log('User ' + username + ' stole ' + scrapToSteal + ' SCRAP from ' + _target);
-                await collection.updateOne({ username: username }, { $inc: { scrap: scrapToSteal, attacks: -1 }, $set: { lastBattle: Date.now() } });
+            try{
+                //calculate the new scrap of the user
+                var newScrap = user.scrap + scrapToSteal;
+                //calculate the new scrap of the target
+                var newTargetScrap = target.scrap - scrapToSteal;
+                //calculate the new amount of attacks the user has
+                var newAttacks = user.attacks - 1;
+
+                //modify target scrap first loop until success
+                while(true) {
+                    var result = await collection.updateOne({ username: _target }, { $set: { scrap: newTargetScrap } });
+                    if (result.modifiedCount === 1) {
+                        break;
+                    }
+                }
+
+                //modify user scrap first loop until success
+                while(true) {
+                    var result = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks } });
+                    if (result.modifiedCount === 1) {
+                        break;
+                    }
+                }
                 //send webhook with red color add roll to message and round roll to 2 decimal places
                 webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
                 //store battle in db
                 collection = db.collection('battle_logs');
                 await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
                 return;
-            } else {
+            }
+            catch (e) {
                 //send webhook with red color
-                webhook("New Error", "User " + username + " tried to attack " + _target + " but there was a Database Error... No Attacks were lost. Please Try again!", '#6385ff')
+                webhook("New Error", " Error: " + e, '#6385ff');
+                return;
             }
 
         }
