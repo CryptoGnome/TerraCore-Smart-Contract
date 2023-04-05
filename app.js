@@ -354,6 +354,7 @@ async function sendTransaction(username, type, target) {
 //create a function that can be called to send all transactions in the queue
 async function sendTransactions() {
     try{
+        lastCheck = Date.now();
         let db = client.db(dbName);
         let collection = db.collection('transactions');
         //before starting make sure there are no transactions in the queue from the same username with the same type if so remove all but one, this will help prevents spamming, filter by tim received
@@ -832,10 +833,11 @@ async function clearTransactions() {
 
 
 var lastevent = Date.now();
+var lastCheck = Date.now();
 const mintPrice = '20.000 HIVE'
 //aysncfunction to start listening for events
 async function listen() {
-    await clearTransactions();
+    //await clearTransactions();
     checkTransactions();
     hive.config.set('alternative_api_endpoints', ['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me', 'https://rpc.ecency.com']);
     hive.api.streamOperations(function(err, result) {
@@ -913,3 +915,13 @@ setInterval(function() {
         process.exit();
     }
 }, 1000);
+
+
+setInterval(function() {
+    console.log('Last Check: ' + (Date.now() - lastCheck) + ' ms ago');
+    if (Date.now() - lastCheck > 5000) {
+        console.log('No events received in 5 seconds, shutting down so pm2 can restart');
+        process.exit();
+    }
+}, 1000);
+
