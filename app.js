@@ -368,33 +368,37 @@ async function sendTransactions() {
                 let transaction2 = transactions[j];
                 if(transaction.username == transaction2.username && transaction.type == transaction2.type && transaction.target == transaction2.target && transaction._id != transaction2._id) {
                     await collection.deleteOne({ _id: transaction2._id });
+                    //also remove the transaction from the array so it is not checked again
+                    transactions.splice(j, 1);
                 }
             }
         }   
-        //get all transactions in the queue sort so that battles are sent first then claims
-        transactions = await collection.find({})
-        .sort({ type: 1 })
-        .toArray();
 
-        console.log('Sending ' + transactions.length + ' transactions');
-        for (let i = 0; i < transactions.length; i++) {
-            let transaction = transactions[i];
-            if(transaction.type == 'claim') {
-                var result = await claim(transaction.username);
-                if(result) {
-                    await collection.deleteOne({ _id: transaction._id });
+        //check if there are any transactions to send
+        if(transactions.length != 0) {
+            console.log('Sending ' + transactions.length + ' transactions');
+            for (let i = 0; i < transactions.length; i++) {
+                let transaction = transactions[i];
+                if(transaction.type == 'claim') {
+                    var result = await claim(transaction.username);
+                    if(result) {
+                        await collection.deleteOne({ _id: transaction._id });
+                    }
+
+                }
+                else if(transaction.type == 'battle') {
+                    var result = await battle(transaction.username, transaction.target);
+                    if(result) {
+                        await collection.deleteOne({ _id: transaction._id });
+                    }
                 }
 
             }
-            else if(transaction.type == 'battle') {
-                var result = await battle(transaction.username, transaction.target);
-                if(result) {
-                    await collection.deleteOne({ _id: transaction._id });
-                }
-            }
-
+            return true;
         }
-        return true;
+        else {
+            return true;
+        }
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
@@ -411,6 +415,7 @@ async function sendTransactions() {
 //call send transactions and wait for it to return true then call check transactions
 async function checkTransactions() {
     try{
+        //check if there are any transactions in the queue, if no return in 3 seconds kill the process
         let done = await sendTransactions();
         if(done) {
             setTimeout(checkTransactions, 1000);
@@ -486,14 +491,12 @@ async function claim(username) {
         
         try{
             //reset payout time
-            await setLastPayout(username);
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
             if(claim) {
                 await resetScrap(username, user.claims - 1);
                 webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                 await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
-                await storeClaim(username, qty);
-                await setLastPayout(username);
+                storeClaim(username, qty);
                 return true;
             }
             else {
