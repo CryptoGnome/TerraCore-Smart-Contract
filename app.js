@@ -380,13 +380,19 @@ async function sendTransactions() {
         for (let i = 0; i < transactions.length; i++) {
             let transaction = transactions[i];
             if(transaction.type == 'claim') {
-                await claim(transaction.username);
+                var result = await claim(transaction.username);
+                if(result) {
+                    await collection.deleteOne({ _id: transaction._id });
+                }
+
             }
             else if(transaction.type == 'battle') {
-                await battle(transaction.username, transaction.target);
+                var result = await battle(transaction.username, transaction.target);
+                if(result) {
+                    await collection.deleteOne({ _id: transaction._id });
+                }
             }
-            //remove transaction from queue
-            await collection.deleteOne({ _id: transaction._id });
+
         }
         return true;
     }
@@ -424,8 +430,6 @@ async function broadcastClaim(username, data, user, qty) {
             webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
             return false;
         }
-        await resetScrap(username, user.claims - 1);
-        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
         return true;
     } catch (err) {
         //send error webhook
@@ -443,7 +447,7 @@ async function claim(username) {
             console.log('Claim User: ' + username + ' is cached');
             //sendwebhook to say claim failed
             webhook("Error", "Error claiming scrap for user " + username + " Error: User is cached, please try again", '#ff0000');
-            return;
+            return false;
         }
 
         let db = client.db(dbName);
@@ -453,16 +457,16 @@ async function claim(username) {
         let user = await collection.findOne({ username : username });
         if (!user) {
             console.log('User ' + username + ' does not exist');
-            return;
+            return true;
         }
         if (user.claims == 0) {
             console.log('User ' + username + ' has no claims left');
-            return;
+            return true;
         }
         //make sure more than 30 secs have passed since user.lastPayout
         if (Date.now() - user.lastPayout < 30000) {
             console.log('User ' + username + ' has to wait 30 seconds between claims');
-            return;
+            return true;
         }
 
         //transfer scrap to user from terracore
@@ -485,20 +489,23 @@ async function claim(username) {
             await setLastPayout(username);
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
             if(claim) {
+                await resetScrap(username, user.claims - 1);
+                webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                 await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
                 await storeClaim(username, qty);
                 await setLastPayout(username);
+                return true;
             }
             else {
                 webhook("Error", "Error claiming scrap for user line:482 " + username + " Please try again", '#ff0000');
-                return;
+                return false;
             }
 
         }
         catch (err) {
             console.log(err);
             webhook("Error", "Error claiming scrap for user line:489 " + username + " Error: " + err, '#ff0000');
-            return;
+            return false;
         }
                             
         
@@ -511,7 +518,7 @@ async function claim(username) {
         else {
             console.log(err);
             webhook("Error", "Error claiming scrap for user line:502 " + username + " Error: " + err, '#ff0000');
-            return;
+            return false;
         }
     }
     finally {
@@ -529,14 +536,14 @@ async function battle(username, _target) {
             console.log('Battle User: ' + username + ' is cached');
             //sendwebhook to say battle failed
             webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
-            return;
+            return false;
         }
         var cache  = await cacheUser(_target);
         if(cache) {
             console.log('Battle User: ' + _target + ' is cached');
             //sendwebhook to say battle failed
             webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
-            return;
+            return false;
         }
         
         var db = client.db(dbName);
@@ -546,14 +553,14 @@ async function battle(username, _target) {
         //check if user exists
         if (!user) {
             console.log('User ' + username + ' does not exist');
-            return;
+            return true;
         }
         //load target 
         var target = await collection.findOne({ username : _target });
         //check if target exists
         if (!target) {
             console.log('Target ' + target + ' does not exist');
-            return;
+            return true;
         }
 
         //check if targer.registrationTime exists
@@ -563,7 +570,7 @@ async function battle(username, _target) {
                 //send webhook stating target is has new user protection
                 webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
-                return;
+                return true;
             }
         }
 
@@ -578,7 +585,7 @@ async function battle(username, _target) {
         if (Date.now() - target.lastBattle < 60000) {
             //send webhook stating target is has new user protection
             webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
-            return;
+            return true;
         }
 
 
@@ -589,16 +596,14 @@ async function battle(username, _target) {
             var roll = await rollAttack(user);
             //log roles to console
             //console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
-
             var scrapToSteal = target.scrap * (roll / 100);
-
 
             //give target a chance to ddodge based on toughness
             if (checkDodge(target)) {
                 //send webhook stating target dodged attack
                 webhook("Dodge", "User " + _target + " dodged " + username + "'s attack", '#636263')
                 collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
-                return;
+                return true;
             }
 
             //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
@@ -615,14 +620,14 @@ async function battle(username, _target) {
             if (isNaN(scrapToSteal)) {
                 //shoot error webhook
                 webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is NaN, please try again", '#6385ff')
-                return;
+                return true;
             }
 
             //make sure scrapToSteal is not less than 0
             if (scrapToSteal < 0) {
                 //shoot error webhook
                 webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than 0, please try again", '#6385ff')
-                return;
+                return true;
             }
 
             try{
@@ -653,12 +658,12 @@ async function battle(username, _target) {
                 //store battle in db
                 collection = db.collection('battle_logs');
                 await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
-                return;
+                return true;
             }
             catch (e) {
                 //send webhook with red color
                 webhook("New Error", " Error: " + e, '#6385ff');
-                return;
+                return true;
             }
 
         }
@@ -671,13 +676,13 @@ async function battle(username, _target) {
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 } ,  $set: { lastBattle: Date.now() } });
                 //send webhook with red color
                 webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
-                return;
+                return true;
             }
             else {
                 console.log('User ' + username + ' has no attacks left');
                 //send webhook with red color
                 webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
-                return;
+                return true;
             }
             
         }
@@ -690,7 +695,7 @@ async function battle(username, _target) {
         else {
             console.log(err);
             webhook("New Error", " Line: 681 Error: " + err, '#6385ff');
-            return;
+            return true;
         }
     }
     finally {
