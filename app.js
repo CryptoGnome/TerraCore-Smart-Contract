@@ -479,13 +479,15 @@ async function claim(username) {
                 await setLastPayout(username);
             }
             else {
-                webhook("Error", "Error claiming scrap for user " + username + " Please try again", '#ff0000');
+                webhook("Error", "Error claiming scrap for user line:482 " + username + " Please try again", '#ff0000');
+                return;
             }
 
         }
         catch (err) {
             console.log(err);
-            webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
+            webhook("Error", "Error claiming scrap for user line:489 " + username + " Error: " + err, '#ff0000');
+            return;
         }
                             
         
@@ -497,6 +499,8 @@ async function claim(username) {
         }
         else {
             console.log(err);
+            webhook("Error", "Error claiming scrap for user line:502 " + username + " Error: " + err, '#ff0000');
+            return;
         }
     }
     finally {
@@ -674,6 +678,7 @@ async function battle(username, _target) {
         }
         else {
             console.log(err);
+            return;
         }
     }
     finally {
