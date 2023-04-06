@@ -377,8 +377,6 @@ async function sendTransactions() {
                     while(true){
                         var result = await claim(transaction.username);
                         if(result) {
-                            //maske sure scrap is set to 0
-                            await resetScrap(transaction.username, result);
                             await collection.deleteOne({ _id: transaction._id });
                             break;
                         }
