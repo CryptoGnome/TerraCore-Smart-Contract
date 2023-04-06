@@ -248,7 +248,7 @@ async function storeClaim(username, qty) {
     try{
         let db = client.db(dbName);
         let collection = db.collection('claims');
-        let result = await collection.insertOne({username: username, qty: qty, time: Date.now()});
+        await collection.insertOne({username: username, qty: qty, time: Date.now()});
         return;
     }
     catch (err) {
@@ -268,24 +268,14 @@ async function resetScrap(username, claims) {
     try{
         let db = client.db(dbName);
         let collection = db.collection('players');
-        //find user in collection
-        let user = collection.find({ username : username });
-        //check if user exists
-        if (!user) {
-            return true;
+        //while loop and check if user has 0 scrap
+        while(true){
+            var clear = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: claims, lastPayout: Date.now() } });
+            if(clear.modifiedCount == 1){
+                return true;
+            }           
         }
-        else if(user.scrap == 0){
-            return true;
-        }
-        else{
-            //while loop and check if user has 0 scrap
-            while(true){
-                var clear = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: claims, lastPayout: Date.now() } });
-                if(clear.modifiedCount == 1){
-                    return true;
-                }           
-            }
-        }
+        
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
@@ -384,21 +374,25 @@ async function sendTransactions() {
                 let transaction = transactions[i];
                 console.log('Sending transaction ' + (i+ 1).toString() + ' of ' + transactions.length.toString());
                 if(transaction.type == 'claim') {
-                    var result = await claim(transaction.username);
-                    if(result) {
-                        await collection.deleteOne({ _id: transaction._id });
+                    while(true){
+                        var result = await claim(transaction.username);
+                        if(result) {
+                            await collection.deleteOne({ _id: transaction._id });
+                            break;
+                        }
                     }
-
                 }
                 else if(transaction.type == 'battle') {
-                    var result = await battle(transaction.username, transaction.target);
-                    if(result) {
-                        await collection.deleteOne({ _id: transaction._id });
+                    while(true){
+                        var result = await battle(transaction.username, transaction.target);
+                        if(result) {
+                            await collection.deleteOne({ _id: transaction._id });
+                            break;
+                        }
                     }
                 }
-
             }
-            console.log('fin.')
+            console.log('Completed Sending Transactions');
             return true;
         }
         else {
@@ -454,9 +448,7 @@ async function claim(username) {
     try{
         var cache  = await cacheUser(username);
         if(cache) {
-            console.log('Claim User: ' + username + ' is cached');
-            //sendwebhook to say claim failed
-            webhook("Error", "Error claiming scrap for user " + username + " Error: User is cached, please try again", '#ff0000');
+            console.log('Error : Claim User: ' + username + ' is cached');
             return false;
         }
 
@@ -542,7 +534,7 @@ async function battle(username, _target) {
 
         //check if user is trying to battle themselves
         if(username == _target) {
-            console.log('Battle User: ' + username + ' tried to battle themselves');
+            console.log('Error : Battle User: ' + username + ' tried to battle themselves');
             return true;
         }
 
@@ -550,7 +542,7 @@ async function battle(username, _target) {
         if(cache) {
             console.log('Battle User: ' + username + ' is cached');
             //sendwebhook to say battle failed
-            webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
+            //webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
             return false;
         }
         var cache  = await cacheUser(_target);
@@ -773,7 +765,7 @@ async function rollAttack(_player) {
     return steal;
 }
 
-//creatre function to cache a user
+//create function to cache a user
 async function cacheUser(username) {
     try{
         var db = client.db(dbName);
@@ -782,7 +774,7 @@ async function cacheUser(username) {
             //check to see if user has been in cache for more than 5 seconds
             if (cache.timestamp < (Date.now() - 5000)) {
                 //remove user from cache
-                await db.collection('cached').deleteOne({username: username});
+                await db.collection('cached').deleteMany({username: username});
             }
             console.log("User in Cache...Skipping");
             return true;
@@ -807,7 +799,7 @@ async function cacheUser(username) {
 async function clearCache(username) {
     try{
         var db = client.db(dbName);
-        await db.collection('cached').deleteOne({username: username});
+        await db.collection('cached').deleteMany({username: username});
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
@@ -934,11 +926,12 @@ setInterval(function() {
     //console.log('Last Transaction Check: ' + (Date.now() - lastCheck) + ' ms ago');
     heartbeat++;
     if (heartbeat == 5) {
-        console.log('.');
+        //log how man seconds since last lastCheck
+        console.log('HeartBeat: ' + (Date.now() - lastCheck) + 'ms ago');
         heartbeat = 0;
     }
-    if (Date.now() - lastCheck > 30000) {
-        console.log('No events received in 30 seconds, shutting down so pm2 can restart');
+    if (Date.now() - lastCheck > 90000) {
+        console.log('Error : No events received in 90 seconds, shutting down so PM2 can restart & try to reconnect to Resolve...');
         process.exit();
     }
 }, 1000);
