@@ -377,6 +377,8 @@ async function sendTransactions() {
                     while(true){
                         var result = await claim(transaction.username);
                         if(result) {
+                            //maske sure scrap is set to 0
+                            await resetScrap(transaction.username, result);
                             await collection.deleteOne({ _id: transaction._id });
                             break;
                         }
@@ -652,8 +654,8 @@ async function battle(username, _target) {
 
                 //modify user scrap first loop until success also set last battle to now
                 while(true) {
-                    var result = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
-                    if (result.modifiedCount === 1) {
+                    var result2 = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
+                    if (result2.modifiedCount === 1) {
                         break;
                     }
                 }
