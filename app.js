@@ -433,17 +433,13 @@ async function claim(username) {
 
         if (!user) {
             console.log('User ' + username + ' does not exist');
-            await db.collection('transactions').deleteMany({ username: username, type: 'claim' });
             return true;
         }
         if (user.claims == 0) {
             console.log('User ' + username + ' has no claims left');
-            //delete from transactions
-            await db.collection('transactions').deleteMany({ username: username, type: 'claim' });
             return true;
         }
         if ((Date.now() - user.lastPayout) < 30000) {
-            await db.collection('transactions').deleteMany({ username: username, type: 'claim' });
             return true;
         }
 
