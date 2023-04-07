@@ -358,8 +358,8 @@ async function sendTransactions() {
                 }
                 else if(transaction.type == 'battle') {
                     while(true){
-                        //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(3000)]);
-                        const result = await battle(transaction.username, transaction.target);
+                        const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
+                        //const result = await battle(transaction.username, transaction.target);
                         if(result) {
                             await collection.deleteOne({ _id: transaction._id });
                             break;
