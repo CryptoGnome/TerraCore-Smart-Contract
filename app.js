@@ -272,11 +272,7 @@ async function resetScrap(username, claims) {
         while(true){
             var clear = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: claims, lastPayout: Date.now() } });
             if(clear.modifiedCount == 1){
-                //check if user has 0 scrap
-                var userCheck = collection.findOne({ username: username });
-                if(userCheck.scrap == 0){
-                    return true;
-                }
+                return true;
             }         
         }
         
@@ -353,6 +349,11 @@ async function sendTransactions() {
                             await collection.deleteOne({ _id: transaction._id });
                             break;
                         }
+                        else if(result == undefined) {
+                            console.log('Transaction ' + transaction._id + ' timed out');
+                            await collection.deleteOne({ _id: transaction._id });
+                            break;
+                        }
                     }
                 }
                 else if(transaction.type == 'battle') {
@@ -360,6 +361,11 @@ async function sendTransactions() {
                         const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
                         //const result = await battle(transaction.username, transaction.target);
                         if(result) {
+                            await collection.deleteOne({ _id: transaction._id });
+                            break;
+                        }
+                        else if(result == undefined) {
+                            console.log('Transaction ' + transaction._id + ' timed out');
                             await collection.deleteOne({ _id: transaction._id });
                             break;
                         }
