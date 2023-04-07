@@ -655,12 +655,15 @@ async function battle(username, _target) {
             if (user.attacks > 0) {
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 } ,  $set: { lastBattle: Date.now() } });
                 //send webhook with red color
+                await db.collection('transactions').deleteOne({ username: username });
                 webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
                 return true;
             }
             else {
                 console.log('User ' + username + ' has no attacks left');
                 //send webhook with red color
+                //remove user from transactions collection
+                await db.collection('transactions').deleteOne({ username: username });
                 webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
                 return true;
             }
@@ -913,8 +916,8 @@ setInterval(function() {
         console.log('HeartBeat: ' + (Date.now() - lastCheck) + 'ms ago');
         heartbeat = 0;
     }
-    if (Date.now() - lastCheck > 90000) {
-        console.log('Error : No events received in 90 seconds, shutting down so PM2 can restart & try to reconnect to Resolve...');
+    if (Date.now() - lastCheck > 30000) {
+        console.log('Error : No events received in 30 seconds, shutting down so PM2 can restart & try to reconnect to Resolve...');
         process.exit();
     }
 }, 1000);
