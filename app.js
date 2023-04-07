@@ -592,6 +592,8 @@ async function battle(username, _target) {
                 //send webhook stating target dodged attack
                 webhook("Dodge", "User " + _target + " dodged " + username + "'s attack", '#636263')
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
+                collection = db.collection('battle_logs');
+                await collection.insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
                 return true;
             }
 
