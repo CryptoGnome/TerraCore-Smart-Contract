@@ -272,8 +272,13 @@ async function resetScrap(username, claims) {
         while(true){
             var clear = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: claims, lastPayout: Date.now() } });
             if(clear.modifiedCount == 1){
-                return true;
-            }           
+                //check if user has 0 scrap
+                var userCheck = collection.findOne({ username: username });
+                if(userCheck.scrap == 0){
+                    return true;
+                }
+            } 
+            return false;          
         }
         
     }
@@ -284,41 +289,9 @@ async function resetScrap(username, claims) {
         }
         else {
             console.log(err);
+            return false;
         }
     }
-}
-
-//set last payout time to now
-async function setLastPayout(username) {
-    try{
-        let db = client.db(dbName);
-        let collection = db.collection('players');
-        //find user in collection
-        let user = collection.find({ username : username });
-        //check if user exists
-        if (!user) {
-            return true;
-        }
-        else{
-            //loop and ensure last payout is set and set scrap to 0
-            while(true){
-                var done = await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
-                if(done.modifiedCount == 1){
-                    return true;
-                }
-            }     
-        }
-    }
-    catch (err) {
-        if(err instanceof MongoTopologyClosedError) {
-            console.log('MongoDB connection closed');
-            process.exit(1);
-        }
-        else {
-            console.log(err);
-        }
-    }
-
 }
 
 //create a function where you can send transactions to be queued to be sent
@@ -375,7 +348,8 @@ async function sendTransactions() {
                 console.log('Sending transaction ' + (i+ 1).toString() + ' of ' + transactions.length.toString());
                 if(transaction.type == 'claim') {
                     while(true){
-                        var result = await claim(transaction.username);
+                        const result = await Promise.race([claim(transaction.username), timeout(5000)]);
+                        //const result = await claim(transaction.username);
                         if(result) {
                             await collection.deleteOne({ _id: transaction._id });
                             break;
@@ -384,7 +358,8 @@ async function sendTransactions() {
                 }
                 else if(transaction.type == 'battle') {
                     while(true){
-                        var result = await battle(transaction.username, transaction.target);
+                        //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(3000)]);
+                        const result = await battle(transaction.username, transaction.target);
                         if(result) {
                             await collection.deleteOne({ _id: transaction._id });
                             break;
@@ -442,7 +417,6 @@ async function broadcastClaim(username, data, user, qty) {
     }
 }
 
-
 //claim favorcheckDodge
 async function claim(username) {
     try{
@@ -454,20 +428,22 @@ async function claim(username) {
 
         let db = client.db(dbName);
         let collection = db.collection('players');
-
         //make sure user exists and has claims left
         let user = await collection.findOne({ username : username });
+
         if (!user) {
             console.log('User ' + username + ' does not exist');
+            await db.collection('transactions').deleteMany({ username: username, type: 'claim' });
             return true;
         }
         if (user.claims == 0) {
             console.log('User ' + username + ' has no claims left');
+            //delete from transactions
+            await db.collection('transactions').deleteMany({ username: username, type: 'claim' });
             return true;
         }
-        //make sure more than 30 secs have passed since user.lastPayout
-        if (Date.now() - user.lastPayout < 30000) {
-            console.log('User ' + username + ' has to wait 30 seconds between claims');
+        if ((Date.now() - user.lastPayout) < 30000) {
+            await db.collection('transactions').deleteMany({ username: username, type: 'claim' });
             return true;
         }
 
@@ -491,8 +467,13 @@ async function claim(username) {
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
             if(claim) {
                 await resetScrap(username, user.claims - 1);
+                while(true) {
+                    var update = await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
+                    if(update.modifiedCount == 1) {
+                        break;
+                    }
+                }
                 webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
-                await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
                 storeClaim(username, qty);
                 return true;
             }
@@ -609,7 +590,7 @@ async function battle(username, _target) {
             if (checkDodge(target)) {
                 //send webhook stating target dodged attack
                 webhook("Dodge", "User " + _target + " dodged " + username + "'s attack", '#636263')
-                collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
                 return true;
             }
 
@@ -636,6 +617,8 @@ async function battle(username, _target) {
                 webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than 0, please try again", '#6385ff')
                 return true;
             }
+
+            
 
             try{
                 var newScrap = user.scrap + scrapToSteal;
@@ -672,9 +655,6 @@ async function battle(username, _target) {
 
         }
         else{
-
-            //remove one from user attacks
-            console.log('User ' + username + ' failed to steal scrap from ' + _target);
             //check if user has attacks left
             if (user.attacks > 0) {
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 } ,  $set: { lastBattle: Date.now() } });
@@ -772,11 +752,12 @@ async function cacheUser(username) {
         const cache = await db.collection('cached').find({username: username}).limit(1).next();
         if (cache) {
             //check to see if user has been in cache for more than 5 seconds
+            ///log how many seconds user has been in cache
+            console.log("User: " + username + " in Cache for " + ((Date.now() - cache.timestamp) / 1000).toString() + " seconds");
             if (cache.timestamp < (Date.now() - 5000)) {
-                //remove user from cache
                 await db.collection('cached').deleteMany({username: username});
+                return false;
             }
-            console.log("User in Cache...Skipping");
             return true;
         } 
         //add username to cache
@@ -799,7 +780,13 @@ async function cacheUser(username) {
 async function clearCache(username) {
     try{
         var db = client.db(dbName);
-        await db.collection('cached').deleteMany({username: username});
+        while(true){
+            var checkUpdate = await db.collection('cached').deleteMany({username: username});
+            //make sure we deleted the user from cache
+            if(checkUpdate.deletedCount > 0){
+                return;
+            }
+        }
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
