@@ -277,8 +277,7 @@ async function resetScrap(username, claims) {
                 if(userCheck.scrap == 0){
                     return true;
                 }
-            } 
-            return false;          
+            }         
         }
         
     }
@@ -462,13 +461,13 @@ async function claim(username) {
             //reset payout time
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
             if(claim) {
-                await resetScrap(username, user.claims - 1);
                 while(true) {
-                    var update = await collection.updateOne({ username: username }, { $set: { scrap: 0, lastPayout: Date.now() } });
+                    var update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
                     if(update.modifiedCount == 1) {
                         break;
                     }
                 }
+                resetScrap(username, user.claims - 1);
                 webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                 storeClaim(username, qty);
                 return true;
