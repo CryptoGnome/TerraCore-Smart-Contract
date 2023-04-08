@@ -323,7 +323,6 @@ async function sendTransaction(username, type, target) {
 }
 
 
-
 //create a function that can be called to send all transactions in the queue
 async function sendTransactions() {
     try{
@@ -491,14 +490,13 @@ async function claim(username) {
                 while(true) {
                     var update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
                     if(update.modifiedCount == 1) {
-                        break;
+                        resetScrap(username, user.claims - 1);
+                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
+                        storeClaim(username, qty);
+                        return true;
                     }
                     await sleep(500);
                 }
-                resetScrap(username, user.claims - 1);
-                webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
-                storeClaim(username, qty);
-                return true;
             }
             else {
                 webhook("Error", "Error claiming scrap for user line:482 " + username + " Please try again", '#ff0000');
@@ -661,16 +659,15 @@ async function battle(username, _target) {
                     var result2 = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
                     //console.log('User ' + username + ' scrap modified');
                     if (result2.modifiedCount === 1) {
-                        break;
+                        //send webhook with red color add roll to message and round roll to 2 decimal places
+                        webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
+                        //store battle in db
+                        collection = db.collection('battle_logs');
+                        collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
+                        return true;
                     }
                     await sleep(500);
                 }
-                //send webhook with red color add roll to message and round roll to 2 decimal places
-                webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
-                //store battle in db
-                collection = db.collection('battle_logs');
-                collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
-                return true;
             }
             catch (e) {
                 //send webhook with red color
