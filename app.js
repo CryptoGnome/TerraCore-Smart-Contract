@@ -14,12 +14,18 @@ const SYMBOL = 'SCRAP';
 const wif = process.env.ACTIVE_KEY;
 
 
-var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 });
+var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 5000, serverSelectionTimeoutMS: 5000 });
 
 
 const timeout = (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
 };
+
+//sleep function
+async function sleep(ms) {
+    console.log('Sleeping for ' + ms + 'ms');
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function webhook(title, message, color) {
     
@@ -213,6 +219,7 @@ async function register(username, referrer) {
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -235,6 +242,7 @@ async function storeRegistration(hash, username) {
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -254,6 +262,7 @@ async function storeClaim(username, qty) {
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -270,16 +279,19 @@ async function resetScrap(username, claims) {
         let collection = db.collection('players');
         //while loop and check if user has 0 scrap
         while(true){
+            //console.log('resetting scrap');
             var clear = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: claims, lastPayout: Date.now() } });
             if(clear.modifiedCount == 1){
                 return true;
-            }         
+            }  
+            await sleep(500);       
         }
         
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -301,6 +313,7 @@ async function sendTransaction(username, type, target) {
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -308,6 +321,8 @@ async function sendTransaction(username, type, target) {
         }
     }
 }
+
+
 
 //create a function that can be called to send all transactions in the queue
 async function sendTransactions() {
@@ -339,38 +354,42 @@ async function sendTransactions() {
             console.log('Sending ' + transactions.length + ' transactions');
             console.log('-------------------------------------------------------')
             for (let i = 0; i < transactions.length; i++) {
+                lastCheck = Date.now();
                 let transaction = transactions[i];
                 console.log('Sending transaction ' + (i+ 1).toString() + ' of ' + transactions.length.toString());
                 if(transaction.type == 'claim') {
                     while(true){
-                        const result = await Promise.race([claim(transaction.username), timeout(5000)]);
-                        //const result = await claim(transaction.username);
+                        //const result = await Promise.race([claim(transaction.username), timeout(5000)]);
+                        const result = await claim(transaction.username);
                         if(result) {
-                            await collection.deleteOne({ _id: transaction._id });
-                            break;
+                            while(true){
+                                var clear = await collection.deleteOne({ _id: transaction._id });
+                                if(clear.deletedCount == 1){
+                                    break;
+                                }
+                                await sleep(1000);
+                            }
                         }
-                        else if(result == undefined) {
-                            console.log('Transaction ' + transaction._id + ' timed out');
-                            await collection.deleteOne({ _id: transaction._id });
-                            break;
-                        }
+                        break;
                     }
                 }
                 else if(transaction.type == 'battle') {
                     while(true){
-                        const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
-                        //const result = await battle(transaction.username, transaction.target);
-                        if(result) {
-                            await collection.deleteOne({ _id: transaction._id });
-                            break;
+                        //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
+                        var result2 = await battle(transaction.username, transaction.target);
+                        if(result2) {
+                            while(true){
+                                var clear = await collection.deleteOne({ _id: transaction._id });
+                                if(clear.deletedCount == 1){
+                                    break;
+                                }
+                                await sleep(1000);
+                            }
                         }
-                        else if(result == undefined) {
-                            console.log('Transaction ' + transaction._id + ' timed out');
-                            await collection.deleteOne({ _id: transaction._id });
-                            break;
-                        }
+                        break;
                     }
                 }
+                
             }
             console.log('Completed Sending Transactions');
             return true;
@@ -382,6 +401,7 @@ async function sendTransactions() {
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -401,6 +421,7 @@ async function checkTransactions() {
         }
     }
     catch (err) {
+        client.close();
         process.exit(1);
     }
 }
@@ -472,6 +493,7 @@ async function claim(username) {
                     if(update.modifiedCount == 1) {
                         break;
                     }
+                    await sleep(500);
                 }
                 resetScrap(username, user.claims - 1);
                 webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
@@ -495,6 +517,7 @@ async function claim(username) {
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -514,23 +537,18 @@ async function claim(username) {
 async function battle(username, _target) {
     try{
 
-        //check if user is trying to battle themselves
         if(username == _target) {
             console.log('Error : Battle User: ' + username + ' tried to battle themselves');
             return true;
         }
-
         var cache  = await cacheUser(username);
         if(cache) {
             console.log('Battle User: ' + username + ' is cached');
-            //sendwebhook to say battle failed
-            //webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
             return false;
         }
-        var cache  = await cacheUser(_target);
-        if(cache) {
+        var cache2  = await cacheUser(_target);
+        if(cache2) {
             console.log('Battle User: ' + _target + ' is cached');
-            //sendwebhook to say battle failed
             webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
             return false;
         }
@@ -631,23 +649,27 @@ async function battle(username, _target) {
                 //modify target scrap first loop until success
                 while(true) {
                     var result = await collection.updateOne({ username: _target }, { $set: { scrap: newTargetScrap } });
+                    //console.log('Target ' + _target + ' scrap modified');
                     if (result.modifiedCount === 1) {
                         break;
                     }
+                    await sleep(500);
                 }
 
                 //modify user scrap first loop until success also set last battle to now
                 while(true) {
                     var result2 = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
+                    //console.log('User ' + username + ' scrap modified');
                     if (result2.modifiedCount === 1) {
                         break;
                     }
+                    await sleep(500);
                 }
                 //send webhook with red color add roll to message and round roll to 2 decimal places
                 webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
                 //store battle in db
                 collection = db.collection('battle_logs');
-                await collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
+                collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
                 return true;
             }
             catch (e) {
@@ -661,17 +683,12 @@ async function battle(username, _target) {
             //check if user has attacks left
             if (user.attacks > 0) {
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 } ,  $set: { lastBattle: Date.now() } });
-                //send webhook with red color
-                await db.collection('transactions').deleteOne({ username: username });
                 webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
                 return true;
             }
             else {
                 console.log('User ' + username + ' has no attacks left');
-                //send webhook with red color
-                //remove user from transactions collection
-                await db.collection('transactions').deleteOne({ username: username });
-                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
+                //webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
                 return true;
             }
             
@@ -680,6 +697,7 @@ async function battle(username, _target) {
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -773,6 +791,7 @@ async function cacheUser(username) {
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -787,16 +806,18 @@ async function clearCache(username) {
     try{
         var db = client.db(dbName);
         while(true){
-            var checkUpdate = await db.collection('cached').deleteMany({username: username});
-            //make sure we deleted the user from cache
+            //console.log('Clearing cache for ' + username);
+            var checkUpdate = await db.collection('cached').deleteOne({username: username})
             if(checkUpdate.deletedCount > 0){
                 return;
             }
+            await sleep(1000);
         }
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
+            client.close();
             process.exit(1);
         }
         else {
@@ -826,7 +847,25 @@ async function clearTransactions() {
         }
     }
 }
+async function clearFirst() {
+    //connect to db
+    try{
+        let db = client.db(dbName);
+        let collection = db.collection('transactions');
+        //delete the first transaction
+        await collection.deleteOne({});
 
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+        }
+    }
+}
 
 var lastevent = Date.now();
 var lastCheck = Date.now();
@@ -834,6 +873,7 @@ const mintPrice = '20.000 HIVE'
 //aysncfunction to start listening for events
 async function listen() {
     //await clearTransactions();
+    await clearFirst();
     checkTransactions();
     hive.config.set('alternative_api_endpoints', ['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me', 'https://rpc.ecency.com']);
     hive.api.streamOperations(function(err, result) {
@@ -910,6 +950,7 @@ setInterval(function() {
     //console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
     if (Date.now() - lastevent > 30000) {
         console.log('No events received in 30 seconds, shutting down so pm2 can restart');
+        client.close();
         process.exit();
     }
 }, 1000);
@@ -923,8 +964,9 @@ setInterval(function() {
         console.log('HeartBeat: ' + (Date.now() - lastCheck) + 'ms ago');
         heartbeat = 0;
     }
-    if (Date.now() - lastCheck > 30000) {
+    if (Date.now() - lastCheck > 10000) {
         console.log('Error : No events received in 30 seconds, shutting down so PM2 can restart & try to reconnect to Resolve...');
+        client.close();
         process.exit();
     }
 }, 1000);
