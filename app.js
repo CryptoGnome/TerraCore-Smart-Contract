@@ -284,7 +284,7 @@ async function resetScrap(username, claims) {
             if(clear.modifiedCount == 1){
                 return true;
             }  
-            await sleep(500);       
+            await sleep(200);       
         }
         
     }
@@ -362,11 +362,11 @@ async function sendTransactions() {
                         const result = await claim(transaction.username);
                         if(result) {
                             while(true){
-                                var clear = await collection.deleteOne({ _id: transaction._id });
+                                let clear = await collection.deleteOne({ _id: transaction._id });
                                 if(clear.deletedCount == 1){
                                     break;
                                 }
-                                await sleep(1000);
+                                await sleep(100);
                             }
                         }
                         break;
@@ -378,11 +378,11 @@ async function sendTransactions() {
                         var result2 = await battle(transaction.username, transaction.target);
                         if(result2) {
                             while(true){
-                                var clear = await collection.deleteOne({ _id: transaction._id });
+                                let clear = await collection.deleteOne({ _id: transaction._id });
                                 if(clear.deletedCount == 1){
                                     break;
                                 }
-                                await sleep(1000);
+                                await sleep(100);
                             }
                         }
                         break;
@@ -488,7 +488,7 @@ async function claim(username) {
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
             if(claim) {
                 while(true) {
-                    var update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
+                    let update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
                     if(update.modifiedCount == 1) {
                         resetScrap(username, user.claims - 1);
                         webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
@@ -646,7 +646,7 @@ async function battle(username, _target) {
 
                 //modify target scrap first loop until success
                 while(true) {
-                    var result = await collection.updateOne({ username: _target }, { $set: { scrap: newTargetScrap } });
+                    let result = await collection.updateOne({ username: _target }, { $set: { scrap: newTargetScrap } });
                     //console.log('Target ' + _target + ' scrap modified');
                     if (result.modifiedCount === 1) {
                         break;
@@ -656,7 +656,7 @@ async function battle(username, _target) {
 
                 //modify user scrap first loop until success also set last battle to now
                 while(true) {
-                    var result2 = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
+                    let result2 = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
                     //console.log('User ' + username + ' scrap modified');
                     if (result2.modifiedCount === 1) {
                         //send webhook with red color add roll to message and round roll to 2 decimal places
@@ -804,10 +804,11 @@ async function clearCache(username) {
         var db = client.db(dbName);
         while(true){
             //console.log('Clearing cache for ' + username);
-            var checkUpdate = await db.collection('cached').deleteOne({username: username})
+            let checkUpdate = await db.collection('cached').deleteOne({username: username})
             if(checkUpdate.deletedCount > 0){
                 return;
             }
+            console.log('Clearing cache for ' + username);
             await sleep(1000);
         }
     }
