@@ -339,12 +339,16 @@ async function sendTransactions() {
                         //const result = await Promise.race([claim(transaction.username), timeout(5000)]);
                         const result = await claim(transaction.username);
                         if(result) {
-                            while(true){
+                            let maxAttempts = 10;
+                            let delay = 200;
+                            for (let i = 0; i < maxAttempts; i++) {
                                 let clear = await collection.deleteOne({ _id: transaction._id });
                                 if(clear.deletedCount == 1){
                                     break;
                                 }
-                                await sleep(100);
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                                delay *= 1.5; // exponential backoff  
+                                
                             }
                         }
                         break;
@@ -355,12 +359,15 @@ async function sendTransactions() {
                         //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
                         var result2 = await battle(transaction.username, transaction.target);
                         if(result2) {
-                            while(true){
+                            let maxAttempts = 10;
+                            let delay = 200;
+                            for (let i = 0; i < maxAttempts; i++) {
                                 let clear = await collection.deleteOne({ _id: transaction._id });
                                 if(clear.deletedCount == 1){
                                     break;
                                 }
-                                await sleep(100);
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                                delay *= 1.5; // exponential backoff
                             }
                         }
                         break;
