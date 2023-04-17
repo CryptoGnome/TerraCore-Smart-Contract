@@ -816,7 +816,8 @@ async function clearCache(username) {
         while(true){
             //console.log('Clearing cache for ' + username);
             let checkUpdate = await db.collection('cached').deleteOne({username: username})
-            if(checkUpdate.deletedCount > 0){
+            console.log(checkUpdate);
+            if(checkUpdate.acknowledged == true) {
                 return;
             }
             console.log('Clearing cache for ' + username);
