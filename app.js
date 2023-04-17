@@ -29,7 +29,7 @@ async function sleep(ms) {
 
 //function to change to a new hive node
 async function changeNode() {
-    var nodes =['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me', 'https://rpc.ecency.com']
+    var nodes =['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me']
     var node = nodes[Math.floor(Math.random() * nodes.length)];
     hive.api.setOptions({ url: node });
     console.log('Changed node to ' + node);
@@ -497,7 +497,7 @@ async function claim(username) {
             if(claim) {
                 while(true) {
                     let update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
-                    if(update.modifiedCount == 1) {
+                    if(update.acknowledged == true) {
                         resetScrap(username, user.claims - 1);
                         webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                         storeClaim(username, qty);
@@ -659,7 +659,7 @@ async function battle(username, _target) {
                 while(true) {
                     let result = await collection.updateOne({ username: _target }, { $set: { scrap: newTargetScrap } });
                     //console.log('Target ' + _target + ' scrap modified');
-                    if (result.modifiedCount === 1) {
+                    if (result.acknowledged == true) {
                         break;
                     }
                     await sleep(500);
@@ -668,8 +668,7 @@ async function battle(username, _target) {
                 //modify user scrap first loop until success also set last battle to now
                 while(true) {
                     let result2 = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
-                    //console.log('User ' + username + ' scrap modified');
-                    if (result2.modifiedCount === 1) {
+                    if (result2.acknowledged == true) {
                         //send webhook with red color add roll to message and round roll to 2 decimal places
                         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
                         //store battle in db
@@ -816,7 +815,6 @@ async function clearCache(username) {
         while(true){
             //console.log('Clearing cache for ' + username);
             let checkUpdate = await db.collection('cached').deleteOne({username: username})
-            console.log(checkUpdate);
             if(checkUpdate.acknowledged == true) {
                 return;
             }
@@ -889,7 +887,6 @@ async function listen() {
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
-        //listen for register event
         if (result[0] == 'transfer' && result[1].to == 'terracore') {
             //grab hash from memo
             var memo = JSON.parse(result[1].memo);
@@ -937,7 +934,8 @@ async function listen() {
                 user = result[1].required_auths[0];
             }
             sendTransaction(user, 'battle', target);
-        }       
+        }    
+        
     });
 }
 
