@@ -29,7 +29,7 @@ async function sleep(ms) {
 
 //function to change to a new hive node
 async function changeNode() {
-    var nodes =['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me']
+    var nodes =['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me']
     var node = nodes[Math.floor(Math.random() * nodes.length)];
     hive.api.setOptions({ url: node });
     console.log('Changed node to ' + node);
@@ -280,35 +280,6 @@ async function storeClaim(username, qty) {
     }
 }
 
-//function to make sure scrap is set to 0
-async function resetScrap(username, claims) {
-    try{
-        let db = client.db(dbName);
-        let collection = db.collection('players');
-        //while loop and check if user has 0 scrap
-        while(true){
-            //console.log('resetting scrap');
-            var clear = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: claims, lastPayout: Date.now() } });
-            if(clear.modifiedCount == 1){
-                return true;
-            }  
-            await sleep(200);       
-        }
-        
-    }
-    catch (err) {
-        if(err instanceof MongoTopologyClosedError) {
-            console.log('MongoDB connection closed');
-            client.close();
-            process.exit(1);
-        }
-        else {
-            console.log(err);
-            return false;
-        }
-    }
-}
-
 //create a function where you can send transactions to be queued to be sent
 async function sendTransaction(username, type, target) {
     //create a que where new transactions are added and then sent in order 1 by 1
@@ -329,7 +300,6 @@ async function sendTransaction(username, type, target) {
         }
     }
 }
-
 
 //create a function that can be called to send all transactions in the queue
 async function sendTransactions() {
@@ -495,15 +465,17 @@ async function claim(username) {
             //reset payout time
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
             if(claim) {
-                while(true) {
+                let maxAttempts = 10;
+                let delay = 200;
+                for (let i = 0; i < maxAttempts; i++) {
                     let update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
-                    if(update.acknowledged == true) {
-                        resetScrap(username, user.claims - 1);
+                    if(update.acknowledged == true && update.modifiedCount == 1) {
                         webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                         storeClaim(username, qty);
                         return true;
                     }
-                    await sleep(500);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // exponential backoff  
                 }
             }
             else {
@@ -656,19 +628,25 @@ async function battle(username, _target) {
                 var newAttacks = user.attacks - 1;
 
                 //modify target scrap first loop until success
-                while(true) {
+                
+                let maxAttempts = 10;
+                let delay = 200;
+                for (let i = 0; i < maxAttempts; i++) {
                     let result = await collection.updateOne({ username: _target }, { $set: { scrap: newTargetScrap } });
-                    //console.log('Target ' + _target + ' scrap modified');
-                    if (result.acknowledged == true) {
+                    //check if update was successful
+                    if (result.acknowledged == true && result.modifiedCount == 1) {
                         break;
                     }
-                    await sleep(500);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // exponential backoff
                 }
 
                 //modify user scrap first loop until success also set last battle to now
-                while(true) {
+                maxAttempts = 10;
+                delay = 200;
+                for (let i = 0; i < maxAttempts; i++) {
                     let result2 = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
-                    if (result2.acknowledged == true) {
+                    if (result2.acknowledged == true && result2.modifiedCount == 1) {
                         //send webhook with red color add roll to message and round roll to 2 decimal places
                         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
                         //store battle in db
@@ -972,8 +950,8 @@ setInterval(function() {
         console.log('HeartBeat: ' + (Date.now() - lastCheck) + 'ms ago');
         heartbeat = 0;
     }
-    if (Date.now() - lastCheck > 10000) {
-        console.log('Error : No events received in 30 seconds, shutting down so PM2 can restart & try to reconnect to Resolve...');
+    if (Date.now() - lastCheck > 20000) {
+        console.log('Error : No events received in 20 seconds, shutting down so PM2 can restart & try to reconnect to Resolve...');
         client.close();
         process.exit();
     }
