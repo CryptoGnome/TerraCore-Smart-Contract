@@ -29,7 +29,7 @@ async function sleep(ms) {
 
 //function to change to a new hive node
 async function changeNode() {
-    var nodes =['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me']
+    var nodes =['https://api.hive.blog', 'https://anyx.io', 'https://api.deathwing.me']
     var node = nodes[Math.floor(Math.random() * nodes.length)];
     hive.api.setOptions({ url: node });
     console.log('Changed node to ' + node);
