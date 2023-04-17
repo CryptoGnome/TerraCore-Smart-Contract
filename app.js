@@ -884,7 +884,7 @@ async function listen() {
     //await clearTransactions();
     await clearFirst();
     checkTransactions();
-    hive.config.set('alternative_api_endpoints', ['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me', 'https://rpc.ecency.com']);
+    await changeNode();
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
