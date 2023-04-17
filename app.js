@@ -27,6 +27,14 @@ async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+//function to change to a new hive node
+async function changeNode() {
+    var nodes =['https://api.hive.blog', 'https://anyx.io', 'https://hive-api.arcange.eu', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://api.deathwing.me', 'https://rpc.ecency.com']
+    var node = nodes[Math.floor(Math.random() * nodes.length)];
+    hive.api.setOptions({ url: node });
+    console.log('Changed node to ' + node);
+}
+
 async function webhook(title, message, color) {
     
     const embed = new MessageBuilder()
@@ -499,6 +507,7 @@ async function claim(username) {
                 }
             }
             else {
+                await changeNode();
                 webhook("Error", "Error claiming scrap for user line:482 " + username + " Please try again", '#ff0000');
                 return false;
             }
@@ -506,6 +515,7 @@ async function claim(username) {
         }
         catch (err) {
             console.log(err);
+            await changeNode();
             webhook("Error", "Error claiming scrap for user line:489 " + username + " Error: " + err, '#ff0000');
             return false;
         }
@@ -520,6 +530,7 @@ async function claim(username) {
         }
         else {
             console.log(err);
+            //switch hive node
             webhook("Error", "Error claiming scrap for user line:502 " + username + " Error: " + err, '#ff0000');
             return false;
         }
