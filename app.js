@@ -757,14 +757,14 @@ async function cacheUser(username) {
         var db = client.db(dbName);
         const cache = await db.collection('cached').find({username: username}).limit(1).next();
         if (cache) {
-            //check to see if user has been in cache for more than 5 seconds
-            ///log how many seconds user has been in cache
-            console.log("User: " + username + " in Cache for " + ((Date.now() - cache.timestamp) / 1000).toString() + " seconds");
-            if (cache.timestamp < (Date.now() - 5000)) {
-                await db.collection('cached').deleteMany({username: username});
-                return false;
+            console((Date.now() - cache.timestamp) > 10000);
+            if ((Date.now() - cache.timestamp) > 10000) {
+                return false;    
             }
-            return true;
+            else {
+                console.log("User: " + username + " in Cache for " + ((Date.now() - cache.timestamp) / 1000).toString() + " seconds");
+                return true;
+            }
         } 
         //add username to cache
         await db.collection('cached').updateOne({username: username}, {$set: {username: username, timestamp: Date.now()}}, {upsert: true})
@@ -787,15 +787,20 @@ async function cacheUser(username) {
 async function clearCache(username) {
     try{
         var db = client.db(dbName);
-        while(true){
-            //console.log('Clearing cache for ' + username);
-            let checkUpdate = await db.collection('cached').deleteOne({username: username})
-            if(checkUpdate.acknowledged == true) {
+        let maxAttempts = 3;
+        let delay = 500;
+        for (let i = 0; i < maxAttempts; i++) {
+            let update = await db.collection('cached').deleteOne({username: username})
+            if(update.acknowledged == true && update.deletedCount == 1) {
                 return;
             }
             console.log('Clearing cache for ' + username);
-            await sleep(1000);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2.5; // exponential backoff  
         }
+        //if it fails to clear cache after 10 attempts
+        console.log('Failed to clear cache for ' + username);
+        return;
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
