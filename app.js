@@ -787,18 +787,15 @@ async function clearCache(username) {
     try{
         var db = client.db(dbName);
         let maxAttempts = 3;
-        let delay = 500;
+        let delay = 300;
         for (let i = 0; i < maxAttempts; i++) {
             let update = await db.collection('cached').deleteOne({username: username})
             if(update.acknowledged == true && update.deletedCount == 1) {
                 return;
             }
-            console.log('Clearing cache for ' + username);
             await new Promise(resolve => setTimeout(resolve, delay));
             delay *= 2.5; // exponential backoff  
         }
-        //if it fails to clear cache after 10 attempts
-        console.log('Failed to clear cache for ' + username);
         return;
     }
     catch (err) {
