@@ -757,7 +757,6 @@ async function cacheUser(username) {
         var db = client.db(dbName);
         const cache = await db.collection('cached').find({username: username}).limit(1).next();
         if (cache) {
-            console((Date.now() - cache.timestamp) > 10000);
             if ((Date.now() - cache.timestamp) > 10000) {
                 return false;    
             }
