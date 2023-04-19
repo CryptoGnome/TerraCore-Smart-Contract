@@ -414,12 +414,14 @@ async function checkTransactions() {
 async function broadcastClaim(username, data, user, qty) {
     try {
         const result = await hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', data);
-        if (!result.id) {
+        if (result.id) {
+            return true;
+        }
+        else {
             console.log("No result id");
             webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
             return false;
         }
-        return true;
     } catch (err) {
         //send error webhook
         webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
@@ -477,8 +479,8 @@ async function claim(username) {
                 for (let i = 0; i < maxAttempts; i++) {
                     let update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
                     if(update.acknowledged == true && update.modifiedCount == 1) {
+                        await storeClaim(username, qty);
                         webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
-                        storeClaim(username, qty);
                         return true;
                     }
                     await new Promise(resolve => setTimeout(resolve, delay));
@@ -563,8 +565,8 @@ async function battle(username, _target) {
             //check if target registrationTime is less than 24 hours ago
             if (Date.now() - target.registrationTime < 86400000) {
                 //send webhook stating target is has new user protection
-                webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
+                webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
                 return true;
             }
         }
@@ -589,18 +591,14 @@ async function battle(username, _target) {
             //check the amount of scrap users has staked
             var staked = await scrapStaked(username);
             var roll = await rollAttack(user);
-            //log roles to console
-            //console.log('User ' + username + ' rolled ' + roll + ' against ' + _target + ' who has ' + target.favor + ' favor');
             var scrapToSteal = target.scrap * (roll / 100);
 
             //give target a chance to ddodge based on toughness
             if (checkDodge(target)) {
                 //send webhook stating target dodged attack
-                webhook("Dodge", "User " + _target + " dodged " + username + "'s attack", '#636263')
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
-                collection = db.collection('battle_logs');
-                await collection.insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
-                return true;
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
+                webhook("Attack Dodged", "User " + username + " tried to attack " + _target + " but they dodged the attack", '#ff6eaf')
             }
 
             //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
@@ -630,39 +628,31 @@ async function battle(username, _target) {
             
 
             try{
-                var newScrap = user.scrap + scrapToSteal;
-                var newTargetScrap = target.scrap - scrapToSteal;
-                var newAttacks = user.attacks - 1;
-
-                //modify target scrap first loop until success
-                
+                let newScrap = user.scrap + scrapToSteal;
+                let newTargetScrap = target.scrap - scrapToSteal;
+                let newAttacks = user.attacks - 1;
+                //modify target scrap & add to user scrap
                 let maxAttempts = 10;
                 let delay = 200;
                 for (let i = 0; i < maxAttempts; i++) {
-                    let result = await collection.updateOne({ username: _target }, { $set: { scrap: newTargetScrap } });
-                    //check if update was successful
-                    if (result.acknowledged == true && result.modifiedCount == 1) {
-                        break;
+                    const bulkOps = [
+                        { updateOne: { filter: { username: _target }, update: { $set: { scrap: newTargetScrap } } } },
+                        { updateOne: { filter: { username: username }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } } } }
+                    ];
+                    const result = await collection.bulkWrite(bulkOps);
+                    //check if update was successful frim above result
+                    if (result.nModified == 2 && result.nMatched == 2 && result.ok == 1) {
+                        await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
+                        webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
+                        return true;
                     }
                     await new Promise(resolve => setTimeout(resolve, delay));
                     delay *= 2; // exponential backoff
                 }
 
-                //modify user scrap first loop until success also set last battle to now
-                maxAttempts = 10;
-                delay = 200;
-                for (let i = 0; i < maxAttempts; i++) {
-                    let result2 = await collection.updateOne({ username: username }, { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } });
-                    if (result2.acknowledged == true && result2.modifiedCount == 1) {
-                        //send webhook with red color add roll to message and round roll to 2 decimal places
-                        webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
-                        //store battle in db
-                        collection = db.collection('battle_logs');
-                        collection.insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
-                        return true;
-                    }
-                    await sleep(500);
-                }
+                //if we get here then we failed to update the database return 
+                return true;
+
             }
             catch (e) {
                 //send webhook with red color
