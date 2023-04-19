@@ -587,7 +587,7 @@ async function battle(username, _target) {
 
 
         //check if user has more damage than target defense and attacks > 0 and has defense > 10
-        if (user.damage > target.defense && user.attacks > 0) {
+        if (user.stats.damage > target.stats.defense && user.attacks > 0) {
             //check the amount of scrap users has staked
             var staked = await scrapStaked(username);
             var roll = await rollAttack(user);
