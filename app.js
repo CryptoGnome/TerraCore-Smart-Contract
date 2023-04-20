@@ -533,13 +533,10 @@ async function battle(username, _target) {
         }
         var cache  = await cacheUser(username);
         if(cache) {
-            console.log('Battle User: ' + username + ' is cached');
             return false;
         }
         var cache2  = await cacheUser(_target);
         if(cache2) {
-            console.log('Battle User: ' + _target + ' is cached');
-            webhook("Error", username + " tried to attack " + _target + " but they are cached, please try again", '#ff0000');
             return false;
         }
         
