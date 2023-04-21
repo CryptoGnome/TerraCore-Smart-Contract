@@ -480,6 +480,7 @@ async function claim(username) {
                     let update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
                     if(update.acknowledged == true && update.modifiedCount == 1) {
                         await storeClaim(username, qty);
+                        await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
                         webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                         return true;
                     }
