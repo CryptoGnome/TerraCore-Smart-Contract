@@ -511,10 +511,6 @@ async function claim(username) {
             return false;
         }
     }
-    finally {
-        await clearCache(username);
-    }
-
 
 }
 
