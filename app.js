@@ -432,12 +432,6 @@ async function broadcastClaim(username, data, user, qty) {
 //claim favorcheckDodge
 async function claim(username) {
     try{
-        var cache  = await cacheUser(username);
-        if(cache) {
-            console.log('Error : Claim User: ' + username + ' is cached');
-            return false;
-        }
-
         let db = client.db(dbName);
         let collection = db.collection('players');
         //make sure user exists and has claims left
@@ -477,10 +471,10 @@ async function claim(username) {
                 let maxAttempts = 10;
                 let delay = 200;
                 for (let i = 0; i < maxAttempts; i++) {
-                    let update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
+                    //inc version
+                    let update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() }, $inc: { version: 1 } });
                     if(update.acknowledged == true && update.modifiedCount == 1) {
                         await storeClaim(username, qty);
-                        await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() } });
                         webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
                         return true;
                     }
@@ -532,15 +526,7 @@ async function battle(username, _target) {
             console.log('Error : Battle User: ' + username + ' tried to battle themselves');
             return true;
         }
-        var cache  = await cacheUser(username);
-        if(cache) {
-            return false;
-        }
-        var cache2  = await cacheUser(_target);
-        if(cache2) {
-            return false;
-        }
-        
+
         var db = client.db(dbName);
         var collection = db.collection('players');
         //load target user
@@ -562,8 +548,8 @@ async function battle(username, _target) {
         if (target.registrationTime) {
             //check if target registrationTime is less than 24 hours ago
             if (Date.now() - target.registrationTime < 86400000) {
-                //send webhook stating target is has new user protection
-                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } });
+                //send webhook stating target is has new user protection inc version
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
                 webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
                 return true;
             }
@@ -573,7 +559,8 @@ async function battle(username, _target) {
         if (!target.lastBattle) {
             //set to now - 60 seconds
             target.lastBattle = Date.now() - 60000;
-            await collection.updateOne({ username: _target }, { $set: { lastBattle: target.lastBattle } });
+            //inv version
+            await collection.updateOne({ username: _target }, { $set: { lastBattle: target.lastBattle }, $inc: { version: 1 } });
         }
 
         //make sure target is not getting attacked withing 60 seconds of last payout
@@ -594,7 +581,7 @@ async function battle(username, _target) {
             //give target a chance to ddodge based on toughness
             if (checkDodge(target)) {
                 //send webhook stating target dodged attack
-                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } })
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
                 await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
                 webhook("Attack Dodged", "User " + username + " tried to attack " + _target + " but they dodged the attack", '#ff6eaf')
             }
@@ -624,7 +611,6 @@ async function battle(username, _target) {
             }
 
             
-
             try{
                 let newScrap = user.scrap + scrapToSteal;
                 let newTargetScrap = target.scrap - scrapToSteal;
@@ -633,9 +619,10 @@ async function battle(username, _target) {
                 let maxAttempts = 10;
                 let delay = 200;
                 for (let i = 0; i < maxAttempts; i++) {
+                    //inc versions
                     const bulkOps = [
-                        { updateOne: { filter: { username: _target }, update: { $set: { scrap: newTargetScrap } } } },
-                        { updateOne: { filter: { username: username }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } } } }
+                        { updateOne: { filter: { username: _target }, update: { $set: { scrap: newTargetScrap }, $inc: { version: 1 } } } },
+                        { updateOne: { filter: { username: username }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } , $inc: { version: 1 } } } }
                     ];
                     const result = await collection.bulkWrite(bulkOps);
                     //check if update was successful frim above result
@@ -662,13 +649,14 @@ async function battle(username, _target) {
         else{
             //check if user has attacks left
             if (user.attacks > 0) {
-                await collection.updateOne({ username: username }, { $inc: { attacks: -1 } ,  $set: { lastBattle: Date.now() } });
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1, version: 1 } ,  $set: { lastBattle: Date.now() } });
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
                 webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
                 return true;
             }
             else {
                 console.log('User ' + username + ' has no attacks left');
-                //webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
+                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
                 return true;
             }
             
@@ -685,10 +673,6 @@ async function battle(username, _target) {
             webhook("New Error", " Line: 681 Error: " + err, '#6385ff');
             return true;
         }
-    }
-    finally {
-        await clearCache(username);
-        await clearCache(_target);
     }
 }
 
@@ -749,64 +733,6 @@ async function rollAttack(_player) {
     return steal;
 }
 
-//create function to cache a user
-async function cacheUser(username) {
-    try{
-        var db = client.db(dbName);
-        const cache = await db.collection('cached').find({username: username}).limit(1).next();
-        if (cache) {
-            if ((Date.now() - cache.timestamp) > 10000) {
-                return false;    
-            }
-            else {
-                console.log("User: " + username + " in Cache for " + ((Date.now() - cache.timestamp) / 1000).toString() + " seconds");
-                return true;
-            }
-        } 
-        //add username to cache
-        await db.collection('cached').updateOne({username: username}, {$set: {username: username, timestamp: Date.now()}}, {upsert: true})
-        return false;
-    }
-    catch (err) {
-        if(err instanceof MongoTopologyClosedError) {
-            console.log('MongoDB connection closed');
-            client.close();
-            process.exit(1);
-        }
-        else {
-            console.log(err);
-            return false;
-        }
-    }
-}
-
-//create a function to clear user from cache
-async function clearCache(username) {
-    try{
-        var db = client.db(dbName);
-        let maxAttempts = 3;
-        let delay = 300;
-        for (let i = 0; i < maxAttempts; i++) {
-            let update = await db.collection('cached').deleteOne({username: username})
-            if(update.acknowledged == true && update.deletedCount == 1) {
-                return;
-            }
-            await new Promise(resolve => setTimeout(resolve, delay));
-            delay *= 2.5; // exponential backoff  
-        }
-        return;
-    }
-    catch (err) {
-        if(err instanceof MongoTopologyClosedError) {
-            console.log('MongoDB connection closed');
-            client.close();
-            process.exit(1);
-        }
-        else {
-            console.log(err);
-        }
-    }
-}
 
 //async function to clear transactions from queue
 async function clearTransactions() {
