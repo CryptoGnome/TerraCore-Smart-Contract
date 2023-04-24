@@ -561,8 +561,8 @@ async function battle(username, _target) {
 
         //make sure target is not getting attacked withing 60 seconds of last payout
         if (Date.now() - target.lastBattle < 60000) {
-            //send webhook stating target is has new user protection
-            webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
+            await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
+            //webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
             return true;
         }
 
