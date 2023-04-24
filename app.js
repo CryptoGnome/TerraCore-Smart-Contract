@@ -673,27 +673,9 @@ async function battle(username, _target) {
 }
 
 function checkDodge(_target) {
-    var k = 0.025;
-    var toughness = k * _target.hiveEngineStake;
-
-    // Adjust toughness based on stake
-    var values = [3, 5, 10, 20, 30, 40, 50, 60, 75];
-    for (var i = 0; i < values.length; i++) {
-        if (toughness > values[i]) {
-            var scrapNeeded = (values[i] / k);
-            k = k / 2;
-            toughness = values[i] + k * (_target.hiveEngineStake - scrapNeeded);
-        }
-    }
-
-    //check that _target.stats.dodge exists
-    if(_target.stats.dodge != undefined) {
-        toughness = toughness + _target.stats.dodge;
-    }
-
     // Check if attack is dodged
     var roll = Math.floor(Math.random() * 100) + 1;
-    if (roll < toughness) {
+    if (roll < _target.stats.dodge) {
         return true;
     }
     else {
@@ -702,25 +684,8 @@ function checkDodge(_target) {
 }
 
 async function rollAttack(_player) {
-    var k = 0.025;
-    var favor = k * _player.favor;
-    var values = [3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75];
-
-    for (var i = 0; i < values.length; i++) {
-        if (favor > values[i]) {
-            var scrapNeeded = (values[i] / k);
-            k = k / 2;
-            favor = values[i] + k * (_player.favor - scrapNeeded);
-        }
-    }
-
-    //check that _player.stats.crit exists
-    if(_player.stats.crit != undefined) {
-        favor = favor + _player.stats.crit;
-    }
-
     //roll a random number between favor and 100
-    var steal = Math.floor(Math.random() * (100 - favor + 1)) + favor;
+    var steal = Math.floor(Math.random() * (100 - _player.stats.crit + 1)) + _player.stats.crit;
     //check if steal is greater than 100
     if (steal > 100) {
         steal = 100;
