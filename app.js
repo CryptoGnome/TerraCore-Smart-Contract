@@ -177,12 +177,12 @@ async function scrapStaked(username) {
 }
 
 //pay 1 HIVE to refferrer
-async function payReferrer(referrer, username) {
+async function payReferrer(referrer, username, amount) {
     try {
         const xfer = new Object();
         xfer.from = "terracore";
         xfer.to = referrer;
-        xfer.amount = "1.000 HIVE";
+        xfer.amount = amount;
         xfer.memo = 'Here is your Refferal Bonus for inviting ' + username + ' to TerraCore!';
         await hive.broadcast.transfer(wif, xfer.from, xfer.to, xfer.amount, xfer.memo, function (err, result) {
             if (err) {
@@ -197,9 +197,20 @@ async function payReferrer(referrer, username) {
     }
 }
 
-async function register(username, referrer) {
+async function register(username, referrer, amount) {
     try{
-        let db = client.db(dbName);
+        let db = client.db(dbName)
+        //cehck if amount == registration_fee in price_feed db
+        let registration_fee_query = await db.collection('price_feed').findOne({date: "global"});
+        let registration_fee = registration_fee_query.registration_fee;
+        let referrer_fee = registration_fee_query.referral_fee;    
+        
+        //masure sure amount == registration_fee
+        if (amount != registration_fee) {
+            console.log('Amount does not match registration fee');
+            return false;
+        }
+
         let collection = db.collection('players');
         let user = await collection.findOne({ username: username });
         if (user) {
@@ -217,7 +228,7 @@ async function register(username, referrer) {
 
         if (referrer != 'terracore' && referrer != username) {
             webhook2('A New Citizen of Terracore has Registered', username + ' was invited by ' + referrer, 0x00ff00);
-            payReferrer(referrer, username);
+            payReferrer(referrer, username, referrer_fee);
         }
         else{
             webhook2('A New Citizen of Terracore has Registered', username, 0x00ff00);
@@ -738,7 +749,6 @@ async function clearFirst() {
 
 var lastevent = Date.now();
 var lastCheck = Date.now();
-const mintPrice = '20.000 HIVE'
 //aysncfunction to start listening for events
 async function listen() {
     //await clearTransactions();
@@ -756,8 +766,8 @@ async function listen() {
                 //split hash to get hash
                 var hash = memo.hash.split('-')[1];
                 var referrer = memo.referrer;
-                if (result[1].to == 'terracore' && result[1].amount == mintPrice) {
-                    var registered = register(result[1].from, referrer);
+                if (result[1].to == 'terracore') {
+                    var registered = register(result[1].from, referrer, result[1].amount);
                     if (registered) {
                         storeRegistration(hash, result[1].from);
                     }
