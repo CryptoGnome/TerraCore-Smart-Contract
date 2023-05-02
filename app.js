@@ -179,6 +179,7 @@ async function scrapStaked(username) {
 //pay 1 HIVE to refferrer
 async function payReferrer(referrer, username, amount) {
     try {
+        console.log('Paying ' + referrer + ' for referring ' + username + ' ' + amount + ' HIVE');
         const xfer = new Object();
         xfer.from = "terracore";
         xfer.to = referrer;
@@ -206,6 +207,7 @@ async function register(username, referrer, amount) {
         let referrer_fee = registration_fee_query.referral_fee;    
         
         //masure sure amount == registration_fee
+        console.log('Amount: ' + amount + ' Registration Fee: ' + registration_fee);
         if (amount != registration_fee) {
             console.log('Amount does not match registration fee');
             return false;
@@ -557,6 +559,7 @@ async function battle(username, _target) {
             if (Date.now() - target.registrationTime < 86400000) {
                 //send webhook stating target is has new user protection inc version
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
                 webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
                 return true;
             }
@@ -573,6 +576,7 @@ async function battle(username, _target) {
         //make sure target is not getting attacked withing 60 seconds of last payout
         if (Date.now() - target.lastBattle < 60000) {
             await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
+            await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
             //webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
             return true;
         }
