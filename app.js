@@ -9,6 +9,7 @@ const hook = new Webhook(process.env.DISCORD_WEBHOOK);
 //seciondary webhook for registrations
 const hook2 = new Webhook(process.env.DISCORD_WEBHOOK_2);
 
+
 const dbName = 'terracore';
 const SYMBOL = 'SCRAP';
 const wif = process.env.ACTIVE_KEY;
@@ -595,6 +596,7 @@ async function battle(username, _target) {
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
                 await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
                 webhook("Attack Dodged", "User " + username + " tried to attack " + _target + " but they dodged the attack", '#ff6eaf')
+                return true;
             }
 
             //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
@@ -710,6 +712,8 @@ async function rollAttack(_player) {
 }
 
 
+
+
 //async function to clear transactions from queue
 async function clearTransactions() {
     //connect to db
@@ -750,6 +754,8 @@ async function clearFirst() {
         }
     }
 }
+
+
 
 var lastevent = Date.now();
 var lastCheck = Date.now();
