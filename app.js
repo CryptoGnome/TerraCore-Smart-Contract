@@ -209,10 +209,11 @@ async function register(username, referrer, amount) {
         
         //masure sure amount == registration_fee
         console.log('Amount: ' + amount + ' Registration Fee: ' + registration_fee);
-        if (amount != registration_fee) {
+        if (amount >= registration_fee) {
             console.log('Amount does not match registration fee');
             return false;
         }
+        
 
         let collection = db.collection('players');
         let user = await collection.findOne({ username: username });
