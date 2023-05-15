@@ -235,7 +235,7 @@ async function register(username, referrer, amount) {
         console.log('Amount: ' + amount + ' Registration Fee: ' + registration_fee);
         if (amount <= registration_fee) {
             console.log('Amount does not match registration fee');
-            payReferrer(referrer, username, referrer_fee);
+            //await refund(username, amount);
             return false;
         }
         
