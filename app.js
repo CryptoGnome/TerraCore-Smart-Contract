@@ -177,7 +177,7 @@ async function scrapStaked(username) {
     }
 }
 
-//pay 1 HIVE to refferrer
+//pay refferrer
 async function payReferrer(referrer, username, amount) {
     try {
         console.log('Paying ' + referrer + ' for referring ' + username + ' ' + amount + ' HIVE');
@@ -199,6 +199,27 @@ async function payReferrer(referrer, username, amount) {
     }
 }
 
+async function refund(username, amount) {
+    try {
+        console.log('Refunding ' + username + ' ' + amount + ' HIVE');
+        const xfer = new Object();
+        xfer.from = "terracore";
+        xfer.to = username;
+        xfer.amount = amount;
+        xfer.memo = 'Refund for failed registration';
+        await hive.broadcast.transfer(wif, xfer.from, xfer.to, xfer.amount, xfer.memo, function (err, result) {
+            if (err) {
+                console.log(err);
+            } else {
+                console.log(result);
+            }
+        });
+        return;
+    } catch (error) {
+        console.log(error);
+    }
+}
+
 async function register(username, referrer, amount) {
     try{
         let db = client.db(dbName)
@@ -207,13 +228,14 @@ async function register(username, referrer, amount) {
         let registration_fee = registration_fee_query.registration_fee;
         let referrer_fee = registration_fee_query.referral_fee;    
         
-        //remove HIVE from registration_fee string
-        registration_fee = registration_fee.split(' ')[0];
-        amount = amount.split(' ')[0];
+        //remove HIVE from registration_fee string with 3 decimal places
+        registration_fee = parseFloat(registration_fee.split(' ')[0]).toFixed(3);
+        amount = parseFloat(amount.split(' ')[0]).toFixed(3);
 
         console.log('Amount: ' + amount + ' Registration Fee: ' + registration_fee);
-        if (parseFloat(amount) >= parseFloat(registration_fee)) {
+        if (amount <= registration_fee) {
             console.log('Amount does not match registration fee');
+            payReferrer(referrer, username, referrer_fee);
             return false;
         }
         
