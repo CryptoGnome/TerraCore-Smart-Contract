@@ -207,7 +207,10 @@ async function register(username, referrer, amount) {
         let registration_fee = registration_fee_query.registration_fee;
         let referrer_fee = registration_fee_query.referral_fee;    
         
-        //convert amount & registration_fee to float
+        //remove HIVE from registration_fee string
+        registration_fee = registration_fee.split(' ')[0];
+        amount = amount.split(' ')[0];
+
         console.log('Amount: ' + amount + ' Registration Fee: ' + registration_fee);
         if (parseFloat(amount) >= parseFloat(registration_fee)) {
             console.log('Amount does not match registration fee');
