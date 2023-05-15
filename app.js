@@ -233,7 +233,7 @@ async function register(username, referrer, amount) {
         amount = parseFloat(amount.split(' ')[0]).toFixed(3);
 
         console.log('Amount: ' + amount + ' Registration Fee: ' + registration_fee);
-        if (amount <= registration_fee) {
+        if (amount < registration_fee) {
             console.log('Amount does not match registration fee');
             //await refund(username, amount);
             return false;
