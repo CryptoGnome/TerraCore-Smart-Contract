@@ -643,9 +643,9 @@ async function battle(username, _target) {
             }
 
             //make sure scrapToSteal is not less than 0
-            if (scrapToSteal < 0) {
+            if (scrapToSteal <= 0) {
                 //shoot error webhook
-                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than 0, please try again", '#6385ff')
+                webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than or = 0, please try again", '#6385ff')
                 return true;
             }
 
@@ -688,7 +688,8 @@ async function battle(username, _target) {
         else{
             //check if user has attacks left
             if (user.attacks > 0) {
-                await collection.updateOne({ username: username }, { $inc: { attacks: -1, version: 1 } ,  $set: { lastBattle: Date.now() } });
+                //inc but make sure attacks is not less than 0
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
                 await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
                 webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
                 return true;
@@ -737,7 +738,17 @@ async function rollAttack(_player) {
     return steal;
 }
 
-
+////////////////////////////////////////////////////
+////////////
+/////////// Quest  Functions
+//////////
+///////////////////////////////////////////////////
+//create a function the selects quests 
+//the functions for start & end will be in the HE contract
+async function selectQuest() {
+    //go into quest-templates collection and select a random quest then add it to users current quest
+    
+}
 
 
 //async function to clear transactions from queue
