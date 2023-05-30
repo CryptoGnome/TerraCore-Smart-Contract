@@ -18,22 +18,48 @@ const wif = process.env.ACTIVE_KEY;
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 5000, serverSelectionTimeoutMS: 5000 });
 
 
-const timeout = (ms) => {
-    return new Promise(resolve => setTimeout(resolve, ms));
-};
+const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io'];
 
-//sleep function
-async function sleep(ms) {
-    console.log('Sleeping for ' + ms + 'ms');
-    return new Promise(resolve => setTimeout(resolve, ms));
+
+async function testNodeEndpoints(nodes) {
+  let fastestEndpoint = '';
+  let fastestResponseTime = Infinity;
+
+  nodes.forEach((endpoint) => {
+    hive.api.setOptions({ url: endpoint });
+
+    const startTime = Date.now();
+
+    hive.api.getState('/', (err, result) => {
+      if (err) {
+        console.error(`${endpoint} error: ${err.message}`);
+      } else {
+        const responseTime = Date.now() - startTime;
+        console.log(`${endpoint}: ${responseTime}ms`);
+        if (responseTime < fastestResponseTime) {
+          fastestResponseTime = responseTime;
+          fastestEndpoint = endpoint;
+        
+          const json = { "action": "test-tx" };
+          const data = JSON.stringify(json);
+
+          hive.broadcast.customJson(wif, ['terracore.market'], [], 'test-tx', data, (err, result) => {
+            if (err) {
+              console.error(`${endpoint} transaction error: ${err.message}`);
+            } else {
+              console.log(`${endpoint} transaction successful`);
+            }
+          });
+        }
+      }
+    });
+  });
+
+
 }
 
-//function to change to a new hive node
 async function changeNode() {
-    var nodes = ['https://api.hive.blog', 'https://anyx.io', 'https://api.deathwing.me']
-    var node = nodes[Math.floor(Math.random() * nodes.length)];
-    hive.api.setOptions({ url: node });
-    console.log('Changed node to ' + node);
+    await testNodeEndpoints(nodes);
 }
 
 async function webhook(title, message, color) {
@@ -83,98 +109,24 @@ async function webhook2(title, message, color) {
     
 }
 
-async function engineBalance(username) {
-    //make a list of nodes to try
-    const nodes = ["https://engine.rishipanthee.com", "https://herpc.dtools.dev", "https://api.primersion.com"];
-    var node;
-
-    //try each node until one works, just try for a response
-    for (let i = 0; i < nodes.length; i++) {
-        try {
-            const response = await fetch(nodes[i], {
-                method: "GET",
-                headers:{'Content-type' : 'application/json'},
-            });
-            const data = await response.json()
-            node = nodes[i];
-            break;
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-                
-
-    const response = await fetch(node + "/contracts", {
-      method: "POST",
-      headers:{'Content-type' : 'application/json'},
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "find",
-        params: {
-          contract: "tokens",
-          table: "balances",
-          query: {
-            "account":username,
-            "symbol":SYMBOL    
-          }
-        },
-        "id": 1,
-      })
-    });
-    const data = await response.json()
-    if (data.result.length > 0) {
-        return parseFloat(data.result[0].balance);
-    } else {
-        return 0;
-    }
-}
-
+//switch this to look at DB
 async function scrapStaked(username) {
-    //make a list of nodes to try
-    const nodes = ["https://engine.rishipanthee.com", "https://herpc.dtools.dev", "https://api.primersion.com"];
-    var node;
+    try{
+        //read the username balacne from the player collection
+        let db = client.db(dbName);
+        let collection = db.collection('players');
 
-    //try each node until one works, just try for a response
-    for (let i = 0; i < nodes.length; i++) {
-        try {
-            const response = await fetch(nodes[i], {
-                method: "GET",
-                headers:{'Content-type' : 'application/json'},
-            });
-            const data = await response.json()
-            node = nodes[i];
-            break;
-        } catch (error) {
-            console.log(error);
+        //find the player
+        let player = await collection.findOne({ username: username });
+        if (player) {
+            return player.hiveEngineStake
+        } else {
+            return 0;
         }
+    } catch (error) {   
+        console.log(error);
     }
 
-                
-
-    const response = await fetch(node + "/contracts", {
-      method: "POST",
-      headers:{'Content-type' : 'application/json'},
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "find",
-        params: {
-          contract: "tokens",
-          table: "balances",
-          query: {
-            "account":username,
-            "symbol":SYMBOL    
-          }
-        },
-        "id": 1,
-      })
-    });
-    const data = await response.json()
-    if (data.result.length > 0) {
-        return parseFloat(data.result[0].stake);
-    } else {
-        return 0;
-    }
 }
 
 //pay refferrer
@@ -186,27 +138,6 @@ async function payReferrer(referrer, username, amount) {
         xfer.to = referrer;
         xfer.amount = amount;
         xfer.memo = 'Here is your Refferal Bonus for inviting ' + username + ' to TerraCore!';
-        await hive.broadcast.transfer(wif, xfer.from, xfer.to, xfer.amount, xfer.memo, function (err, result) {
-            if (err) {
-                console.log(err);
-            } else {
-                console.log(result);
-            }
-        });
-        return;
-    } catch (error) {
-        console.log(error);
-    }
-}
-
-async function refund(username, amount) {
-    try {
-        console.log('Refunding ' + username + ' ' + amount + ' HIVE');
-        const xfer = new Object();
-        xfer.from = "terracore";
-        xfer.to = username;
-        xfer.amount = amount;
-        xfer.memo = 'Refund for failed registration';
         await hive.broadcast.transfer(wif, xfer.from, xfer.to, xfer.amount, xfer.memo, function (err, result) {
             if (err) {
                 console.log(err);
@@ -685,22 +616,10 @@ async function battle(username, _target) {
             }
 
         }
-        else{
-            //check if user has attacks left
-            if (user.attacks > 0) {
-                //inc but make sure attacks is not less than 0
-                await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
-                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
-                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you need more attack power than your opponent!', '#f55a42');
-                return true;
-            }
-            else {
-                console.log('User ' + username + ' has no attacks left');
-                webhook("New Battle Log", 'User ' + username + ' failed to steal scrap from ' + _target + ' you have no attacks left!', '#f55a42');
-                return true;
-            }
-            
+        else {
+            return true;
         }
+ 
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
@@ -743,12 +662,393 @@ async function rollAttack(_player) {
 /////////// Quest  Functions
 //////////
 ///////////////////////////////////////////////////
-//create a function the selects quests 
-//the functions for start & end will be in the HE contract
-async function selectQuest() {
-    //go into quest-templates collection and select a random quest then add it to users current quest
+//start quest is for testing only in this contract -- lives in HE contract for FLUX
+async function startQuest(username) {
+    //check if user has a quest already
+    //if so return false else insert quest into active-quests collection
+    try{
+        //check if user is in active-quests collection
+        let db = client.db(dbName);
+        let collection = db.collection('active-quests');
+        let user = await collection.findOne({ username: username });
+        //get username from players collection
+        let _username = await db.collection('players').findOne({ username: username });
+   
+        if(_username) {
+            var activeQuest;
+            if (!user) {
+                //select a quest
+                activeQuest = await selectQuest(1, _username);
+                //add quest to active-quests collection
+                await collection.insertOne(activeQuest);
+            }
+            else {
+                console.log('User ' + username + ' already has a quest');
+                return false;
+            }
+          
+        }
+        else {
+            console.log('User ' + username + ' does not exist');
+            return false;
+        }
+
+    
+
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            client.close();
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+            return false;
+        }
+    }
+}
+
+async function progressQuest(username) {
+    //check if user has a quest already
+    //if so return false else insert quest into active-quests collection
+    try{
+        //check if user is in active-quests collection
+        let db = client.db(dbName);
+        let collection = db.collection('active-quests');
+        let user = await collection.findOne({ username: username });
+        //get username from players collection
+        let _username = await db.collection('players').findOne({ username: username });
+
+        if (user) {
+            //before progressing quest let's make a roll to see if the quest is successful
+            var roll = Math.random();
+            if(roll < user.success_chance) {
+                console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + user.success_chance.toFixed(2).toString());
+                //quest was successful
+                if(_username) {
+                    var activeQuest;
+                    if (user) {
+                        //user already has a quest lets start from the current round
+                        activeQuest = await selectQuest(user.round + 1, _username);
+                        //replace current quest with new quest
+                        await collection.replaceOne({ username: username }, activeQuest);
+
+                    }
+                    else {
+                        console.log('User ' + username + ' does not have a quest yet please use startQuest');
+                    }
+                }
+                else {
+                    console.log('User ' + username + ' does not exist');
+                    return false;
+                }
+            }
+            else {
+                //quest failed
+                //remove quest from active-quests collection
+                console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + user.success_chance.toFixed(2).toString());
+                await collection.deleteOne({ username: username });
+            }
+        }
+        else {
+            console.log('User ' + username + ' does not have a quest yet please use startQuest');
+        }
+
+        
+
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            client.close();
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+            return false;
+        }
+    }
+}
+
+async function selectQuest(round, user) {
+    //go into quest-template collection and select a random quest then add it to users current quest
+    try{
+        let db = client.db(dbName);
+        let collection = db.collection('quest-template');
+        let quests = await collection.find({}).toArray();
+
+        //select a random quest
+        var random_quest = quests[Math.floor(Math.random() * quests.length)];
+
+        //choose a random attribute based on round
+        var availableAttributes = ["damage", "defense", "engineering", "dodge", "crit", "luck"];
+        var attribute_one = availableAttributes[Math.floor(Math.random() * availableAttributes.length)];
+        availableAttributes = availableAttributes.filter(item => item !== attribute_one);
+        var attribute_two = availableAttributes[Math.floor(Math.random() * availableAttributes.length)];
+
+        //come up with base stats for the quest these should scale based on the round
+        var base_stats = {
+            "damage": 20 * round,
+            "defense": 20 * round,
+            "engineering": 2 * round,
+            "dodge": round,
+            "crit": round,
+            "luck": round
+        };
+
+
+        //base success chance
+        var success_chance = 1;
+
+        //for every round remove 10% chance of success
+        for (let i = 0; i < round; i++) {
+            success_chance -= 0.05;
+        }
+
+        //loop users stats and find attribute_one and attribute_two
+
+        //go through each stat and add to success chance
+        for(var key in user.stats) {
+            if(key == attribute_one || key == attribute_two) {
+                //check of stat is greater than base stat
+                if(user.stats[key] > base_stats[key]) {
+                    //add to success chance
+                    success_chance += 0.1;
+                }
+            }
+        }
+
+
+        
+        //if round is greater than 1 roll for rewards, rewards should scale based on round
+        if (round > 0) {
+            //roll float for rewards between 0 and 1
+            var roll = Math.random() + 0.01;
+
+            var common_relics = 0;
+            var uncommon_relics = 0;
+            var rare_relics = 0;
+            var epic_relics = 0;
+            var legendary_relics = 0;
+
+            var relic_types = 1;
+            if (round > 5) {
+                if (roll < 0.5) {
+                    relic_types = 2;
+                }
+            }
+            if (round > 10) {
+                if (roll < 0.75) {
+                    relic_types = 2;
+                }
+                else if (roll < 0.5) {
+                    relic_types = 3;
+                }
+
+            }
+            if (round > 14) {
+                if (roll < 0.95) {
+                    relic_types = 2;
+                }
+                else if (roll < 0.75) {
+                    relic_types = 3;
+                }
+                else if (roll < 0.25) {
+                    relic_types = 4;
+                }
+            }
+            if (round > 18) {
+                if (roll < 0.98) {
+                    relic_types = 2
+                }
+                else if (roll < 0.75) {
+                    relic_types = 3;
+                }
+                else if (roll < 0.50) {
+                    relic_types = 4;
+                }
+                else if (roll < 0.2) {
+                    relic_types = 5;
+                }
+            }
+
+            //loop through shard_types and give relics
+            for (let i = 0; i < relic_types; i++) {
+                //make  roll for relics
+                roll = Math.random();
+                //decide which relics to give
+                if (roll > 0.5) {
+                    roll = Math.random();
+                    common_relics = (roll * 10) * round/4;
+                }
+                else if (roll > 0.4) {
+                    roll = Math.random();
+                    uncommon_relics = (roll * 10) * round/4;
+
+                }
+                else if (roll > 0.25) {
+                    roll = Math.random();
+                    rare_relics = (roll * 10) * round/4;
+                }
+                else if (roll > 0.10) {
+                    roll = Math.random();
+                    epic_relics = (roll * 10) * round/6;
+                    
+                }
+                else if (roll > 0.05) {
+                    roll = Math.random();
+                    legendary_relics = (roll * 10) * round/8;
+                }
+            }
+
+        }
+        else {
+            var common_relics = 0;
+            var uncommon_relics = 0;
+            var rare_relics = 0;
+            var epic_relics = 0;
+            var legendary_relics = 0;
+        }
+
+        //log scraps, and shards to console
+        console.log('------------------------------------------------------');
+        console.log('Round: ' + round.toString() + ' Success Chance: ' + success_chance.toString() + ' for user: ' + user.username);
+        console.log('Common Relics: ' + common_relics.toString());
+        console.log('Uncommon Relics: ' + uncommon_relics.toString());
+        console.log('Rare Relics: ' + rare_relics.toString());
+        console.log('Epic Relics: ' + epic_relics.toString());
+        console.log('Legendary Relics: ' + legendary_relics.toString());
+        //create new quest object
+        var quest = {
+            "username": user.username,
+            "name": random_quest.name,
+            "description": random_quest.description,
+            "image": random_quest.image,
+            "round": round,
+            "success_chance": success_chance,
+            "attribute_one": attribute_one,
+            "attribute_two": attribute_two,
+            "attribute_one_value": base_stats[attribute_one],
+            "attribute_two_value": base_stats[attribute_two],
+            "common_relics": common_relics,
+            "uncommon_relics": uncommon_relics,
+            "rare_relics": rare_relics,
+            "epic_relics": epic_relics,
+            "legendary_relics": legendary_relics,
+        };
+  
+        //return quest
+        return quest;
+
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            client.close();
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+            return false;
+        }
+    }
+
     
 }
+
+async function completeQuest(username) {
+    //check if user has a quest already
+    //if so return false else insert quest into active-quests collection
+    try{
+        //check if user is in active-quests collection
+        let db = client.db(dbName);
+        let collection = db.collection('active-quests');
+        let user = await collection.findOne({ username: username });
+        if (user) {
+            if (user.common_relics > 0) {
+                await issue(username, 'common_relics', user.common_relics);
+            }
+            if (user.uncommon_relics > 0) {
+                await issue(username, 'uncommon_relics', user.uncommon_relics);
+            }
+            if (user.rare_relics > 0) {
+                await issue(username, 'rare_relics', user.rare_relics);
+            }
+            if (user.epic_relics > 0) {
+                await issue(username, 'epic_relics', user.epic_relics);
+            }
+            if (user.legendary_relics > 0) {
+                await issue(username, 'legendary_relics', user.legendary_relics);
+            }
+ 
+        }
+        else {
+            console.log('User ' + username + ' does not have a quest yet please use startQuest');
+        }
+
+        //remove quest from active-quests collection
+        await collection.deleteOne({ username: username });
+
+        //return true
+        return true;
+
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            client.close();
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+            return false;
+        }
+    }
+}
+
+//issue relic tokens to player collection
+async function issue(username, type, amount){
+    try{
+        //see if user exists
+        var db = client.db(dbName);
+        var collection = db.collection('relics');
+        let player = await collection.findOne({ username : username , type: type });
+        if (!player) {
+            //insert player into collection with   "market": {
+            await collection.insertOne({ username: username, version: 1, type: type, amount: amount, market: { listed: false, amount: 0, price: 0, seller: null, created: 0, expires: 0, sold: 0 } });
+        }
+        //update player collection adding relics to player9
+        await collection.updateOne({ username: username, type: type }, { $inc: { amount: amount } });
+        return true;
+    }
+    catch (err) {
+        if(err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            client.close();
+            process.exit(1);
+        }
+        else {
+            console.log(err);
+            return true;
+        }
+    }
+}
+
+
+
+
+
+//test function
+async function test() {
+    await startQuest('asgarth-dev');
+    for (let i = 0; i < 3; i++) {
+        await progressQuest('asgarth-dev');
+       
+    }
+    //await completeQuest('asgarth-dev');
+}
+//test();
 
 
 //async function to clear transactions from queue
@@ -798,10 +1098,11 @@ var lastevent = Date.now();
 var lastCheck = Date.now();
 //aysncfunction to start listening for events
 async function listen() {
+    
     //await clearTransactions();
     await clearFirst();
-    checkTransactions();
     await changeNode();
+    checkTransactions();
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
@@ -838,6 +1139,7 @@ async function listen() {
             //claim function
             sendTransaction(user, 'claim', 'none');
         }
+
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
             //console.log(result);
             var data = JSON.parse(result[1].json);
@@ -853,6 +1155,38 @@ async function listen() {
             }
             sendTransaction(user, 'battle', target);
         }    
+        else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_progress') {
+            //console.log(result);
+            var data = JSON.parse(result[1].json);
+            //get target from data
+            var target = data.target;
+            var user;
+            //check if required_auths[0] is []
+            if (result[1].required_auths[0] == undefined) {
+                user = result[1].required_posting_auths[0];
+            }
+            else {
+                user = result[1].required_auths[0];
+            }
+            //sendTransaction(user, 'battle', target);
+        }
+        else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_complete') {
+            //console.log(result);
+            var data = JSON.parse(result[1].json);
+            //get target from data
+            var target = data.target;
+            var user;
+            //check if required_auths[0] is []
+            if (result[1].required_auths[0] == undefined) {
+                user = result[1].required_posting_auths[0];
+            }
+            else {
+                user = result[1].required_auths[0];
+            }
+            completeQuest(user);
+            
+        } 
+
         
     });
 }
