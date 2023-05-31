@@ -280,7 +280,7 @@ async function sendTransactions() {
         let collection = db.collection('transactions');
         //before starting make sure there are no transactions in the queue from the same username with the same type if so remove all but one, this will help prevents spamming, filter by tim received
         let transactions = await collection.find({})
-        .sort({ time: 1 })
+        .sort({ time: -1 })
         .toArray()
 
         //loop through transactions and remove any that are the same type and username
