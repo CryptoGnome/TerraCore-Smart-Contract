@@ -1142,7 +1142,7 @@ async function listen() {
             sendTransaction(user, 'claim', 'none');
         }
 
-        else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
+        if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
             //console.log(result);
             var data = JSON.parse(result[1].json);
             //get target from data
@@ -1156,8 +1156,9 @@ async function listen() {
                 user = result[1].required_auths[0];
             }
             sendTransaction(user, 'battle', target);
-        }    
-        else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_progress') {
+        }  
+
+        if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_progress') {
             //console.log(result);
             var data = JSON.parse(result[1].json);
             var user;
@@ -1170,7 +1171,8 @@ async function listen() {
             }
             progressQuest(user);
         }
-        else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_complete') {
+        
+        if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_complete') {
             console.log(result);
             var data = JSON.parse(result[1].json);
             var user;
