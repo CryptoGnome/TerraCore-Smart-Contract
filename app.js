@@ -965,6 +965,7 @@ async function completeQuest(username) {
         let db = client.db(dbName);
         let collection = db.collection('active-quests');
         let user = await collection.findOne({ username: username });
+        console.log(user);
         if (user) {
             if (user.common_relics > 0) {
                 await issue(username, 'common_relics', user.common_relics);
@@ -1017,6 +1018,7 @@ async function issue(username, type, amount){
         if (!player) {
             //insert player into collection with   "market": {
             await collection.insertOne({ username: username, version: 1, type: type, amount: amount, market: { listed: false, amount: 0, price: 0, seller: null, created: 0, expires: 0, sold: 0 } });
+            return true;
         }
         //update player collection adding relics to player9
         await collection.updateOne({ username: username, type: type }, { $inc: { amount: amount } });
@@ -1158,8 +1160,6 @@ async function listen() {
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_progress') {
             //console.log(result);
             var data = JSON.parse(result[1].json);
-            //get target from data
-            var target = data.target;
             var user;
             //check if required_auths[0] is []
             if (result[1].required_auths[0] == undefined) {
@@ -1168,13 +1168,11 @@ async function listen() {
             else {
                 user = result[1].required_auths[0];
             }
-            //sendTransaction(user, 'battle', target);
+            progressQuest(user);
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_complete') {
             //console.log(result);
             var data = JSON.parse(result[1].json);
-            //get target from data
-            var target = data.target;
             var user;
             //check if required_auths[0] is []
             if (result[1].required_auths[0] == undefined) {
