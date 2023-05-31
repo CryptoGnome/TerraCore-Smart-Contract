@@ -1171,7 +1171,7 @@ async function listen() {
             progressQuest(user);
         }
         else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_complete') {
-            //console.log(result);
+            console.log(result);
             var data = JSON.parse(result[1].json);
             var user;
             //check if required_auths[0] is []
