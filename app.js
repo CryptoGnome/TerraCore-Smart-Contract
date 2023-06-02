@@ -279,7 +279,7 @@ async function sendTransactions() {
         let db = client.db(dbName);
         let collection = db.collection('transactions');
         let transactions = await collection.find({})
-        .sort({ time: -1 })
+        .sort({ time: 1 })
         .toArray()
 
         //check if there are any transactions to send
