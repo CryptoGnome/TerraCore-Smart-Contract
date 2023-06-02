@@ -1086,13 +1086,13 @@ var lastevent = Date.now();
 var lastCheck = Date.now();
 //aysncfunction to start listening for events
 async function listen() {
-    //await clearFirst();
+    await clearFirst();
     await changeNode();
-    //checkTransactions();
+    checkTransactions();
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
-        /*
+      
         if (result[0] == 'transfer' && result[1].to == 'terracore') {
             //grab hash from memo
             var memo = JSON.parse(result[1].memo);
@@ -1142,7 +1142,7 @@ async function listen() {
             }
             sendTransaction(user, 'battle', target);
         }  
-        */
+     
 
         if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_progress') {
             console.log(result);
