@@ -1092,6 +1092,9 @@ async function listen() {
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
+        if (result[1].id.contains('terracore_quest')) {
+            console.log(result);
+        }
 
         if (result[0] == 'transfer' && result[1].to === 'terracore') {
             //grab hash from memo
