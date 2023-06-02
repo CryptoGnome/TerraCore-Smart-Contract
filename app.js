@@ -862,28 +862,28 @@ async function selectQuest(round, user) {
             //loop through shard_types and give relics
             for (let i = 0; i < relic_types; i++) {
                 //make  roll for relics
-                roll = Math.random();
+                roll = Math.random() + 0.01;
                 //decide which relics to give
                 if (roll > 0.5) {
-                    roll = Math.random();
+                    roll = Math.random() + 0.01;
                     common_relics = (roll * 10) * round/4;
                 }
                 else if (roll > 0.4) {
-                    roll = Math.random();
+                    roll = Math.random() + 0.01;
                     uncommon_relics = (roll * 10) * round/4;
 
                 }
                 else if (roll > 0.25) {
-                    roll = Math.random();
+                    roll = Math.random() + 0.01;
                     rare_relics = (roll * 10) * round/4;
                 }
                 else if (roll > 0.10) {
-                    roll = Math.random();
+                    roll = Math.random() + 0.01;
                     epic_relics = (roll * 10) * round/6;
                     
                 }
                 else if (roll > 0.05) {
-                    roll = Math.random();
+                    roll = Math.random() + 0.01;
                     legendary_relics = (roll * 10) * round/8;
                 }
             }
@@ -1165,8 +1165,7 @@ async function listen() {
             completeQuest(user);
             
         } 
-
-        
+   
     });
 }
 
