@@ -1092,9 +1092,6 @@ async function listen() {
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
-        if (result[1].id.contains('terracore_quest')) {
-            console.log(result);
-        }
 
         if (result[0] == 'transfer' && result[1].to === 'terracore') {
             //grab hash from memo
@@ -1113,7 +1110,7 @@ async function listen() {
             }
         
         }
-        else if (result[0] == 'custom_json' && result[1].id === 'terracore_claim') {
+        if (result[0] == 'custom_json' && result[1].id === 'terracore_claim') {
             //grab the json from result[1].json
             var data = JSON.parse(result[1].json);
             var user;
@@ -1128,7 +1125,7 @@ async function listen() {
             //claim function
             sendTransaction(user, 'claim', 'none');
         }
-        else if (result[0] == 'custom_json' && result[1].id === 'terracore_battle') {
+        if (result[0] == 'custom_json' && result[1].id === 'terracore_battle') {
             //console.log(result);
             var data = JSON.parse(result[1].json);
             //get target from data
@@ -1143,7 +1140,7 @@ async function listen() {
             }
             sendTransaction(user, 'battle', target);
         }  
-        else if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_progress') {
+        if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_progress') {
             console.log(result);
             var user;
             //check if required_auths[0] is []
@@ -1155,7 +1152,7 @@ async function listen() {
             }
             progressQuest(user);
         }
-        else if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_complete') {
+        if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_complete') {
             console.log(result);
             var user;
             //check if required_auths[0] is []
