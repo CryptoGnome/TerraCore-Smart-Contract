@@ -1092,7 +1092,7 @@ async function listen() {
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
-      
+
         if (result[0] == 'transfer' && result[1].to == 'terracore') {
             //grab hash from memo
             var memo = JSON.parse(result[1].memo);
@@ -1126,8 +1126,7 @@ async function listen() {
             //claim function
             sendTransaction(user, 'claim', 'none');
         }
-
-        if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
+        else if (result[0] == 'custom_json' && result[1].id == 'terracore_battle') {
             //console.log(result);
             var data = JSON.parse(result[1].json);
             //get target from data
@@ -1142,9 +1141,7 @@ async function listen() {
             }
             sendTransaction(user, 'battle', target);
         }  
-     
-
-        if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_progress') {
+        else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_progress') {
             console.log(result);
             var user;
             //check if required_auths[0] is []
@@ -1156,8 +1153,7 @@ async function listen() {
             }
             progressQuest(user);
         }
-        
-        if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_complete') {
+        else if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_complete') {
             console.log(result);
             var user;
             //check if required_auths[0] is []
