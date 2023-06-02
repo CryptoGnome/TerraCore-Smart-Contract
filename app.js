@@ -43,7 +43,7 @@ async function testNodeEndpoints(nodes) {
           const json = { "action": "test-tx" };
           const data = JSON.stringify(json);
 
-          hive.broadcast.customJson(wif, ['terracore.market'], [], 'test-tx', data, (err, result) => {
+          hive.broadcast.customJson(wif, ['terracore'], [], 'test-tx', data, (err, result) => {
             if (err) {
               console.error(`${endpoint} transaction error: ${err.message}`);
             } else {
@@ -278,23 +278,9 @@ async function sendTransactions() {
         lastCheck = Date.now();
         let db = client.db(dbName);
         let collection = db.collection('transactions');
-        //before starting make sure there are no transactions in the queue from the same username with the same type if so remove all but one, this will help prevents spamming, filter by tim received
         let transactions = await collection.find({})
         .sort({ time: -1 })
         .toArray()
-
-        //loop through transactions and remove any that are the same type and username
-        for (let i = 0; i < transactions.length; i++) {
-            let transaction = transactions[i];
-            for (let j = 0; j < transactions.length; j++) {
-                let transaction2 = transactions[j];
-                if(transaction.username == transaction2.username && transaction.type == transaction2.type && transaction.target == transaction2.target && transaction._id != transaction2._id) {
-                    await collection.deleteOne({ _id: transaction2._id });
-                    //also remove the transaction from the array so it is not checked again
-                    transactions.splice(j, 1);
-                }
-            }
-        }   
 
         //check if there are any transactions to send
         if(transactions.length != 0) {
@@ -1100,14 +1086,13 @@ var lastevent = Date.now();
 var lastCheck = Date.now();
 //aysncfunction to start listening for events
 async function listen() {
-    
-    //await clearTransactions();
-    await clearFirst();
+    //await clearFirst();
     await changeNode();
-    checkTransactions();
+    //checkTransactions();
     hive.api.streamOperations(function(err, result) {
         //timestamp of last event
         lastevent = Date.now(); 
+        /*
         if (result[0] == 'transfer' && result[1].to == 'terracore') {
             //grab hash from memo
             var memo = JSON.parse(result[1].memo);
@@ -1157,10 +1142,10 @@ async function listen() {
             }
             sendTransaction(user, 'battle', target);
         }  
+        */
 
         if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_progress') {
-            //console.log(result);
-            var data = JSON.parse(result[1].json);
+            console.log(result);
             var user;
             //check if required_auths[0] is []
             if (result[1].required_auths[0] == undefined) {
@@ -1174,7 +1159,6 @@ async function listen() {
         
         if (result[0] == 'custom_json' && result[1].id == 'terracore_quest_complete') {
             console.log(result);
-            var data = JSON.parse(result[1].json);
             var user;
             //check if required_auths[0] is []
             if (result[1].required_auths[0] == undefined) {
