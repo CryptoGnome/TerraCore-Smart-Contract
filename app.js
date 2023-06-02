@@ -1110,8 +1110,7 @@ async function listen() {
             }
         
         }
-
-        if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
+        else if (result[0] == 'custom_json' && result[1].id == 'terracore_claim') {
             //grab the json from result[1].json
             var data = JSON.parse(result[1].json);
             var user;
