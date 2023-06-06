@@ -705,11 +705,11 @@ async function progressQuest(username) {
         //check if user is in active-quests collection
         let db = client.db(dbName);
         let collection = db.collection('active-quests');
-        let user = await collection.findOne({ username: username });
+        let quest = await collection.findOne({ username: username });
         //get username from players collection
         let _username = await db.collection('players').findOne({ username: username });
 
-        if (user) {
+        if (quest) {
             //before progressing quest let's make a roll to see if the quest is successful
             var roll = Math.random();
             if(roll < user.success_chance) {
@@ -717,16 +717,19 @@ async function progressQuest(username) {
                 //quest was successful
                 if(_username) {
                     var activeQuest;
-                    if (user) {
-                        //user already has a quest lets start from the current round
-                        activeQuest = await selectQuest(user.round + 1, _username);
-                        //replace current quest with new quest
-                        await collection.replaceOne({ username: username }, activeQuest);
+                    //user already has a quest lets start from the current round
+                    activeQuest = await selectQuest(user.round + 1, _username);
+                    //take the rewards from the quest and add them to values in activeQuest
+                    activeQuest.common_relics += quest.common_relics;
+                    activeQuest.uncommon_relics += quest.uncommon_relics;
+                    activeQuest.rare_relics += quest.rare_relics;
+                    activeQuest.epic_relics += quest.epic_relics;
+                    activeQuest.legendary_relics += quest.legendary_relics;
 
-                    }
-                    else {
-                        console.log('User ' + username + ' does not have a quest yet please use startQuest');
-                    }
+                    //replace current quest with new quest
+                    await collection.replaceOne({ username: username }, activeQuest);
+
+                
                 }
                 else {
                     console.log('User ' + username + ' does not exist');
@@ -788,7 +791,7 @@ async function selectQuest(round, user) {
 
 
         //base success chance
-        var success_chance = 1;
+        var success_chance = 0.8;
 
         //for every round remove 10% chance of success
         for (let i = 0; i < round; i++) {
@@ -883,7 +886,6 @@ async function selectQuest(round, user) {
                 else if (roll > 0.10) {
                     roll = await rollDice(1);
                     epic_relics = (roll * 10) * round/6;
-                    
                 }
                 else if (roll > 0.05) {
                     roll = await rollDice(1);
