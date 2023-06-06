@@ -712,7 +712,7 @@ async function progressQuest(username) {
         if (quest) {
             //before progressing quest let's make a roll to see if the quest is successful
             var roll = Math.random();
-            if(roll < user.success_chance) {
+            if(roll < quest.success_chance) {
                 console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + user.success_chance.toFixed(2).toString());
                 //quest was successful
                 if(_username) {
