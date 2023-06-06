@@ -713,12 +713,12 @@ async function progressQuest(username) {
             //before progressing quest let's make a roll to see if the quest is successful
             var roll = Math.random();
             if(roll < quest.success_chance) {
-                console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + user.success_chance.toFixed(2).toString());
+                console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
                 //quest was successful
                 if(_username) {
                     var activeQuest;
                     //user already has a quest lets start from the current round
-                    activeQuest = await selectQuest(user.round + 1, _username);
+                    activeQuest = await selectQuest(quest.round + 1, _username);
                     //take the rewards from the quest and add them to values in activeQuest
                     activeQuest.common_relics += quest.common_relics;
                     activeQuest.uncommon_relics += quest.uncommon_relics;
@@ -739,7 +739,7 @@ async function progressQuest(username) {
             else {
                 //quest failed
                 //remove quest from active-quests collection
-                console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + user.success_chance.toFixed(2).toString());
+                console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
                 await collection.deleteOne({ username: username });
             }
         }
