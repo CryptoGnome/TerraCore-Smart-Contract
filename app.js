@@ -648,6 +648,9 @@ async function rollAttack(_player) {
 /////////// Quest  Functions
 //////////
 ///////////////////////////////////////////////////
+async function rollDice(index) {
+    return Math.random() * (index - 0.01 * index) + 0.01 * index;
+}
 //start quest is for testing only in this contract -- lives in HE contract for FLUX
 async function startQuest(username) {
     //check if user has a quest already
@@ -810,7 +813,7 @@ async function selectQuest(round, user) {
         //if round is greater than 1 roll for rewards, rewards should scale based on round
         if (round > 0) {
             //roll float for rewards between 0 and 1
-            var roll = Math.random() + 0.01;
+            var roll = await rollDice(1);
 
             var common_relics = 0;
             var uncommon_relics = 0;
@@ -862,28 +865,28 @@ async function selectQuest(round, user) {
             //loop through shard_types and give relics
             for (let i = 0; i < relic_types; i++) {
                 //make  roll for relics
-                roll = Math.random() + 0.01;
+                roll = await rollDice(1);
                 //decide which relics to give
                 if (roll > 0.5) {
-                    roll = Math.random() + 0.01;
+                    roll = await rollDice(1);
                     common_relics = (roll * 10) * round/4;
                 }
                 else if (roll > 0.4) {
-                    roll = Math.random() + 0.01;
+                    roll = await rollDice(1);
                     uncommon_relics = (roll * 10) * round/4;
 
                 }
                 else if (roll > 0.25) {
-                    roll = Math.random() + 0.01;
+                    roll = await rollDice(1);
                     rare_relics = (roll * 10) * round/4;
                 }
                 else if (roll > 0.10) {
-                    roll = Math.random() + 0.01;
+                    roll = await rollDice(1);
                     epic_relics = (roll * 10) * round/6;
                     
                 }
                 else if (roll > 0.05) {
-                    roll = Math.random() + 0.01;
+                    roll = await rollDice(1);
                     legendary_relics = (roll * 10) * round/8;
                 }
             }
@@ -1037,6 +1040,7 @@ async function test() {
     //await completeQuest('asgarth-dev');
 }
 //test();
+
 
 
 //async function to clear transactions from queue
