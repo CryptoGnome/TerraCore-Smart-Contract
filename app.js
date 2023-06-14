@@ -729,6 +729,9 @@ async function progressQuest(username) {
                     //replace current quest with new quest
                     await collection.replaceOne({ username: username }, activeQuest);
 
+                    //log quest progress
+                    await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, time: new Date()});
+
                 
                 }
                 else {
@@ -740,6 +743,7 @@ async function progressQuest(username) {
                 //quest failed
                 //remove quest from active-quests collection
                 console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
+                await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, time: new Date()});
                 await collection.deleteOne({ username: username });
             }
         }
@@ -958,6 +962,7 @@ async function completeQuest(username) {
         let user = await collection.findOne({ username: username });
         console.log(user);
         if (user) {
+            await db.collection('quest-log').insertOne({username: username, action: 'complete', rewards: user, time: new Date()});
             if (user.common_relics > 0) {
                 await issue(username, 'common_relics', user.common_relics);
             }
@@ -1027,6 +1032,7 @@ async function issue(username, type, amount){
         }
     }
 }
+
 
 
 
