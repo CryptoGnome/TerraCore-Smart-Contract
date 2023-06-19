@@ -352,6 +352,17 @@ async function sendTransactions() {
                         break;
                     }
                 }
+                else if(transaction.type == 'progress') {
+                    while(true){
+                        await progressQuest(username);
+                        break;
+                    }
+                }
+                else if(transaction.type == 'complete') {
+                    while(true){
+                         await completeQuest(username);
+                    }
+                }
                 
             }
             console.log('Completed Sending Transactions');
@@ -749,7 +760,7 @@ async function progressQuest(username) {
                     activeQuest.legendary_relics += quest.legendary_relics;
 
                     //replace current quest with new quest
-                    await collection.replaceOne({ username: username }, activeQuest);
+                    await db.collection('active-quests').replaceOne({ username: username }, activeQuest);
 
                     //log quest progress
                     await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, time: new Date()});
@@ -1186,7 +1197,8 @@ async function listen() {
             else {
                 user = result[1].required_auths[0];
             }
-            progressQuest(user);
+            //progressQuest(user);
+            sendTransaction(user, 'progress', 'none');
         }
         if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_complete') {
             console.log(result);
@@ -1198,7 +1210,9 @@ async function listen() {
             else {
                 user = result[1].required_auths[0];
             }
-            completeQuest(user);
+            //completeQuest(user);
+            sendTransaction(user, 'complete', 'none');
+
             
         } 
    
