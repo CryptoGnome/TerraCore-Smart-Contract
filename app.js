@@ -734,12 +734,17 @@ async function progressQuest(username) {
         if (quest) {
             //check if quest has time if not add time
             if (!quest.time) {
+                //create unix timestamp
+                console.log('Quest does not have time');
                 quest.time = Date.now();
                 //update quest with time
                 await collection.updateOne({ username: username }, { $set: { time: quest.time } });
             }
-            //make sure time of quest is more than 3 seconds ago
-            if (Date.now() - quest.time > 3000) {
+            //log time of quest difrence
+            console.log('Quest time is ' + quest.time.toString());
+            console.log('Current time is ' + Date.now().toString());
+            //make sure more 3 sec
+            if (quest.time + 3000 < Date.now()) {
                 //before progressing quest let's make a roll to see if the quest is successful
                 var roll = Math.random();
                 if(roll < quest.success_chance) {
