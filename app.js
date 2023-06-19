@@ -1002,7 +1002,7 @@ async function completeQuest(username) {
         //remove quest from active-quests collection
         await collection.deleteOne({ username: username });
         
-        webhook3.send('User ' + username + ' has completed their quest', "Rewards:  Common Relics - " + user.common_relics + " Uncommon Relics - " + user.uncommon_relics + " Rare Relics - " + user.rare_relics + " Epic Relics - " + user.epic_relics + " Legendary Relics - " + user.legendary_relics, '#00FF00');
+        webhook3('User ' + username + ' has completed their quest', "Rewards:  Common Relics - " + user.common_relics + " Uncommon Relics - " + user.uncommon_relics + " Rare Relics - " + user.rare_relics + " Epic Relics - " + user.epic_relics + " Legendary Relics - " + user.legendary_relics, '#00FF00');
 
         //return true
         return true;
