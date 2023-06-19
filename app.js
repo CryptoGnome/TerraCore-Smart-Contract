@@ -114,7 +114,6 @@ async function webhook3(title, common, uncommon, rare, epic, legendary) {
 
     const embed = new MessageBuilder()
         .setTitle(title)
-        .addField('Message: ', message, true)
         .addField('Common Relics: ', common, true)
         .addField('Uncommon Relics: ', uncommon, true)
         .addField('Rare Relics: ', rare, true)
