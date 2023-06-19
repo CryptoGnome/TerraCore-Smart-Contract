@@ -8,6 +8,8 @@ require('dotenv').config();
 const hook = new Webhook(process.env.DISCORD_WEBHOOK);
 //seciondary webhook for registrations
 const hook2 = new Webhook(process.env.DISCORD_WEBHOOK_2);
+//hook for quest completions
+const hook3 = new Webhook(process.env.DISCORD_WEBHOOK_3);
 
 
 const dbName = 'terracore';
@@ -108,6 +110,19 @@ async function webhook2(title, message, color) {
     }
     
 }
+async function webhook3(title, message, color) {
+    const embed = new MessageBuilder()
+        .setTitle(title)
+        .addField('Message: ', message, true)
+        .setColor(color)
+        .setTimestamp();
+    try {
+        hook3.send(embed).catch(err => console.log(err.message));    
+    }
+    catch (err) {
+        console.log(chalk.red("Discord Webhook Error"));
+    }
+}  
 
 //switch this to look at DB
 async function scrapStaked(username) {
@@ -986,6 +1001,8 @@ async function completeQuest(username) {
 
         //remove quest from active-quests collection
         await collection.deleteOne({ username: username });
+        
+        webhook3.send('User ' + username + ' has completed their quest', "Rewards:  Common Relics - " + user.common_relics + " Uncommon Relics - " + user.uncommon_relics + " Rare Relics - " + user.rare_relics + " Epic Relics - " + user.epic_relics + " Legendary Relics - " + user.legendary_relics, '#00FF00');
 
         //return true
         return true;
