@@ -110,11 +110,17 @@ async function webhook2(title, message, color) {
     }
     
 }
-async function webhook3(title, message, color) {
+async function webhook3(title, common, uncommon, rare, epic, legendary) {
+
     const embed = new MessageBuilder()
         .setTitle(title)
         .addField('Message: ', message, true)
-        .setColor(color)
+        .addField('Common Relics: ', common, true)
+        .addField('Uncommon Relics: ', uncommon, true)
+        .addField('Rare Relics: ', rare, true)
+        .addField('Epic Relics: ', epic, true)
+        .addField('Legendary Relics: ', legendary, true)
+        .setColor('#800080')
         .setTimestamp();
     try {
         hook3.send(embed).catch(err => console.log(err.message));    
@@ -1002,7 +1008,7 @@ async function completeQuest(username) {
         //remove quest from active-quests collection
         await collection.deleteOne({ username: username });
         
-        webhook3('User ' + username + ' has completed their quest', "Rewards:  Common Relics - " + user.common_relics + " Uncommon Relics - " + user.uncommon_relics + " Rare Relics - " + user.rare_relics + " Epic Relics - " + user.epic_relics + " Legendary Relics - " + user.legendary_relics, '#00FF00');
+        webhook3('User ' + username + ' has completed their quest', user.common_relics, user.uncommon_relics, user.rare_relics, user.epic_relics, user.legendary_relics);
 
         //return true
         return true;
