@@ -732,41 +732,52 @@ async function progressQuest(username) {
         let _username = await db.collection('players').findOne({ username: username });
 
         if (quest) {
-            //before progressing quest let's make a roll to see if the quest is successful
-            var roll = Math.random();
-            if(roll < quest.success_chance) {
-                console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
-                //quest was successful
-                if(_username) {
-                    var activeQuest;
-                    //user already has a quest lets start from the current round
-                    activeQuest = await selectQuest(quest.round + 1, _username);
-                    //take the rewards from the quest and add them to values in activeQuest
-                    activeQuest.common_relics += quest.common_relics;
-                    activeQuest.uncommon_relics += quest.uncommon_relics;
-                    activeQuest.rare_relics += quest.rare_relics;
-                    activeQuest.epic_relics += quest.epic_relics;
-                    activeQuest.legendary_relics += quest.legendary_relics;
+            //check if quest has time if not add time
+            if (!quest.time) {
+                quest.time = Date.now();
+            }
+            //make sure time of quest is more than 3 seconds ago
+            if (Date.now() - quest.time > 3000) {
+                //before progressing quest let's make a roll to see if the quest is successful
+                var roll = Math.random();
+                if(roll < quest.success_chance) {
+                    console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
+                    //quest was successful
+                    if(_username) {
+                        var activeQuest;
+                        //user already has a quest lets start from the current round
+                        activeQuest = await selectQuest(quest.round + 1, _username);
+                        //take the rewards from the quest and add them to values in activeQuest
+                        activeQuest.common_relics += quest.common_relics;
+                        activeQuest.uncommon_relics += quest.uncommon_relics;
+                        activeQuest.rare_relics += quest.rare_relics;
+                        activeQuest.epic_relics += quest.epic_relics;
+                        activeQuest.legendary_relics += quest.legendary_relics;
 
-                    //replace current quest with new quest
-                    await collection.replaceOne({ username: username }, activeQuest);
+                        //replace current quest with new quest
+                        await collection.replaceOne({ username: username }, activeQuest);
 
-                    //log quest progress
-                    await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, time: new Date()});
+                        //log quest progress
+                        await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, time: new Date()});
 
-                
+                    
+                    }
+                    else {
+                        console.log('User ' + username + ' does not exist');
+                        return false;
+                    }
                 }
                 else {
-                    console.log('User ' + username + ' does not exist');
-                    return false;
+                    //quest failed
+                    //remove quest from active-quests collection
+                    console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
+                    await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, time: new Date()});
+                    await collection.deleteOne({ username: username });
                 }
             }
             else {
-                //quest failed
-                //remove quest from active-quests collection
-                console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
-                await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, time: new Date()});
-                await collection.deleteOne({ username: username });
+                console.log('Quest for user ' + username + ' has not been 3 seconds since last progress');
+                return false;
             }
         }
         else {
@@ -953,7 +964,8 @@ async function selectQuest(round, user) {
             "rare_relics": rare_relics,
             "epic_relics": epic_relics,
             "legendary_relics": legendary_relics,
-        };
+            "time": Date.now()
+        }
   
         //return quest
         return quest;
@@ -1059,19 +1071,6 @@ async function issue(username, type, amount){
 
 
 
-
-
-
-//test function
-async function test() {
-    await startQuest('asgarth-dev');
-    for (let i = 0; i < 3; i++) {
-        await progressQuest('asgarth-dev');
-       
-    }
-    //await completeQuest('asgarth-dev');
-}
-//test();
 
 
 
