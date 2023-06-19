@@ -1151,7 +1151,7 @@ async function completeQuest(username) {
         //remove quest from active-quests collection
         await collection.deleteOne({ username: username });
         
-        webhook3('User ' + username + ' has completed their quest', user.common_relics.toString(), user.uncommon_relics.toString(), user.rare_relics.toString(), user.epic_relics.toString(), user.legendary_relics.toString());
+        webhook3('User ' + username + ' has completed their quest at round ' + user.round.toString(), user.common_relics.toString(), user.uncommon_relics.toString(), user.rare_relics.toString(), user.epic_relics.toString(), user.legendary_relics.toString());
 
         //return true
         return true;
