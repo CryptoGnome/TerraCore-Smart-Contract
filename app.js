@@ -735,6 +735,8 @@ async function progressQuest(username) {
             //check if quest has time if not add time
             if (!quest.time) {
                 quest.time = Date.now();
+                //update quest with time
+                await collection.updateOne({ username: username }, { $set: { time: quest.time } });
             }
             //make sure time of quest is more than 3 seconds ago
             if (Date.now() - quest.time > 3000) {
