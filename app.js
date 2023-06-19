@@ -897,7 +897,7 @@ async function selectQuest(round, user) {
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/24;
+                        legendary_relics = (roll * 10) * round/36;
                     }
                     //5% chance for epic relic
                     else if (roll <= 0.1) {
@@ -933,12 +933,12 @@ async function selectQuest(round, user) {
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/18;
+                        legendary_relics = (roll * 10) * round/32;
                     }
                     //7.5% chance for epic relic
                     else if (roll <= 0.125) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/16;
+                        epic_relics = (roll * 10) * round/24;
                     }
                     //15% chance for rare relic
                     else if (roll <= 0.275) {
@@ -974,12 +974,12 @@ async function selectQuest(round, user) {
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/12;
+                        legendary_relics = (roll * 10) * round/24;
                     }
                     //10% chance for epic relic
                     else if (roll <= 0.15) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/10;
+                        epic_relics = (roll * 10) * round/16;
                     }
                     //20% chance for rare relic
                     else if (roll <= 0.35) {
@@ -1016,12 +1016,12 @@ async function selectQuest(round, user) {
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/6;
+                        legendary_relics = (roll * 10) * round/16;
                     }
                     //10% chance for epic relic
                     else if (roll <= 0.15) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/4;
+                        epic_relics = (roll * 10) * round/12;
                     }
                     //20% chance for rare relic
                     else if (roll <= 0.35) {
