@@ -361,7 +361,6 @@ async function sendTransactions() {
                 else if(transaction.type == 'complete') {
                     while(true){
                          await completeQuest(transaction.username);
-                         break;
                     }
                 }
                 
@@ -766,8 +765,6 @@ async function progressQuest(username) {
                     //log quest progress
                     await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, time: new Date()});
 
-                    return true;
-
                 
                 }
                 else {
@@ -781,12 +778,10 @@ async function progressQuest(username) {
                 console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
                 await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, time: new Date()});
                 await collection.deleteOne({ username: username });
-                return false;
             }
         }
         else {
             console.log('User ' + username + ' does not have a quest yet please use startQuest');
-            return false;
         }
 
         
@@ -998,7 +993,7 @@ async function completeQuest(username) {
         let db = client.db(dbName);
         let collection = db.collection('active-quests');
         let user = await collection.findOne({ username: username });
-        //console.log(user);
+        console.log(user);
         if (user) {
             await db.collection('quest-log').insertOne({username: username, action: 'complete', rewards: user, time: new Date()});
             if (user.common_relics > 0) {
@@ -1139,7 +1134,6 @@ var lastCheck = Date.now();
 //aysncfunction to start listening for events
 async function listen() {
     await clearFirst();
-    await clearTransactions();
     await changeNode();
     checkTransactions();
     hive.api.streamOperations(function(err, result) {
