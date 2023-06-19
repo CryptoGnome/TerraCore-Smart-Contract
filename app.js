@@ -130,6 +130,24 @@ async function webhook3(title, common, uncommon, rare, epic, legendary) {
     }
 
 }  
+async function webhook4(title, msg) {
+    //send embed to discord red color
+    const embed = new MessageBuilder()
+        .setTitle(title)
+        .addField('Message: ', msg, true)
+        .setColor('#ff0000')
+        .setTimestamp();
+    try {
+        hook3.send(embed).then(() => console.log('Sent webhook successfully!'))
+        .catch(err => console.log(err.message));
+    }
+    catch (err) {
+        console.log(chalk.red("Discord Webhook Error"));
+    }
+
+}  
+
+
 
 //switch this to look at DB
 async function scrapStaked(username) {
@@ -778,6 +796,8 @@ async function progressQuest(username) {
                     console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
                     await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, time: new Date()});
                     await collection.deleteOne({ username: username });
+                    webhook4.send('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
+
                 }
             }
             else {
