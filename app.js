@@ -833,7 +833,7 @@ async function selectQuest(round, user) {
 
 
         //base success chance
-        var success_chance = 0.8;
+        var success_chance = 0.95;
 
         //for every round remove 2.5% chance of success
         for (let i = 0; i < round; i++) {
