@@ -111,7 +111,7 @@ async function webhook2(title, message, color) {
     
 }
 async function webhook3(title, common, uncommon, rare, epic, legendary) {
-
+    //send embed to discord
     const embed = new MessageBuilder()
         .setTitle(title)
         .addField('Common Relics: ', common, true)
@@ -119,14 +119,16 @@ async function webhook3(title, common, uncommon, rare, epic, legendary) {
         .addField('Rare Relics: ', rare, true)
         .addField('Epic Relics: ', epic, true)
         .addField('Legendary Relics: ', legendary, true)
-        .setColor('#800080')
+        .setColor('#00ff00')
         .setTimestamp();
     try {
-        hook3.send(embed).catch(err => console.log(err.message));    
+        hook3.send(embed).then(() => console.log('Sent webhook successfully!'))
+        .catch(err => console.log(err.message));
     }
     catch (err) {
         console.log(chalk.red("Discord Webhook Error"));
     }
+
 }  
 
 //switch this to look at DB
@@ -1007,7 +1009,7 @@ async function completeQuest(username) {
         //remove quest from active-quests collection
         await collection.deleteOne({ username: username });
         
-        webhook3('User ' + username + ' has completed their quest', user.common_relics, user.uncommon_relics, user.rare_relics, user.epic_relics, user.legendary_relics);
+        webhook3('User ' + username + ' has completed their quest', user.common_relics.toString(), user.uncommon_relics.toString(), user.rare_relics.toString(), user.epic_relics.toString(), user.legendary_relics.toString());
 
         //return true
         return true;
