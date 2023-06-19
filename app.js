@@ -1025,16 +1025,15 @@ async function selectQuest(round, user) {
                 for (let i = 0; i < relic_types; i++) {
                     //make  roll for relics
                     roll = await rollDice(1);
-
-                    //70% chance to get common relic
-                    if (roll > 0.7) {
+                    // 70% chance to get common relic
+                    if (roll <= 0.7) {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/8;
+                        common_relics = (roll * 10) * round / 8;
                     }
-                    //else uncommon
-                    else{
+                    // 30% chance to get uncommon relic
+                    else {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/8;
+                        uncommon_relics = (roll * 10) * round / 8;
                     }
                 }
             }
