@@ -740,9 +740,7 @@ async function progressQuest(username) {
                 //update quest with time
                 await collection.updateOne({ username: username }, { $set: { time: quest.time } });
             }
-            //log time of quest difrence
-            console.log('Quest time is ' + quest.time.toString());
-            console.log('Current time is ' + Date.now().toString());
+
             //make sure more 3 sec
             if (quest.time + 3000 < Date.now()) {
                 //before progressing quest let's make a roll to see if the quest is successful
@@ -1183,7 +1181,7 @@ async function listen() {
             sendTransaction(user, 'battle', target);
         }  
         if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_progress') {
-            console.log(result);
+            //console.log(result);
             var user;
             //check if required_auths[0] is []
             if (result[1].required_auths[0] == undefined) {
@@ -1195,7 +1193,7 @@ async function listen() {
             progressQuest(user);
         }
         if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_complete') {
-            console.log(result);
+            //console.log(result);
             var user;
             //check if required_auths[0] is []
             if (result[1].required_auths[0] == undefined) {
