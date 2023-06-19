@@ -796,7 +796,7 @@ async function progressQuest(username) {
                     console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
                     await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, time: new Date()});
                     await collection.deleteOne({ username: username });
-                    webhook4.send('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
+                    webhook4("Quest Failed", "Quest Failed for " + username + " with a roll of " + roll.toFixed(2).toString() + " and a success chance of " + quest.success_chance.toFixed(2).toString());
 
                 }
             }
