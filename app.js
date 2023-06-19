@@ -900,12 +900,12 @@ async function selectQuest(round, user) {
                     roll = await rollDice(1);
                     common_relics = (roll * 10) * round/4;
                 }
-                else if (roll > 0.4) {
+                else if (roll > 0.30) {
                     roll = await rollDice(1);
                     uncommon_relics = (roll * 10) * round/4;
 
                 }
-                else if (roll > 0.25) {
+                else if (roll > 0.20) {
                     roll = await rollDice(1);
                     rare_relics = (roll * 10) * round/4;
                 }
