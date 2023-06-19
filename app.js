@@ -115,10 +115,10 @@ async function webhook3(title, common, uncommon, rare, epic, legendary) {
     const embed = new MessageBuilder()
         .setTitle(title)
         .addField('Common Relics: ', common, true)
-        .addField('Uncommon Relics: ', uncommon, true)
-        .addField('Rare Relics: ', rare, true)
-        .addField('Epic Relics: ', epic, true)
-        .addField('Legendary Relics: ', legendary, true)
+        .addField('Uncommon Relics: ', uncommon, false)
+        .addField('Rare Relics: ', rare, false)
+        .addField('Epic Relics: ', epic, false)
+        .addField('Legendary Relics: ', legendary, false)
         .setColor('#00ff00')
         .setTimestamp();
     try {
