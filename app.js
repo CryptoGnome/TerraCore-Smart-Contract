@@ -833,11 +833,11 @@ async function selectQuest(round, user) {
 
 
         //base success chance
-        var success_chance = 0.95;
+        var success_chance = 0.85;
 
-        //for every round remove 2.5% chance of success
+        //for every round remove 2% chance of success
         for (let i = 0; i < round; i++) {
-            success_chance -= 0.025;
+            success_chance -= 0.02;
         }
 
         //loop users stats and find attribute_one and attribute_two
