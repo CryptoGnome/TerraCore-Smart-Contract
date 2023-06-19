@@ -354,13 +354,13 @@ async function sendTransactions() {
                 }
                 else if(transaction.type == 'progress') {
                     while(true){
-                        await progressQuest(username);
+                        await progressQuest(transaction.username);
                         break;
                     }
                 }
                 else if(transaction.type == 'complete') {
                     while(true){
-                         await completeQuest(username);
+                         await completeQuest(transaction.username);
                     }
                 }
                 
