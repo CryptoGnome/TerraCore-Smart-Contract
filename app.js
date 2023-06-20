@@ -865,9 +865,9 @@ async function selectQuest(round, user) {
         //base success chance
         var success_chance = 0.80;
 
-        //for every round remove 1.5% chance of success
+        //for every round remove 1% chance of success
         for (let i = 0; i < round; i++) {
-            success_chance -= 0.015;
+            success_chance -= 0.01;
         }
 
         //loop users stats and find attribute_one and attribute_two
@@ -897,6 +897,7 @@ async function selectQuest(round, user) {
             var legendary_relics = 0;
 
             var relic_types = 1;
+
             if (round > 6) {
                 if (roll < 0.5) {
                     relic_types = 2;
