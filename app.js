@@ -788,7 +788,7 @@ async function progressQuest(username) {
                         await collection.replaceOne({ username: username }, activeQuest);
 
                         //log quest progress
-                        await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, time: new Date()});
+                        await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, roll: roll, success_chance: quest.success_chance, time: new Date()});
 
                         return true;
 
@@ -803,7 +803,7 @@ async function progressQuest(username) {
                     //quest failed
                     //remove quest from active-quests collection
                     console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
-                    await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, time: new Date()});
+                    await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, roll: roll, success_chance: quest.success_chance, time: new Date()});
                     await collection.deleteOne({ username: username });
                     webhook4("Quest Failed", "Quest Failed for " + username + " with a roll of " + roll.toFixed(2).toString() + " and a success chance of " + quest.success_chance.toFixed(2).toString());
                     return false;
