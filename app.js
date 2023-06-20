@@ -897,26 +897,26 @@ async function selectQuest(round, user) {
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/36;
+                        legendary_relics = (roll * 10) * round/46;
                     }
                     //5% chance for epic relic
                     else if (roll <= 0.1) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/24;
+                        epic_relics = (roll * 10) * round/36;
                     }
                     //10% chance for rare relic
                     else if (roll <= 0.2) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * round/16;
+                        rare_relics = (roll * 10) * round/32;
                     }
                     //20% chance for uncommon relic
                     else if (roll <= 0.4) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/12;
+                        uncommon_relics = (roll * 10) * round/24;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/12;
+                        common_relics = (roll * 10) * round/24;
                     }
                 
                 }
@@ -1048,12 +1048,12 @@ async function selectQuest(round, user) {
                     // 70% chance to get common relic
                     if (roll <= 0.7) {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round / 8;
+                        common_relics = (roll * 10) * round / 24;
                     }
                     // 30% chance to get uncommon relic
                     else {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round / 8;
+                        uncommon_relics = (roll * 10) * round / 24;
                     }
                 }
             }
