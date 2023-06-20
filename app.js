@@ -370,7 +370,14 @@ async function sendTransactions() {
                         break;
                     }
                 }
-                
+                else if(transaction.type == 'progress') {
+                    await progressQuest(transaction.username);
+                    await collection.deleteOne({ _id: transaction._id });
+                }
+                else if(transaction.type == 'complete') {
+                    await completeQuest(transaction.username);
+                    await collection.deleteOne({ _id: transaction._id });
+                }
             }
             console.log('Completed Sending Transactions');
             return true;
@@ -783,6 +790,8 @@ async function progressQuest(username) {
                         //log quest progress
                         await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, time: new Date()});
 
+                        return true;
+
                     
                     }
                     else {
@@ -797,7 +806,7 @@ async function progressQuest(username) {
                     await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, time: new Date()});
                     await collection.deleteOne({ username: username });
                     webhook4("Quest Failed", "Quest Failed for " + username + " with a roll of " + roll.toFixed(2).toString() + " and a success chance of " + quest.success_chance.toFixed(2).toString());
-
+                    return false;
                 }
             }
             else {
@@ -807,6 +816,7 @@ async function progressQuest(username) {
         }
         else {
             console.log('User ' + username + ' does not have a quest yet please use startQuest');
+            return false;
         }
 
         
@@ -1146,6 +1156,7 @@ async function completeQuest(username) {
         }
         else {
             console.log('User ' + username + ' does not have a quest yet please use startQuest');
+            return false;
         }
 
         //remove quest from active-quests collection
@@ -1315,7 +1326,8 @@ async function listen() {
             else {
                 user = result[1].required_auths[0];
             }
-            progressQuest(user);
+            //progressQuest(user);
+            sendTransaction(user, 'progress', 'none');
         }
         if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_complete') {
             //console.log(result);
@@ -1327,7 +1339,8 @@ async function listen() {
             else {
                 user = result[1].required_auths[0];
             }
-            completeQuest(user);
+            //completeQuest(user);
+            sendTransaction(user, 'complete', 'none');
             
         } 
    
