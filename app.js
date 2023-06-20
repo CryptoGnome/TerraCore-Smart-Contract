@@ -865,9 +865,9 @@ async function selectQuest(round, user) {
         //base success chance
         var success_chance = 0.80;
 
-        //for every round remove 2% chance of success
+        //for every round remove 1.5% chance of success
         for (let i = 0; i < round; i++) {
-            success_chance -= 0.02;
+            success_chance -= 0.015;
         }
 
         //loop users stats and find attribute_one and attribute_two
@@ -897,7 +897,7 @@ async function selectQuest(round, user) {
             var legendary_relics = 0;
 
             var relic_types = 1;
-            if (round > 5) {
+            if (round > 6) {
                 if (roll < 0.5) {
                     relic_types = 2;
                 }
@@ -931,7 +931,7 @@ async function selectQuest(round, user) {
                 
                 }
             }
-            if (round > 10) {
+            if (round > 12) {
                 if (roll < 0.75) {
                     relic_types = 2;
                 }
@@ -968,7 +968,7 @@ async function selectQuest(round, user) {
                 }
 
             }
-            if (round > 14) {
+            if (round > 16) {
                 if (roll < 0.95) {
                     relic_types = 2;
                 }
@@ -1007,7 +1007,7 @@ async function selectQuest(round, user) {
                     }
                 }
             }
-            if (round > 18) {
+            if (round > 20) {
                 if (roll < 0.98) {
                     relic_types = 2
                 }
@@ -1058,7 +1058,7 @@ async function selectQuest(round, user) {
                     // 70% chance to get common relic
                     if (roll <= 0.7) {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round / 24;
+                        common_relics = (roll * 10) * round / 16;
                     }
                     // 30% chance to get uncommon relic
                     else {
