@@ -918,16 +918,16 @@ async function selectQuest(round, user) {
                     //15% chance for rare relic
                     else if (roll <= 0.21) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * round/36;
+                        rare_relics = (roll * 10) * round/46;
                     }
                     //20% chance for uncommon relic
                     else if (roll <= 0.41) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/36;
+                        uncommon_relics = (roll * 10) * round/46;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/24;
+                        common_relics = (roll * 10) * round/36;
                     }
                 
                 }
@@ -959,11 +959,11 @@ async function selectQuest(round, user) {
                     //25% chance for uncommon relic
                     else if (roll <= 0.525) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/16;
+                        uncommon_relics = (roll * 10) * round/36;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/16;
+                        common_relics = (roll * 10) * round/24;
                     }
                    
                 }
@@ -1000,7 +1000,7 @@ async function selectQuest(round, user) {
                     //30% chance for uncommon relic
                     else if (roll <= 0.65) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/12;
+                        uncommon_relics = (roll * 10) * round/24;
                     }
                     else {
                         roll = await rollDice(1);
