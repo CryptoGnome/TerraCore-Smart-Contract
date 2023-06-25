@@ -787,6 +787,8 @@ async function progressQuest(username) {
                         //replace current quest with new quest
                         await collection.replaceOne({ username: username }, activeQuest);
 
+        
+
                         //log quest progress
                         await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, roll: roll, success_chance: quest.success_chance, time: new Date()});
 
@@ -870,7 +872,8 @@ async function selectQuest(round, user) {
             success_chance -= 0.01;
         }
 
-        //loop users stats and find attribute_one and attribute_two
+        //create multiplier that can be used to scale the stats based on the round
+        var multiplier = round * 2;
 
         //go through each stat and add to success chance
         for(var key in user.stats) {
@@ -905,79 +908,75 @@ async function selectQuest(round, user) {
                 for (let i = 0; i < relic_types; i++) {
                     //make  roll for relics
                     roll = await rollDice(1);
-                    //2% chance for legendary relic
-                    if (roll <= 0.02) {
-                        roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/72;
-                    }
                     //4% chance for epic relic
-                    else if (roll <= 0.06) {
+                    if (roll <= 0.04) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/72;
+                        epic_relics = (roll * 10) * multiplier/128;
                     }
                     //15% chance for rare relic
-                    else if (roll <= 0.21) {
+                    else if (roll <= 0.19) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * round/72;
+                        rare_relics = (roll * 10) * multiplier/128;
                     }
-                    //20% chance for uncommon relic
+                    //22% chance for uncommon relic
                     else if (roll <= 0.41) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/64;
+                        uncommon_relics = (roll * 10) * multiplier/128;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/46;
+                        common_relics = (roll * 10) * multiplier/128;
                     }
                 
                 }
             }
             if (round > 9) {
                 if (roll < 0.75) {
-                    relic_types = 2;
+                    relic_types = 1
                 }
                 else if (roll < 0.5) {
-                    relic_types = 3;
+                    relic_types = 2;
                 }
                 for (let i = 0; i < relic_types; i++) {
                    roll = await rollDice(1);
                     //2.5% chance for legendary relic
                     if (roll <= 0.025) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/72;
+                        legendary_relics = (roll * 10) * multiplier/256;
                     }
-                    //9% chance for epic relic
+                    //7.5% chance for epic relic
                     else if (roll <= 0.1) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/72;
+                        epic_relics = (roll * 10) * multiplier/256;
                     }
                     //15% chance for rare relic
-                    else if (roll <= 0.275) {
+                    else if (roll <= 0.25) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * round/72;
+                        rare_relics = (roll * 10) * multiplier/256;
                     }
                     //25% chance for uncommon relic
                     else if (roll <= 0.525) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/62;
+                        uncommon_relics = (roll * 10) * multiplier/256;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/36;
+                        common_relics = (roll * 10) * multiplier/256;
                     }
                    
                 }
 
             }
             if (round > 15) {
+                relic_types = 1;
                 if (roll < 0.95) {
-                    relic_types = 2;
+                    relic_types = 1;
                 }
                 else if (roll < 0.75) {
-                    relic_types = 3;
+                    relic_types = 2
                 }
                 else if (roll < 0.25) {
-                    relic_types = 4;
+                    relic_types = 3;
                 }
 
                 for (let i = 0; i < relic_types; i++) {
@@ -985,40 +984,41 @@ async function selectQuest(round, user) {
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/68;
+                        legendary_relics = (roll * 10) * multiplier/256;
                     }
                     //10% chance for epic relic
                     else if (roll <= 0.15) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/64;
+                        epic_relics = (roll * 10) * multiplier/256;
                     }
                     //20% chance for rare relic
                     else if (roll <= 0.35) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * round/64;
+                        rare_relics = (roll * 10) * multiplier/256;
                     }
                     //30% chance for uncommon relic
                     else if (roll <= 0.65) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/64;
+                        uncommon_relics = (roll * 10) * multiplier/128
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/36;
+                        common_relics = (roll * 10) * multiplier/128;
                     }
                 }
             }
             if (round > 18) {
-                if (roll < 0.98) {
-                    relic_types = 2
+                relic_types = 1;
+                if (roll < 0.80) {
+                    relic_types = 2;
                 }
-                else if (roll < 0.75) {
+                else if (roll < 0.60) {
                     relic_types = 3;
                 }
-                else if (roll < 0.50) {
+                else if (roll < 0.40) {
                     relic_types = 4;
                 }
-                else if (roll < 0.2) {
+                else if (roll < 0.20) { 
                     relic_types = 5;
                 }
 
@@ -1027,26 +1027,26 @@ async function selectQuest(round, user) {
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * round/42;
+                        legendary_relics = (roll * 10) * multiplier/128;
                     }
                     //10% chance for epic relic
                     else if (roll <= 0.15) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/36;
+                        epic_relics = (roll * 10) * multiplier/128;
                     }
                     //20% chance for rare relic
                     else if (roll <= 0.35) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * round/28;
+                        rare_relics = (roll * 10) * multiplier/128;
                     }
                     //30% chance for uncommon relic
                     else if (roll <= 0.65) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/12;
+                        uncommon_relics = (roll * 10) * multiplier/64;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/8;
+                        common_relics = (roll * 10) * round/64;
                     }
                 }
 
@@ -1059,22 +1059,22 @@ async function selectQuest(round, user) {
                     // 5% epic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * round/36;
+                        epic_relics = (roll * 10) * multiplier/64;
                     }
                     // 15% rare
                     else if (roll <= 0.2) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * round/36;
+                        rare_relics = (roll * 10) * multiplier/64;
                     }
                     // 30% uncommon
                     else if (roll <= 0.5) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * round/36;
+                        uncommon_relics = (roll * 10) * multiplier/32;
                     }
                     // 50% common
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/16;
+                        common_relics = (roll * 10) * multiplier/16;
                     }
 
              
@@ -1224,10 +1224,6 @@ async function issue(username, type, amount){
 }
 
 
-
-
-
-
 //async function to clear transactions from queue
 async function clearTransactions() {
     //connect to db
@@ -1268,9 +1264,24 @@ async function clearFirst() {
         }
     }
 }
+//sleep function
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+async function test(){
+    //start quest for funkydev
+    await startQuest('crypt0gnome');
+    //wait 10 seconds
+    await sleep(7000);
+    //progress quest for funkydev 20 times
+    for (var i = 0; i < 20; i++) {
+        await progressQuest('crypt0gnome');
+        //sleep for 1 second
+        await sleep(3200);
+    }
+}
 
-
-
+//test();
 var lastevent = Date.now();
 var lastCheck = Date.now();
 //aysncfunction to start listening for events
@@ -1372,6 +1383,7 @@ try{
 catch(err){
     console.log(err);
 }
+
 
 
 
