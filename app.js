@@ -961,7 +961,7 @@ async function selectQuest(round, user) {
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * multiplier/256;
+                        common_relics = (roll * 10) * multiplier/128;
                     }
                    
                 }
@@ -994,16 +994,16 @@ async function selectQuest(round, user) {
                     //20% chance for rare relic
                     else if (roll <= 0.35) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * multiplier/256;
+                        rare_relics = (roll * 10) * multiplier/128;
                     }
                     //30% chance for uncommon relic
                     else if (roll <= 0.65) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * multiplier/128
+                        uncommon_relics = (roll * 10) * multiplier/64;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * multiplier/128;
+                        common_relics = (roll * 10) * multiplier/64;
                     }
                 }
             }
@@ -1037,7 +1037,7 @@ async function selectQuest(round, user) {
                     //20% chance for rare relic
                     else if (roll <= 0.35) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * multiplier/128;
+                        rare_relics = (roll * 10) * multiplier/64;
                     }
                     //30% chance for uncommon relic
                     else if (roll <= 0.65) {
@@ -1046,7 +1046,7 @@ async function selectQuest(round, user) {
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/64;
+                        common_relics = (roll * 10) * round/32;
                     }
                 }
 
