@@ -292,12 +292,12 @@ async function storeClaim(username, qty) {
 }
 
 //create a function where you can send transactions to be queued to be sent
-async function sendTransaction(username, type, target, blockId, trxId) {
+async function sendTransaction(username, type, target, blockId, trxId, hash) {
     //create a que where new transactions are added and then sent in order 1 by 1
     try{
         let db = client.db(dbName);
         let collection = db.collection('transactions');
-        let result = await collection.insertOne({username: username, type: type, target: target, blockId: blockId, trxId: trxId, time: Date.now()});
+        let result = await collection.insertOne({username: username, type: type, target: target, blockId: blockId, trxId: trxId, hash: hash, time: Date.now()});
         console.log('Transaction ' + result.insertedId + ' added to queue');
     }
     catch (err) {
@@ -354,7 +354,7 @@ async function sendTransactions() {
                 else if(transaction.type == 'battle') {
                     while(true){
                         //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
-                        var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId);
+                        var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash);
                         if(result2) {
                             let maxAttempts = 10;
                             let delay = 200;
@@ -519,7 +519,7 @@ async function claim(username) {
 }
 
 //battle function
-async function battle(username, _target, blockId, trxId) {
+async function battle(username, _target, blockId, trxId, hash) {
     try{
 
         if(username == _target) {
@@ -577,7 +577,7 @@ async function battle(username, _target, blockId, trxId) {
         if (user.stats.damage > target.stats.defense && user.attacks > 0) {
             //check the amount of scrap users has staked
             var staked = await scrapStaked(username);
-            var seed = await createSeed(blockId, trxId);
+            var seed = await createSeed(blockId, trxId, hash);
             var roll = await rollAttack(user, seed);
             var scrapToSteal = target.scrap * (roll / 100);
 
@@ -717,9 +717,9 @@ async function rollAttack(_player, seed = null) {
 //////////
 ///////////////////////////////////////////////////
 //function to create a seed from blockId & trxId to make verifiable random number using the Hive blockchain
-function createSeed(blockId, trxId) {
+function createSeed(blockId, trxId, hash) {
     //create seed from blockId & trxId
-    var seed = blockId + trxId;
+    var seed = blockId + "@" + trxId + "@" + hash;
     //return seed
     return seed;
 }
@@ -773,7 +773,7 @@ async function progressQuest(username, blockId, trxId) {
             //make sure more 3 sec
             if (quest.time + 3000 < Date.now()) {
                 //before progressing quest let's make a roll to see if the quest is successful
-                var seed = await createSeed(blockId, trxId);
+                var seed = await createSeed(blockId, trxId, quest.round.toString());
                 var roll = await rollDice(1, seed);
                 if(roll < quest.success_chance) {
                     console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
@@ -1281,98 +1281,109 @@ async function listen() {
     await changeNode();
     checkTransactions();
     hive.api.streamBlock(function (err, result) {
-        const blockId = result.block_id
+        try {
+            const blockId = result.block_id
 
-        if (!result || !result.transactions) {
-          console.error('Block without transactions !!')
-          return
-        }
-      
-        //loop through transactions in result
-        for (const transaction of result.transactions) {
-            const trxId = transaction.transaction_id
-            //loop through operations in transaction
-            for (const operation of transaction.operations) {
-                //timestamp of last event
-                lastevent = Date.now(); 
-                //console.log(operation);
-                if (operation[0] == 'transfer' && operation[1].to === 'terracore') {
-                    //grab hash from memo
-                    var memo = JSON.parse(operation[1].memo);
-                    //check if memo is register
-                    if(memo.hash.includes('terracore_register')){
-                        //split hash to get hash
-                        var hash = memo.hash.split('-')[1];
-                        var referrer = memo.referrer;
-                        if (operation[1].to == 'terracore') {
-                            var registered = register(operation[1].from, referrer, operation[1].amount);
-                            if (registered) {
-                                storeRegistration(hash, operation[1].from);
+            if (!result || !result.transactions) {
+            console.error('Block without transactions !!')
+            return
+            }
+        
+            //loop through transactions in result
+            for (const transaction of result.transactions) {
+                const trxId = transaction.transaction_id
+                //loop through operations in transaction
+                for (const operation of transaction.operations) {
+                    //timestamp of last event
+                    lastevent = Date.now(); 
+                    //console.log(operation);
+                    if (operation[0] == 'transfer' && operation[1].to === 'terracore') {
+                        //grab hash from memo
+                        var memo = JSON.parse(operation[1].memo);
+                        //check if memo is register
+                        if(memo.hash.includes('terracore_register')){
+                            //split hash to get hash
+                            var hash = memo.hash.split('-')[1];
+                            var referrer = memo.referrer;
+                            if (operation[1].to == 'terracore') {
+                                var registered = register(operation[1].from, referrer, operation[1].amount);
+                                if (registered) {
+                                    storeRegistration(hash, operation[1].from);
+                                }
                             }
                         }
-                    }
-                
-                }
-                if (operation[0] == 'custom_json' && operation[1].id === 'terracore_claim') {
-                    //grab the json from result[1].json
-                    var data = JSON.parse(operation[1].json);
-                    var user;
-                    //check if required_auths[0] is []
-                    if (operation[1].required_auths[0] == undefined) {
-                        user = operation[1].required_posting_auths[0];
-                    }
-                    else {
-                        user = operation[1].required_auths[0];
-                    }
-        
-                    //claim function
-                    sendTransaction(user, 'claim', 'none');
-                }
-                if (operation[0] == 'custom_json' && operation[1].id === 'terracore_battle') {
-                    //console.log(result);
-                    var data = JSON.parse(operation[1].json);
-                    //get target from data
-                    var target = data.target;
-                    var user;
-                    //check if required_auths[0] is []
-                    if (operation[1].required_auths[0] == undefined) {
-                        user = operation[1].required_posting_auths[0];
-                    }
-                    else {
-                        user = operation[1].required_auths[0];
-                    }
-                    sendTransaction(user, 'battle', target, blockId, trxId);
-                }  
-                if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_progress') {
-                    //console.log(result);
-                    var user;
-                    //check if required_auths[0] is []
-                    if (operation[1].required_auths[0] == undefined) {
-                        user = operation[1].required_posting_auths[0];
-                    }
-                    else {
-                        user = operation[1].required_auths[0];
-                    }
-                    sendTransaction(user, 'progress', 'none', blockId, trxId);
-                }
-                if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_complete') {
-                    //console.log(result);
-                    var user;
-                    //check if required_auths[0] is []
-                    if (operation[1].required_auths[0] == undefined) {
-                        user = operation[1].required_posting_auths[0];
-                    }
-                    else {
-                        user = operation[1].required_auths[0];
-                    }
-                    //completeQuest(user);
-                    sendTransaction(user, 'complete', 'none');
                     
-                }
-            }
-
-
+                    }
+                    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_claim') {
+                        //grab the json from result[1].json
+                        var data = JSON.parse(operation[1].json);
+                        var user;
+                        //check if required_auths[0] is []
+                        if (operation[1].required_auths[0] == undefined) {
+                            user = operation[1].required_posting_auths[0];
+                        }
+                        else {
+                            user = operation[1].required_auths[0];
+                        }
+            
+                        //claim function
+                        sendTransaction(user, 'claim', 'none');
+                    }
+                    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_battle') {
+                    
+                        var data = JSON.parse(operation[1].json);
+                        //get target from data
+                        var target = data.target;
+                        //confirm that data contains a tx-hash
+                       
+                        //find the inddex of this operation
+                        var hash = operation[1].json.split('"')[3];
           
+                        var user;
+                        //check if required_auths[0] is []
+                        if (operation[1].required_auths[0] == undefined) {
+                            user = operation[1].required_posting_auths[0];
+                        }
+                        else {
+                            user = operation[1].required_auths[0];
+                        }
+                        sendTransaction(user, 'battle', target, blockId, trxId, hash);
+                        
+                    }  
+                    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_progress') {
+                        //console.log(result);
+                        var user;
+                        //check if required_auths[0] is []
+                        if (operation[1].required_auths[0] == undefined) {
+                            user = operation[1].required_posting_auths[0];
+                        }
+                        else {
+                            user = operation[1].required_auths[0];
+                        }
+                        sendTransaction(user, 'progress', 'none', blockId, trxId);
+                    }
+                    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_complete') {
+                        //console.log(result);
+                        var user;
+                        //check if required_auths[0] is []
+                        if (operation[1].required_auths[0] == undefined) {
+                            user = operation[1].required_posting_auths[0];
+                        }
+                        else {
+                            user = operation[1].required_auths[0];
+                        }
+                        //completeQuest(user);
+                        sendTransaction(user, 'complete', 'none');
+                        
+                    }
+                }
+
+
+            
+            }
+        }
+        catch(err) {
+            console.log(err);
         }
    
     });
