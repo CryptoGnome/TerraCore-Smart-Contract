@@ -292,12 +292,12 @@ async function storeClaim(username, qty) {
 }
 
 //create a function where you can send transactions to be queued to be sent
-async function sendTransaction(username, type, target) {
+async function sendTransaction(username, type, target, blockId, trxId) {
     //create a que where new transactions are added and then sent in order 1 by 1
     try{
         let db = client.db(dbName);
         let collection = db.collection('transactions');
-        let result = await collection.insertOne({username: username, type: type, target: target, time: Date.now()});
+        let result = await collection.insertOne({username: username, type: type, target: target, blockId: blockId, trxId: trxId, time: Date.now()});
         console.log('Transaction ' + result.insertedId + ' added to queue');
     }
     catch (err) {
@@ -354,7 +354,7 @@ async function sendTransactions() {
                 else if(transaction.type == 'battle') {
                     while(true){
                         //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
-                        var result2 = await battle(transaction.username, transaction.target);
+                        var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId);
                         if(result2) {
                             let maxAttempts = 10;
                             let delay = 200;
@@ -371,7 +371,7 @@ async function sendTransactions() {
                     }
                 }
                 else if(transaction.type == 'progress') {
-                    await progressQuest(transaction.username);
+                    await progressQuest(transaction.username, transaction.blockId, transaction.trxId);
                     await collection.deleteOne({ _id: transaction._id });
                 }
                 else if(transaction.type == 'complete') {
@@ -519,7 +519,7 @@ async function claim(username) {
 }
 
 //battle function
-async function battle(username, _target) {
+async function battle(username, _target, blockId, trxId) {
     try{
 
         if(username == _target) {
@@ -577,14 +577,15 @@ async function battle(username, _target) {
         if (user.stats.damage > target.stats.defense && user.attacks > 0) {
             //check the amount of scrap users has staked
             var staked = await scrapStaked(username);
-            var roll = await rollAttack(user);
+            var seed = await createSeed(blockId, trxId);
+            var roll = await rollAttack(user, seed);
             var scrapToSteal = target.scrap * (roll / 100);
 
             //give target a chance to ddodge based on toughness
             if (checkDodge(target)) {
                 //send webhook stating target dodged attack
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
-                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, seed: seed, roll: roll, timestamp: Date.now()});
                 webhook("Attack Dodged", "User " + username + " tried to attack " + _target + " but they dodged the attack", '#ff6eaf')
                 return true;
             }
@@ -630,7 +631,7 @@ async function battle(username, _target) {
                     const result = await collection.bulkWrite(bulkOps);
                     //check if update was successful frim above result
                     if (result.nModified == 2 && result.nMatched == 2 && result.ok == 1) {
-                        await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: scrapToSteal, timestamp: Date.now()});
+                        await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: scrapToSteal, seed: seed, roll: roll, timestamp: Date.now()});
                         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
                         return true;
                     }
@@ -679,73 +680,76 @@ function checkDodge(_target) {
     }
 }
 
-async function rollAttack(_player) {
-    //roll a random number between favor and 100
-    var steal = Math.floor(Math.random() * (100 - _player.stats.crit + 1)) + _player.stats.crit;
-    //check if steal is greater than 100
-    if (steal > 100) {
-        steal = 100;
+async function rollAttack(_player, seed = null) {
+    let originalRandom;
+    let seedValue = seed;
+  
+    if (seedValue !== null) {
+      originalRandom = Math.random;
+      seedValue = parseInt(seedValue, 16); // Convert the hexadecimal seed to an integer
+      Math.random = function() {
+        const x = Math.sin(seedValue++) * 10000;
+        return x - Math.floor(x);
+      };
     }
-    //return steal
+  
+    var steal = Math.floor(Math.random() * (100 - _player.stats.crit + 1)) + _player.stats.crit;
+  
+    if (steal > 100) {
+      steal = 100;
+    }
+  
+    if (seedValue !== null) {
+      Math.random = originalRandom;
+    }
+  
     return steal;
 }
+  
+
+  
+  
+  
 
 ////////////////////////////////////////////////////
 ////////////
 /////////// Quest  Functions
 //////////
 ///////////////////////////////////////////////////
-async function rollDice(index) {
-    return Math.random() * (index - 0.01 * index) + 0.01 * index;
-}
-//start quest is for testing only in this contract -- lives in HE contract for FLUX
-async function startQuest(username) {
-    //check if user has a quest already
-    //if so return false else insert quest into active-quests collection
-    try{
-        //check if user is in active-quests collection
-        let db = client.db(dbName);
-        let collection = db.collection('active-quests');
-        let user = await collection.findOne({ username: username });
-        //get username from players collection
-        let _username = await db.collection('players').findOne({ username: username });
-   
-        if(_username) {
-            var activeQuest;
-            if (!user) {
-                //select a quest
-                activeQuest = await selectQuest(1, _username);
-                //add quest to active-quests collection
-                await collection.insertOne(activeQuest);
-            }
-            else {
-                console.log('User ' + username + ' already has a quest');
-                return false;
-            }
-          
-        }
-        else {
-            console.log('User ' + username + ' does not exist');
-            return false;
-        }
-
-    
-
-    }
-    catch (err) {
-        if(err instanceof MongoTopologyClosedError) {
-            console.log('MongoDB connection closed');
-            client.close();
-            process.exit(1);
-        }
-        else {
-            console.log(err);
-            return false;
-        }
-    }
+//function to create a seed from blockId & trxId to make verifiable random number using the Hive blockchain
+function createSeed(blockId, trxId) {
+    //create seed from blockId & trxId
+    var seed = blockId + trxId;
+    //return seed
+    return seed;
 }
 
-async function progressQuest(username) {
+function rollDice(index, seed = null) {
+    let originalRandom;
+    let seedValue = seed;
+  
+    if (seedValue !== null) {
+      originalRandom = Math.random;
+      seedValue = parseInt(seedValue, 16); // Convert the hexadecimal seed to an integer
+      Math.random = function() {
+        const x = Math.sin(seedValue++) * 10000;
+        return x - Math.floor(x);
+      };
+    }
+  
+    const result = Math.random() * (index - 0.01 * index) + 0.01 * index;
+  
+    if (seedValue !== null) {
+      Math.random = originalRandom;
+    }
+  
+    return result;
+}
+  
+  
+
+
+async function progressQuest(username, blockId, trxId) {
     //check if user has a quest already
     //if so return false else insert quest into active-quests collection
     try{
@@ -769,7 +773,8 @@ async function progressQuest(username) {
             //make sure more 3 sec
             if (quest.time + 3000 < Date.now()) {
                 //before progressing quest let's make a roll to see if the quest is successful
-                var roll = Math.random();
+                var seed = await createSeed(blockId, trxId);
+                var roll = await rollDice(1, seed);
                 if(roll < quest.success_chance) {
                     console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
                     //quest was successful
@@ -785,12 +790,12 @@ async function progressQuest(username) {
                         activeQuest.legendary_relics += quest.legendary_relics;
 
                         //replace current quest with new quest
-                        await collection.replaceOne({ username: username }, activeQuest);
+                        collection.replaceOne({ username: username }, activeQuest);
 
         
 
                         //log quest progress
-                        await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, roll: roll, success_chance: quest.success_chance, time: new Date()});
+                        await db.collection('quest-log').insertOne({username: username, action: 'progress', quest: activeQuest, roll: roll, success_chance: quest.success_chance, seed: seed, time: new Date()});
 
                         return true;
 
@@ -805,7 +810,7 @@ async function progressQuest(username) {
                     //quest failed
                     //remove quest from active-quests collection
                     console.log('Quest failed for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
-                    await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, roll: roll, success_chance: quest.success_chance, time: new Date()});
+                    await db.collection('quest-log').insertOne({username: username, action: 'failed', quest: quest, roll: roll, success_chance: quest.success_chance, seed: seed, time: new Date()});
                     await collection.deleteOne({ username: username });
                     webhook4("Quest Failed", "Quest Failed for " + username + " with a roll of " + roll.toFixed(2).toString() + " and a success chance of " + quest.success_chance.toFixed(2).toString());
                     return false;
@@ -1264,22 +1269,8 @@ async function clearFirst() {
         }
     }
 }
-//sleep function
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-async function test(){
-    //start quest for funkydev
-    await startQuest('crypt0gnome');
-    //wait 10 seconds
-    await sleep(7000);
-    //progress quest for funkydev 20 times
-    for (var i = 0; i < 20; i++) {
-        await progressQuest('crypt0gnome');
-        //sleep for 1 second
-        await sleep(3200);
-    }
-}
+
+
 
 //test();
 var lastevent = Date.now();
@@ -1289,89 +1280,103 @@ async function listen() {
     await clearFirst();
     await changeNode();
     checkTransactions();
-    hive.api.streamOperations(function(err, result) {
-        //timestamp of last event
-        lastevent = Date.now(); 
+    hive.api.streamBlock(function (err, result) {
+        const blockId = result.block_id
 
-        if (result[0] == 'transfer' && result[1].to === 'terracore') {
-            //grab hash from memo
-            var memo = JSON.parse(result[1].memo);
-            //check if memo is register
-            if(memo.hash.includes('terracore_register')){
-                //split hash to get hash
-                var hash = memo.hash.split('-')[1];
-                var referrer = memo.referrer;
-                if (result[1].to == 'terracore') {
-                    var registered = register(result[1].from, referrer, result[1].amount);
-                    if (registered) {
-                        storeRegistration(hash, result[1].from);
+        if (!result || !result.transactions) {
+          console.error('Block without transactions !!')
+          return
+        }
+      
+        //loop through transactions in result
+        for (const transaction of result.transactions) {
+            const trxId = transaction.transaction_id
+            //loop through operations in transaction
+            for (const operation of transaction.operations) {
+                //timestamp of last event
+                lastevent = Date.now(); 
+                //console.log(operation);
+                if (operation[0] == 'transfer' && operation[1].to === 'terracore') {
+                    //grab hash from memo
+                    var memo = JSON.parse(operation[1].memo);
+                    //check if memo is register
+                    if(memo.hash.includes('terracore_register')){
+                        //split hash to get hash
+                        var hash = memo.hash.split('-')[1];
+                        var referrer = memo.referrer;
+                        if (operation[1].to == 'terracore') {
+                            var registered = register(operation[1].from, referrer, operation[1].amount);
+                            if (registered) {
+                                storeRegistration(hash, operation[1].from);
+                            }
+                        }
                     }
+                
+                }
+                if (operation[0] == 'custom_json' && operation[1].id === 'terracore_claim') {
+                    //grab the json from result[1].json
+                    var data = JSON.parse(operation[1].json);
+                    var user;
+                    //check if required_auths[0] is []
+                    if (operation[1].required_auths[0] == undefined) {
+                        user = operation[1].required_posting_auths[0];
+                    }
+                    else {
+                        user = operation[1].required_auths[0];
+                    }
+        
+                    //claim function
+                    sendTransaction(user, 'claim', 'none');
+                }
+                if (operation[0] == 'custom_json' && operation[1].id === 'terracore_battle') {
+                    //console.log(result);
+                    var data = JSON.parse(operation[1].json);
+                    //get target from data
+                    var target = data.target;
+                    var user;
+                    //check if required_auths[0] is []
+                    if (operation[1].required_auths[0] == undefined) {
+                        user = operation[1].required_posting_auths[0];
+                    }
+                    else {
+                        user = operation[1].required_auths[0];
+                    }
+                    sendTransaction(user, 'battle', target, blockId, trxId);
+                }  
+                if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_progress') {
+                    //console.log(result);
+                    var user;
+                    //check if required_auths[0] is []
+                    if (operation[1].required_auths[0] == undefined) {
+                        user = operation[1].required_posting_auths[0];
+                    }
+                    else {
+                        user = operation[1].required_auths[0];
+                    }
+                    sendTransaction(user, 'progress', 'none', blockId, trxId);
+                }
+                if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_complete') {
+                    //console.log(result);
+                    var user;
+                    //check if required_auths[0] is []
+                    if (operation[1].required_auths[0] == undefined) {
+                        user = operation[1].required_posting_auths[0];
+                    }
+                    else {
+                        user = operation[1].required_auths[0];
+                    }
+                    //completeQuest(user);
+                    sendTransaction(user, 'complete', 'none');
+                    
                 }
             }
-        
-        }
-        if (result[0] == 'custom_json' && result[1].id === 'terracore_claim') {
-            //grab the json from result[1].json
-            var data = JSON.parse(result[1].json);
-            var user;
-            //check if required_auths[0] is []
-            if (result[1].required_auths[0] == undefined) {
-                user = result[1].required_posting_auths[0];
-            }
-            else {
-                user = result[1].required_auths[0];
-            }
 
-            //claim function
-            sendTransaction(user, 'claim', 'none');
+
+          
         }
-        if (result[0] == 'custom_json' && result[1].id === 'terracore_battle') {
-            //console.log(result);
-            var data = JSON.parse(result[1].json);
-            //get target from data
-            var target = data.target;
-            var user;
-            //check if required_auths[0] is []
-            if (result[1].required_auths[0] == undefined) {
-                user = result[1].required_posting_auths[0];
-            }
-            else {
-                user = result[1].required_auths[0];
-            }
-            sendTransaction(user, 'battle', target);
-        }  
-        if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_progress') {
-            //console.log(result);
-            var user;
-            //check if required_auths[0] is []
-            if (result[1].required_auths[0] == undefined) {
-                user = result[1].required_posting_auths[0];
-            }
-            else {
-                user = result[1].required_auths[0];
-            }
-            //progressQuest(user);
-            sendTransaction(user, 'progress', 'none');
-        }
-        if (result[0] == 'custom_json' && result[1].id === 'terracore_quest_complete') {
-            //console.log(result);
-            var user;
-            //check if required_auths[0] is []
-            if (result[1].required_auths[0] == undefined) {
-                user = result[1].required_posting_auths[0];
-            }
-            else {
-                user = result[1].required_auths[0];
-            }
-            //completeQuest(user);
-            sendTransaction(user, 'complete', 'none');
-            
-        } 
    
     });
 }
-
-
 
 //track last event and reset claims every 15 seconds
 try{
