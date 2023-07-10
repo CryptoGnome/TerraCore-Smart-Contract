@@ -299,6 +299,7 @@ async function sendTransaction(username, type, target, blockId, trxId, hash) {
         let collection = db.collection('transactions');
         let result = await collection.insertOne({username: username, type: type, target: target, blockId: blockId, trxId: trxId, hash: hash, time: Date.now()});
         console.log('Transaction ' + result.insertedId + ' added to queue');
+        return;
     }
     catch (err) {
         if(err instanceof MongoTopologyClosedError) {
@@ -308,6 +309,7 @@ async function sendTransaction(username, type, target, blockId, trxId, hash) {
         }
         else {
             console.log(err);
+            return;
         }
     }
 }
@@ -1280,7 +1282,7 @@ async function listen() {
     await clearFirst();
     await changeNode();
     checkTransactions();
-    hive.api.streamBlock(function (err, result) {
+    hive.api.streamBlock(async function (err, result) {
         try {
             const blockId = result.block_id
 
@@ -1327,7 +1329,7 @@ async function listen() {
                         }
             
                         //claim function
-                        sendTransaction(user, 'claim', 'none');
+                        await sendTransaction(user, 'claim', 'none');
                     }
                     if (operation[0] == 'custom_json' && operation[1].id === 'terracore_battle') {
                     
@@ -1347,7 +1349,7 @@ async function listen() {
                         else {
                             user = operation[1].required_auths[0];
                         }
-                        sendTransaction(user, 'battle', target, blockId, trxId, hash);
+                        await sendTransaction(user, 'battle', target, blockId, trxId, hash);
                         
                     }  
                     if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_progress') {
@@ -1395,6 +1397,7 @@ try{
     console.log('Starting to Listening for events on HIVE...');
     console.log('-------------------------------------------------------')
     listen();
+
 }
 catch(err){
     console.log(err);
