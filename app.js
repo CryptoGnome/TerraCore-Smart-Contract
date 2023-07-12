@@ -748,8 +748,6 @@ function rollDice(index, seed = null) {
     return result;
 }
   
-  
-
 
 async function progressQuest(username, blockId, trxId) {
     //check if user has a quest already
@@ -1292,12 +1290,14 @@ async function listen() {
             }
         
             //loop through transactions in result
+            var hash = -1;
             for (const transaction of result.transactions) {
                 const trxId = transaction.transaction_id
                 //loop through operations in transaction
                 for (const operation of transaction.operations) {
                     //timestamp of last event
                     lastevent = Date.now(); 
+                    hash++;
                     //console.log(operation);
                     if (operation[0] == 'transfer' && operation[1].to === 'terracore') {
                         //grab hash from memo
@@ -1336,11 +1336,6 @@ async function listen() {
                         var data = JSON.parse(operation[1].json);
                         //get target from data
                         var target = data.target;
-                        //confirm that data contains a tx-hash
-                       
-                        //find the inddex of this operation
-                        var hash = operation[1].json.split('"')[3];
-          
                         var user;
                         //check if required_auths[0] is []
                         if (operation[1].required_auths[0] == undefined) {
@@ -1362,7 +1357,7 @@ async function listen() {
                         else {
                             user = operation[1].required_auths[0];
                         }
-                        sendTransaction(user, 'progress', 'none', blockId, trxId);
+                        sendTransaction(user, 'progress', 'none', blockId, trxId, hash);
                     }
                     if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_complete') {
                         //console.log(result);
@@ -1377,6 +1372,19 @@ async function listen() {
                         //completeQuest(user);
                         sendTransaction(user, 'complete', 'none');
                         
+                    }
+                    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_use_consumable') {
+                        //console.log(result);
+                        var user;
+                        //check if required_auths[0] is []
+                        if (operation[1].required_auths[0] == undefined) {
+                            user = operation[1].required_posting_auths[0];
+                        }
+                        else {
+                            user = operation[1].required_auths[0];
+                        }
+                        //completeQuest(user);
+                        sendTransaction(user, 'use_consumable', 'none');
                     }
                 }
 
