@@ -3,7 +3,7 @@ const { MongoClient, MongoTopologyClosedError } = require('mongodb');
 const fetch = require('node-fetch');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
 require('dotenv').config();
-var RNG = require('rng-js');
+var seedrandom = require('seedrandom');
 
 //connect to Webhook using retry on limit
 const hook = new Webhook(process.env.DISCORD_WEBHOOK);
@@ -684,11 +684,10 @@ function checkDodge(_target) {
 }
 
 function rollAttack(_player, seed) {
-    const rng = new RNG(seed);
-    var roll = rng.uniform();
-    // Generate a random number let steal = Math.floor(Math.random() * (100 - _player.stats.crit + 1)) + _player.stats.crit;
-    var steal = Math.floor(roll * (100 - _player.stats.crit + 1)) + _player.stats.crit;
-
+    var rng = seedrandom(seed);
+    var roll = rng();
+    // Generate a random number let steal = Math.floor(Math.random() * (100 - _player.stats.crit + 1)) + _player.stats.crit; //dont floor
+    var steal = roll * (100 - _player.stats.crit + 1) + _player.stats.crit;
     if (steal > 100) {
       steal = 100;
     }
@@ -704,29 +703,24 @@ function rollAttack(_player, seed) {
 //function to create a seed from blockId & trxId to make verifiable random number using the Hive blockchain
 async function createSeed(blockId, trxId, hash) {
     //create seed from blockId & trxId
-    var seed = blockId  + trxId  + hash;
+    var seed = blockId + '@' + trxId + '@'  + hash;
     //return seed
     return seed;
 }
 
 async function rollDice(index, seed = null) {
-    let originalRandom;
-    let seedValue = seed;
 
     //if there is a seed value then use it to generate a random number
-    if (seedValue !== null) {
-        const rng = new RNG(seed);
-        originalRandom = Math.random;
-        Math.random = () => rng.uniform();
-        return Math.floor(rng.uniform() * (index - 0.01 * index) + 0.01 * index);
+    if (seed !== null) {
+        const rng = seedrandom(seed.toString(), {state: true});
+        //roll a number using rng that can be reproduced using the seed
+        const result = rng() * (index - 0.01 * index) + 0.01 * index;
+        return result;
+
     }
 
     const result = Math.random() * (index - 0.01 * index) + 0.01 * index;
-  
-    if (seedValue !== null) {
-        Math.random = originalRandom;
-    }
-  
+
     return result;
 }
   
