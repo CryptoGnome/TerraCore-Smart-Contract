@@ -3,6 +3,7 @@ const { MongoClient, MongoTopologyClosedError } = require('mongodb');
 const fetch = require('node-fetch');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
 require('dotenv').config();
+var RNG = require('rng-js');
 
 //connect to Webhook using retry on limit
 const hook = new Webhook(process.env.DISCORD_WEBHOOK);
@@ -682,67 +683,48 @@ function checkDodge(_target) {
     }
 }
 
-async function rollAttack(_player, seed = null) {
-    let originalRandom;
-    let seedValue = seed;
-  
-    if (seedValue !== null) {
-      originalRandom = Math.random;
-      seedValue = parseInt(seedValue, 16); // Convert the hexadecimal seed to an integer
-      Math.random = function() {
-        const x = Math.sin(seedValue++) * 10000;
-        return x - Math.floor(x);
-      };
-    }
-  
-    var steal = Math.floor(Math.random() * (100 - _player.stats.crit + 1)) + _player.stats.crit;
-  
+function rollAttack(_player, seed) {
+    const rng = new RNG(seed);
+    var roll = rng.uniform();
+    // Generate a random number let steal = Math.floor(Math.random() * (100 - _player.stats.crit + 1)) + _player.stats.crit;
+    var steal = Math.floor(roll * (100 - _player.stats.crit + 1)) + _player.stats.crit;
+
     if (steal > 100) {
       steal = 100;
     }
-  
-    if (seedValue !== null) {
-      Math.random = originalRandom;
-    }
-  
+
     return steal;
 }
   
-
-  
-  
-  
-
 ////////////////////////////////////////////////////
 ////////////
 /////////// Quest  Functions
 //////////
 ///////////////////////////////////////////////////
 //function to create a seed from blockId & trxId to make verifiable random number using the Hive blockchain
-function createSeed(blockId, trxId, hash) {
+async function createSeed(blockId, trxId, hash) {
     //create seed from blockId & trxId
-    var seed = blockId + "@" + trxId + "@" + hash;
+    var seed = blockId  + trxId  + hash;
     //return seed
     return seed;
 }
 
-function rollDice(index, seed = null) {
+async function rollDice(index, seed = null) {
     let originalRandom;
     let seedValue = seed;
-  
+
+    //if there is a seed value then use it to generate a random number
     if (seedValue !== null) {
-      originalRandom = Math.random;
-      seedValue = parseInt(seedValue, 16); // Convert the hexadecimal seed to an integer
-      Math.random = function() {
-        const x = Math.sin(seedValue++) * 10000;
-        return x - Math.floor(x);
-      };
+        const rng = new RNG(seed);
+        originalRandom = Math.random;
+        Math.random = () => rng.uniform();
+        return Math.floor(rng.uniform() * (index - 0.01 * index) + 0.01 * index);
     }
-  
+
     const result = Math.random() * (index - 0.01 * index) + 0.01 * index;
   
     if (seedValue !== null) {
-      Math.random = originalRandom;
+        Math.random = originalRandom;
     }
   
     return result;
@@ -1285,19 +1267,16 @@ async function listen() {
             const blockId = result.block_id
 
             if (!result || !result.transactions) {
-            console.error('Block without transactions !!')
-            return
+                 console.error('Block without transactions !!')
+                return
             }
-        
-            //loop through transactions in result
-            var hash = -1;
+    
             for (const transaction of result.transactions) {
                 const trxId = transaction.transaction_id
                 //loop through operations in transaction
                 for (const operation of transaction.operations) {
                     //timestamp of last event
                     lastevent = Date.now(); 
-                    hash++;
                     //console.log(operation);
                     if (operation[0] == 'transfer' && operation[1].to === 'terracore') {
                         //grab hash from memo
@@ -1344,7 +1323,12 @@ async function listen() {
                         else {
                             user = operation[1].required_auths[0];
                         }
-                        await sendTransaction(user, 'battle', target, blockId, trxId, hash);
+
+                        //get the index of data in transaction.operations 
+                        //var hash = transaction.operations.indexOf(operation);
+                
+                        
+                        await sendTransaction(user, 'battle', target, blockId, trxId, Date.now());
                         
                     }  
                     if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_progress') {
