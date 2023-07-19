@@ -1374,19 +1374,6 @@ async function listen() {
                         sendTransaction(user, 'complete', 'none');
                         
                     }
-                    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_use_consumable') {
-                        //console.log(result);
-                        var user;
-                        //check if required_auths[0] is []
-                        if (operation[1].required_auths[0] == undefined) {
-                            user = operation[1].required_posting_auths[0];
-                        }
-                        else {
-                            user = operation[1].required_auths[0];
-                        }
-                        //completeQuest(user);
-                        sendTransaction(user, 'use_consumable', 'none');
-                    }
                 }
 
 
