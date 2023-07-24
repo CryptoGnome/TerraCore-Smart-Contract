@@ -561,8 +561,8 @@ async function battle(username, _target, blockId, trxId, hash) {
 
         //check if target.protection_time exists
         if (target.protection_time) {
-            //check if target protection_time is less than 24 hours ago
-            if (Date.now() - target.protection_time < 86400000) {
+            //check if target protection_time is less than 24 hours ago and is not == null
+            if (Date.now() - target.protection_time < 86400000 && target.protection_time != null) {
                 //send webhook stating target is has new user protection inc version
                 //await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
                 await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
@@ -588,16 +588,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             return true;
         }
 
-        /*
-        //check the battle_logs for the username to maker sure they are not griefing the same target more than once out of the last 24 hours
-        var logs = await db.collection('battle_logs').find({ username: username, attacked: _target, timestamp: { $gt: Date.now() - 86400000 } }).toArray();
-        if (logs.length > 0) {
-            await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
-            await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
-            webhook("Griefing Detected", "User " + username + " tried to attack " + _target + " but they have already been attacked in the last 24 hours", '#ff6eaf')
-            return true;
-        }
-        */
+
 
         //check if user has more damage than target defense and attacks > 0 and has defense > 10
         if (user.stats.damage > target.stats.defense && user.attacks > 0) {
