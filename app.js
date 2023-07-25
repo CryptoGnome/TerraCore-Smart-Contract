@@ -559,16 +559,18 @@ async function battle(username, _target, blockId, trxId, hash) {
             }
         }
 
-        //check if target.protection_time exists
-        if (target.protection_time) {
-            //check if target protection_time is less than 24 hours ago and is not == null
-            if (Date.now() - target.protection_time < 86400000 && target.protection_time != null) {
-                //send webhook stating target is has new user protection inc version
-                //await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
+        //check if target.consumable.protection > 0
+        if (target.consumable.protection > 0) {
+            //take the first timestamp of the protection array and check if it is less than 24 hours ago
+            if (Date.now() - target.consumable.protection[0] < 86400000) {
+                //send webhook stating target is has protection inc version
+                await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
                 await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
-                webhook("Protection Time", "User " + username + " tried to attack " + _target + " but they have protection time", '#ff6eaf')
+                webhook("Protection Potion Active!", "User " + username + " tried to attack " + _target + " but they have protection", '#ff6eaf')
                 return true;
+                
             }
+         
         }
 
         //check if target.lastBattle does not exist
