@@ -560,9 +560,9 @@ async function battle(username, _target, blockId, trxId, hash) {
         }
 
         //check if target.consumable.protection > 0
-        if (target.consumable.protection > 0) {
+        if (target.consumables.protection > 0) {
             //take the first timestamp of the protection array and check if it is less than 24 hours ago
-            if (Date.now() - target.consumable.protection[0] < 86400000) {
+            if (Date.now() - target.consumables.protection[0] < 86400000) {
                 //send webhook stating target is has protection inc version
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
                 await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
