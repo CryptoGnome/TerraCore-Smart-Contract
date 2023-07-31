@@ -601,12 +601,17 @@ async function battle(username, _target, blockId, trxId, hash) {
             var scrapToSteal = target.scrap * (roll / 100);
 
             //give target a chance to ddodge based on toughness
-            if (checkDodge(target)) {
+            if (checkDodge(target) && user.consumables.focus == 0) {
                 //send webhook stating target dodged attack
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
                 await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, seed: seed, roll: roll, timestamp: Date.now()});
                 webhook("Attack Dodged", "User " + username + " tried to attack " + _target + " but they dodged the attack", '#ff6eaf')
                 return true;
+            }
+
+            //check if target has focus if so remove it as it is used for this attack 
+            if (target.consumables.focus > 0) {
+                await collection.updateOne({ username: _target }, { $inc: { 'consumables.focus': -1 , version: 1 } });
             }
 
             //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
