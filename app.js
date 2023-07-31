@@ -592,8 +592,8 @@ async function battle(username, _target, blockId, trxId, hash) {
 
 
 
-        //check if user has more damage than target defense and attacks > 0 and has defense > 10
-        if (user.stats.damage > target.stats.defense && user.attacks > 0) {
+        //check if user has more damage than target defense and attacks > 0 and has defense > 10 or if consumables.focus > 0
+        if (user.stats.damage > target.stats.defense && user.attacks > 0 || user.consumables.focus > 0 && user.attacks > 0) {
             //check the amount of scrap users has staked
             var staked = await scrapStaked(username);
             var seed = await createSeed(blockId, trxId, hash);
