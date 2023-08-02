@@ -609,9 +609,9 @@ async function battle(username, _target, blockId, trxId, hash) {
                 return true;
             }
 
-            //check if target has focus if so remove it as it is used for this attack 
-            if (target.consumables.focus > 0) {
-                await collection.updateOne({ username: _target }, { $inc: { 'consumables.focus': -1 , version: 1 } });
+            //check if user has focus if so remove it as it is used for this attack 
+            if (user.consumables.focus > 0) {
+                await collection.updateOne({ username: user }, { $inc: { 'consumables.focus': -1 , version: 1 } });
             }
 
             //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
@@ -870,7 +870,7 @@ async function selectQuest(round, user) {
         var success_chance = 0.80;
 
         //for every round remove 1% chance of success
-        for (let i = 0; i < round; i++) {
+        for (let i = 1; i < round; i++) {
             success_chance -= 0.01;
         }
 
