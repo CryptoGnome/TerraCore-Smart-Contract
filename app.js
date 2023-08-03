@@ -611,7 +611,7 @@ async function battle(username, _target, blockId, trxId, hash) {
 
             //check if user has focus if so remove it as it is used for this attack 
             if (user.consumables.focus > 0) {
-                await collection.updateOne({ username: user }, { $inc: { 'consumables.focus': -1 , version: 1 } });
+                await collection.updateOne({ username: username }, { $inc: { 'consumables.focus': -1 , version: 1 } });
             }
 
             //check if scrap to steal is more than target scrap if so set scrap to steal to target scrap
