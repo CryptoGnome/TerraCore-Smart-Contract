@@ -91,7 +91,7 @@ async function webhook2(title, message, color) {
     collection = db.collection('stats');
     let todaysPlayers = await collection.findOne({ date: new Date().toISOString().slice(0, 10) });
     if (todaysPlayers) {
-        todaysPlayers = todaysPlayers.players + 1;
+        todaysPlayers = todaysPlayers.players;
     } else {
         todaysPlayers = 0;
     }
@@ -227,7 +227,7 @@ async function register(username, referrer, amount) {
         await collection.updateOne({ date: new Date().toISOString().slice(0, 10) }, { $inc: { players: 1 } }, { upsert: true });
 
 
-        if (referrer != 'terracore' && referrer != username) {
+        if (referrer != 'terracore' && referrer != username && referrer !== undefined) {
             webhook2('A New Citizen of Terracore has Registered', username + ' was invited by ' + referrer, 0x00ff00);
             payReferrer(referrer, username, referrer_fee);
         }
