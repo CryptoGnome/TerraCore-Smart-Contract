@@ -28,35 +28,52 @@ async function testNodeEndpoints(nodes) {
   let fastestEndpoint = '';
   let fastestResponseTime = Infinity;
 
-  nodes.forEach((endpoint) => {
-    hive.api.setOptions({ url: endpoint });
+    //check if there is a last node set in the node db
+    let db = client.db(dbName);
+    let collection = db.collection('nodes');
+    //check what the last node was
+    let lastNode = await collection.findOne({ name: 'lastNode' });
 
-    const startTime = Date.now();
+    //remove last node from nodes array, this will prevent retesting the last node if it was the fastest to cycle through the nodes on issues
+    if (lastNode) {
+        nodes.splice(nodes.indexOf(lastNode.endpoint), 1);
+    }
 
-    hive.api.getState('/', (err, result) => {
-      if (err) {
-        console.error(`${endpoint} error: ${err.message}`);
-      } else {
-        const responseTime = Date.now() - startTime;
-        console.log(`${endpoint}: ${responseTime}ms`);
-        if (responseTime < fastestResponseTime) {
-          fastestResponseTime = responseTime;
-          fastestEndpoint = endpoint;
-        
-          const json = { "action": "test-tx" };
-          const data = JSON.stringify(json);
+    nodes.forEach((endpoint) => {
+        hive.api.setOptions({ url: endpoint });
+        const startTime = Date.now();
 
-          hive.broadcast.customJson(wif, ['terracore'], [], 'test-tx', data, (err, result) => {
+        hive.api.getState('/', (err, result) => {
             if (err) {
-              console.error(`${endpoint} transaction error: ${err.message}`);
-            } else {
-              console.log(`${endpoint} transaction successful`);
+                console.error(`${endpoint} error: ${err.message}`);
+            } 
+            else {
+                const responseTime = Date.now() - startTime;
+                console.log(`${endpoint}: ${responseTime}ms`);
+                
+                if (responseTime < fastestResponseTime) {
+                    fastestResponseTime = responseTime;
+                    fastestEndpoint = endpoint;
+                    
+                    const json = { "action": "test-tx" };
+                    const data = JSON.stringify(json);
+
+                    hive.broadcast.customJson(wif, ['terracore'], [], 'test-tx', data, async (err, result) => {
+                        if (err) {
+                            console.error(`${endpoint} transaction error: ${err.message}`);
+                        } 
+                        else {
+                            console.log(`${endpoint} transaction successful`);
+                            //set last node to fastest endpoint in db
+                            await collection.updateOne({ name: 'lastNode' }, { $set: { endpoint: fastestEndpoint } }, { upsert: true });
+                        }
+                    });
+                }
             }
-          });
-        }
-      }
+        });
+
+
     });
-  });
 
 
 }
@@ -339,7 +356,7 @@ async function sendTransactions() {
                         //const result = await Promise.race([claim(transaction.username), timeout(5000)]);
                         const result = await claim(transaction.username);
                         if(result) {
-                            let maxAttempts = 10;
+                            let maxAttempts = 5;
                             let delay = 200;
                             for (let i = 0; i < maxAttempts; i++) {
                                 let clear = await collection.deleteOne({ _id: transaction._id });
@@ -359,7 +376,7 @@ async function sendTransactions() {
                         //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
                         var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash);
                         if(result2) {
-                            let maxAttempts = 10;
+                            let maxAttempts = 5;
                             let delay = 200;
                             for (let i = 0; i < maxAttempts; i++) {
                                 let clear = await collection.deleteOne({ _id: transaction._id });
@@ -1385,12 +1402,15 @@ async function listen() {
     });
 }
 
+
 //track last event and reset claims every 15 seconds
 try{
     console.log('-------------------------------------------------------')
     console.log('Starting to Listening for events on HIVE...');
     console.log('-------------------------------------------------------')
     listen();
+    
+    
 
 }
 catch(err){
@@ -1402,7 +1422,7 @@ catch(err){
 
 setInterval(function() {
     //console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
-    if (Date.now() - lastevent > 30000) {
+    if (Date.now() - lastevent > 60000) {
         console.log('No events received in 30 seconds, shutting down so pm2 can restart');
         client.close();
         process.exit();
@@ -1418,8 +1438,8 @@ setInterval(function() {
         console.log('HeartBeat: ' + (Date.now() - lastCheck) + 'ms ago');
         heartbeat = 0;
     }
-    if (Date.now() - lastCheck > 20000) {
-        console.log('Error : No events received in 20 seconds, shutting down so PM2 can restart & try to reconnect to Resolve...');
+    if (Date.now() - lastCheck > 60000) {
+        console.log('Error : No events received in 60 seconds, shutting down so PM2 can restart & try to reconnect to Resolve...');
         client.close();
         process.exit();
     }
