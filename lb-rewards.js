@@ -65,8 +65,26 @@ async function getRewards() {
 
         //loop through json and update players
         for (var i = 0; i < json.length; i++) {
-            await distributeRewards(json[i]);
-            await sleep(500);
+
+            //check if player has lastRewardTime field
+            const collection = db.collection('players');
+            const player = await collection.findOne({ username: json[i].username });
+            if (player.lastRewardTime) {
+                //check if the last reward time is less than the rewardtime
+                if (player.lastRewardTime < rewardTime) {
+                    await distributeRewards(json[i]);
+                    await collection.updateOne({ username: json[i].username }, { $set: { lastRewardTime: rewardTime }, $inc: { version: 1 } });
+                    await sleep(500);
+                }
+                else{
+                    console.log("Player " + json[i].username + " already received rewards");
+                }
+            }
+            else {
+                await distributeRewards(json[i]);
+                await collection.updateOne({ username: json[i].username }, { $set: { lastRewardTime: rewardTime }, $inc: { version: 1 } });
+            }
+                
         }
 
         //reset the rewardtime in the stats collection
