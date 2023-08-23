@@ -83,6 +83,7 @@ async function getRewards() {
             else {
                 await distributeRewards(json[i]);
                 await collection.updateOne({ username: json[i].username }, { $set: { lastRewardTime: rewardTime }, $inc: { version: 1 } });
+                await sleep(500);
             }
                 
         }
