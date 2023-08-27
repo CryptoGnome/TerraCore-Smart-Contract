@@ -375,7 +375,7 @@ async function sendTransactions() {
                         //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
                         var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash);
                         if(result2) {
-                            let maxAttempts = 5;
+                            let maxAttempts = 3;
                             let delay = 200;
                             for (let i = 0; i < maxAttempts; i++) {
                                 let clear = await collection.deleteOne({ _id: transaction._id });
@@ -383,7 +383,7 @@ async function sendTransactions() {
                                     break;
                                 }
                                 await new Promise(resolve => setTimeout(resolve, delay));
-                                delay *= 1.5; // exponential backoff
+                                delay *= 1.2; // exponential backoff
                             }
                         }
                         break;
@@ -1267,6 +1267,7 @@ async function listen() {
     await clearFirst();
     await changeNode();
     checkTransactions();
+
     hive.api.streamBlock(async function (err, result) {
         try {
             
