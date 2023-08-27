@@ -372,8 +372,8 @@ async function sendTransactions() {
                 }
                 else if(transaction.type == 'battle') {
                     while(true){
-                        //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
                         var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash);
+                        //const result2 = await Promise.race([battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash), timeout(3000)]);
                         if(result2) {
                             let maxAttempts = 3;
                             let delay = 200;
@@ -1272,7 +1272,7 @@ var lastCheck = Date.now();
 //aysncfunction to start listening for events
 async function listen() {
     //await clearFirst();
-    await changeNode();
+    changeNode();
     checkTransactions();
 
     hive.api.streamBlock(async function (err, result) {
