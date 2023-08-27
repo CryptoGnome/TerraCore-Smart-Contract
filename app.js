@@ -524,16 +524,21 @@ async function battle(username, _target, blockId, trxId, hash) {
             return true;
         }
         var collection = db.collection('players');
-        //load target user
-        var user = await collection.findOne({ username : username });
-        //check if user exists
+        var result = await collection.find({
+            $or: [
+                { username: username },
+                { username: _target }
+            ]
+        }).toArray();
+        
+        var user = result.find(entry => entry.username === username);
+        var target = result.find(entry => entry.username === _target);
+        
         if (!user) {
             console.log('User ' + username + ' does not exist');
             return true;
         }
-        //load target 
-        var target = await collection.findOne({ username : _target });
-        //check if target exists
+        
         if (!target) {
             console.log('Target ' + target + ' does not exist');
             return true;
