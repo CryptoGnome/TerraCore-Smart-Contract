@@ -19,7 +19,7 @@ const wif = process.env.ACTIVE_KEY;
 
 
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 5000, serverSelectionTimeoutMS: 5000 });
-
+const db = client.db(dbName);
 
 const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io'];
 
@@ -29,7 +29,7 @@ async function testNodeEndpoints(nodes) {
   let fastestResponseTime = Infinity;
 
     //check if there is a last node set in the node db
-    let db = client.db(dbName);
+
     let collection = db.collection('nodes');
     //check what the last node was
     let lastNode = await collection.findOne({ name: 'lastNode' });
@@ -98,9 +98,6 @@ async function webhook(title, message, color) {
     
 }
 async function webhook2(title, message, color) {
-
-    //find total players in database
-    let db = client.db(dbName);
     let collection = db.collection('players');
     let totalPlayers = await collection.countDocuments();
 
@@ -170,8 +167,6 @@ async function webhook4(title, msg) {
 //switch this to look at DB
 async function scrapStaked(username) {
     try{
-        //read the username balacne from the player collection
-        let db = client.db(dbName);
         let collection = db.collection('players');
 
         //find the player
@@ -211,7 +206,6 @@ async function payReferrer(referrer, username, amount) {
 
 async function register(username, referrer, amount) {
     try{
-        let db = client.db(dbName)
         //cehck if amount == registration_fee in price_feed db
         let registration_fee_query = await db.collection('price_feed').findOne({date: "global"});
         let registration_fee = registration_fee_query.registration_fee;
@@ -270,7 +264,6 @@ async function register(username, referrer, amount) {
 //store hash in mongo collection that stores all regsitration hashes
 async function storeRegistration(hash, username) {
     try{
-        let db = client.db(dbName);
         let collection = db.collection('registrations');
         await collection.insertOne({hash: hash, username: username, time: Date.now()});
         console.log('Hash ' + hash + ' stored');
@@ -291,7 +284,6 @@ async function storeRegistration(hash, username) {
 
 async function storeClaim(username, qty) {
     try{
-        let db = client.db(dbName);
         let collection = db.collection('claims');
         await collection.insertOne({username: username, qty: qty, time: Date.now()});
         return;
@@ -313,7 +305,6 @@ async function storeClaim(username, qty) {
 async function sendTransaction(username, type, target, blockId, trxId, hash) {
     //create a que where new transactions are added and then sent in order 1 by 1
     try{
-        let db = client.db(dbName);
         let collection = db.collection('transactions');
         let result = await collection.insertOne({username: username, type: type, target: target, blockId: blockId, trxId: trxId, hash: hash, time: Date.now()});
         console.log('Transaction ' + result.insertedId + ' added to queue');
@@ -336,7 +327,6 @@ async function sendTransaction(username, type, target, blockId, trxId, hash) {
 async function sendTransactions() {
     try{
         lastCheck = Date.now();
-        let db = client.db(dbName);
         let collection = db.collection('transactions');
         let transactions = await collection.find({})
         .sort({ time: 1 })
@@ -456,7 +446,6 @@ async function broadcastClaim(username, data, user, qty) {
 //claim favorcheckDodge
 async function claim(username) {
     try{
-        let db = client.db(dbName);
         let collection = db.collection('players');
         //make sure user exists and has claims left
         let user = await collection.findOne({ username : username });
@@ -495,13 +484,20 @@ async function claim(username) {
                 let maxAttempts = 5;
                 let delay = 200;
                 for (let i = 0; i < maxAttempts; i++) {
-                    //inc version
-                    let update = await collection.updateOne({ username: username }, { $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() }, $inc: { version: 1 } });
-                    if(update.acknowledged == true && update.modifiedCount == 1) {
+                    const updateResult = await collection.updateOne(
+                        { username },
+                        {
+                            $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() },
+                            $inc: { version: 1 }
+                        }
+                    );
+        
+                    if (updateResult.acknowledged && updateResult.modifiedCount === 1) {
                         await storeClaim(username, qty);
-                        webhook("Scrap Claimed", username + " claimed " + qty + " SCRAP", '#6130ff');
+                        webhook("Scrap Claimed", `${username} claimed ${qty} SCRAP`, '#6130ff');
                         return true;
                     }
+                    
                     await new Promise(resolve => setTimeout(resolve, delay));
                     delay *= 2; // exponential backoff  
                 }
@@ -768,7 +764,6 @@ async function progressQuest(username, blockId, trxId) {
     //if so return false else insert quest into active-quests collection
     try{
         //check if user is in active-quests collection
-        let db = client.db(dbName);
         let collection = db.collection('active-quests');
         let quest = await collection.findOne({ username: username });
         //get username from players collection
@@ -859,7 +854,6 @@ async function progressQuest(username, blockId, trxId) {
 async function selectQuest(round, user) {
     //go into quest-template collection and select a random quest then add it to users current quest
     try{
-        let db = client.db(dbName);
         let collection = db.collection('quest-template');
         let quests = await collection.find({}).toArray();
 
@@ -1163,7 +1157,6 @@ async function completeQuest(username) {
     //if so return false else insert quest into active-quests collection
     try{
         //check if user is in active-quests collection
-        let db = client.db(dbName);
         let collection = db.collection('active-quests');
         let user = await collection.findOne({ username: username });
         console.log(user);
@@ -1247,7 +1240,6 @@ async function issue(username, type, amount){
 async function clearTransactions() {
     //connect to db
     try{
-        let db = client.db(dbName);
         let collection = db.collection('transactions');
         //delete all transactions
         await collection.deleteMany({});
@@ -1267,7 +1259,6 @@ async function clearTransactions() {
 async function clearFirst() {
     //connect to db
     try{
-        let db = client.db(dbName);
         let collection = db.collection('transactions');
         //delete the first transaction
         await collection.deleteOne({});
