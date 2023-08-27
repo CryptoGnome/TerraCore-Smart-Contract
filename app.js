@@ -433,12 +433,12 @@ async function claim(username) {
 
         if (!user) {
             console.log('User ' + username + ' does not exist');
-            return false;
+            return true;
         }
 
         if (user.claims === 0) {
             console.log('User ' + username + ' has no claims left');
-            return false;
+            return true;
         }
 
         if ((Date.now() - user.lastPayout) < 30000) {
