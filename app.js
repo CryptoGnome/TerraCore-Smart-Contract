@@ -520,10 +520,15 @@ async function battle(username, _target, blockId, trxId, hash) {
             return true;
         }
         var collection = db.collection('players');
-        const [user, target] = await collection.find({
-            username: { $in: [username, _target] }
-        }, { projection: { username: 1, stats: 1, attacks: 1, consumables: 1, lastBattle: 1, scrap: 1, registrationTime: 1 } }).toArray();
-
+        var result = await collection.find({
+            $or: [
+                { username: username },
+                { username: _target }
+            ]
+        }).toArray();
+        
+        var user = result.find(entry => entry.username === username);
+        var target = result.find(entry => entry.username === _target);
         
         if (!user) {
             console.log('User ' + username + ' does not exist');
