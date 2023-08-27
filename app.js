@@ -492,7 +492,7 @@ async function claim(username) {
             //reset payout time
             var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
             if(claim) {
-                let maxAttempts = 10;
+                let maxAttempts = 5;
                 let delay = 200;
                 for (let i = 0; i < maxAttempts; i++) {
                     //inc version
@@ -661,7 +661,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                 let newTargetScrap = target.scrap - scrapToSteal;
                 let newAttacks = user.attacks - 1;
                 //modify target scrap & add to user scrap
-                let maxAttempts = 10;
+                let maxAttempts = 5;
                 let delay = 200;
                 for (let i = 0; i < maxAttempts; i++) {
                     //inc versions
