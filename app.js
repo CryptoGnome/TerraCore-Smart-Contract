@@ -18,7 +18,7 @@ const SYMBOL = 'SCRAP';
 const wif = process.env.ACTIVE_KEY;
 
 
-var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 5000, serverSelectionTimeoutMS: 5000 });
+var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 30000, serverSelectionTimeoutMS: 30000 });
 const db = client.db(dbName);
 
 const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io'];
