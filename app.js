@@ -497,9 +497,9 @@ async function claim(username) {
                         webhook("Scrap Claimed", `${username} claimed ${qty} SCRAP`, '#6130ff');
                         return true;
                     }
-                    
+
                     await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2; // exponential backoff  
+                    delay *= 1.25; // exponential backoff  
                 }
             }
             else {
