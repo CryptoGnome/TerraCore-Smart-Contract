@@ -24,58 +24,63 @@ const db = client.db(dbName);
 const nodes = ['https://hive-api.arcange.eu', 'https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://api.hive.blue', 'https://anyx.io', 'https://rpc.ecency.com'];
 
 
+
 async function testNodeEndpoints(nodes) {
-  let fastestEndpoint = '';
-  let fastestResponseTime = Infinity;
-
-    //check if there is a last node set in the node db
-
-    let collection = db.collection('nodes');
-    //check what the last node was
-    let lastNode = await collection.findOne({ name: 'lastNode' });
-
-    //remove last node from nodes array, this will prevent retesting the last node if it was the fastest to cycle through the nodes on issues
-    if (lastNode) {
-        nodes.splice(nodes.indexOf(lastNode.endpoint), 1);
-    }
-
-    nodes.forEach((endpoint) => {
+      let fastestEndpoint = '';
+      let fastestResponseTime = Infinity;
+    
+      // Check if there is a last node set in the node db
+      let collection = db.collection('nodes');
+      
+      // Check what the last node was
+      let lastNode = await collection.findOne({ name: 'lastNode' });
+    
+      // Remove last node from nodes array, if it exists
+      if (lastNode) {
+          nodes = nodes.filter(endpoint => endpoint !== lastNode.endpoint);
+      }
+    
+      // Test each endpoint for response time
+      for (const endpoint of nodes) {
         hive.api.setOptions({ url: endpoint });
         const startTime = Date.now();
-
-        hive.api.getState('/', (err, result) => {
-            if (err) {
+    
+        try {
+          await new Promise((resolve, reject) => {
+            hive.api.getState('/', (err, result) => {
+              if (err) {
                 console.error(`${endpoint} error: ${err.message}`);
-            } 
-            else {
+                reject(err);
+              } else {
                 const responseTime = Date.now() - startTime;
                 console.log(`${endpoint}: ${responseTime}ms`);
                 
                 if (responseTime < fastestResponseTime) {
-                    fastestResponseTime = responseTime;
-                    fastestEndpoint = endpoint;
-                    
-                    const json = { "action": "test-tx" };
-                    const data = JSON.stringify(json);
-
-                    hive.broadcast.customJson(wif, ['terracore'], [], 'test-tx', data, async (err, result) => {
-                        if (err) {
-                            console.error(`${endpoint} transaction error: ${err.message}`);
-                        } 
-                        else {
-                            console.log(`${endpoint} transaction successful`);
-                            //set last node to fastest endpoint in db
-                            await collection.updateOne({ name: 'lastNode' }, { $set: { endpoint: fastestEndpoint } }, { upsert: true });
-                        }
-                    });
+                  fastestResponseTime = responseTime;
+                  fastestEndpoint = endpoint;
                 }
-            }
-        });
-
-
-    });
-
-
+    
+                resolve(result);
+              }
+            });
+          });
+        } catch (error) {
+          // Handle errors if necessary
+        }
+      }
+    
+      // Log the fastest endpoint
+      console.log(`Fastest endpoint: ${fastestEndpoint} (${fastestResponseTime}ms)`);
+      hive.api.setOptions({ url: fastestEndpoint });
+    
+      // Set the fastest node as active in the database
+      if (fastestEndpoint) {
+        await collection.updateOne(
+          { name: 'lastNode' },
+          { $set: { endpoint: fastestEndpoint } },
+          { upsert: true }
+        );
+      }
 }
 
 async function changeNode() {
@@ -1259,19 +1264,22 @@ async function listen() {
     checkTransactions();
     hive.api.streamBlock(async function (err, result) {
         try {
-            const blockId = result.block_id
-
-            if (!result || !result.transactions) {
-                 console.error('Block without transactions !!')
-                return
+            
+            if (!result || !result.transactions || !result.block_id) {
+                console.log(result);
+                return;
             }
+            
+
+            const blockId = result.block_id
     
             for (const transaction of result.transactions) {
                 const trxId = transaction.transaction_id
                 //loop through operations in transaction
                 for (const operation of transaction.operations) {
                     //timestamp of last event
-                    lastevent = Date.now(); 
+                    lastevent = Date.now();
+                    lastCheck = Date.now(); 
                     //console.log(operation);
                     if (operation[0] == 'transfer' && operation[1].to === 'terracore') {
                         //grab hash from memo
