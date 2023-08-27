@@ -21,7 +21,7 @@ const wif = process.env.ACTIVE_KEY;
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 30000, serverSelectionTimeoutMS: 30000 });
 const db = client.db(dbName);
 
-const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io'];
+const nodes = ['https://hive-api.arcange.eu', 'https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://api.hive.blue', 'https://anyx.io', 'https://rpc.ecency.com'];
 
 
 async function testNodeEndpoints(nodes) {
@@ -459,7 +459,7 @@ async function claim(username) {
 
         const claimPromise = hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
         const timeoutPromise = new Promise((resolve) => {
-            setTimeout(() => resolve(false), 5000); //  timeout
+            setTimeout(() => resolve(false), 3500); //  timeout
         });
 
         const claimSuccess = await Promise.race([claimPromise, timeoutPromise]);
