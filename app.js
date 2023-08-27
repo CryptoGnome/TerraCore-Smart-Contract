@@ -324,7 +324,7 @@ async function sendTransaction(username, type, target, blockId, trxId, hash) {
 }
 
 //create a function that can be called to send all transactions in the queue
-const TIMEOUT_DURATION = 7000; // Timeout duration in milliseconds
+const TIMEOUT_DURATION = 5000; // Timeout duration in milliseconds
 
 async function sendTransactions() {
     try {
@@ -448,13 +448,13 @@ async function claim(username) {
                     webhook("Scrap Claimed", `${username} claimed ${qty} SCRAP`, '#6130ff');
                     return true;
                 } else {
-                    //await changeNode();
-                    //webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
+                    await changeNode();
+                    webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
                     return false;
                 }
             } else {
                 await changeNode();
-                //webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
+                webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
                 return false;
             }
             
