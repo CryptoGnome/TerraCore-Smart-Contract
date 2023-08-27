@@ -474,7 +474,7 @@ async function claim(username) {
         const claimSuccess = await Promise.race([claimPromise, timeoutPromise]);
 
         if (!claimSuccess) {
-            await changeNode();
+            //await changeNode();
             //webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
             return false;
         }
@@ -489,7 +489,7 @@ async function claim(username) {
         );
 
         if (!updateResult.value) {
-            await changeNode();
+            //await changeNode();
             webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
             return false;
         }
@@ -505,7 +505,6 @@ async function claim(username) {
         }
 
         
-        await changeNode();
         //webhook("Error", `Error claiming scrap for user ${username}. Error: ${err}`, '#ff0000');
         return false;
     }
