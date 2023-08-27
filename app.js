@@ -21,7 +21,7 @@ const wif = process.env.ACTIVE_KEY;
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 30000, serverSelectionTimeoutMS: 30000 });
 const db = client.db(dbName);
 
-const nodes = ['https://hive-api.arcange.eu', 'https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://api.hive.blue', 'https://anyx.io', 'https://rpc.ecency.com'];
+const nodes = ['https://hive-api.arcange.eu', 'https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://api.hive.blue', 'https://anyx.io', 'https://techcoderx.com'];
 
 
 
@@ -1390,8 +1390,8 @@ catch(err){
 
 setInterval(function() {
     //console.log('Last event: ' + (Date.now() - lastevent) + ' ms ago');
-    if (Date.now() - lastevent > 60000) {
-        console.log('No events received in 60 seconds, shutting down so pm2 can restart');
+    if (Date.now() - lastevent > 30000) {
+        console.log('No events received in 30 seconds, shutting down so pm2 can restart');
         client.close();
         process.exit();
     }
