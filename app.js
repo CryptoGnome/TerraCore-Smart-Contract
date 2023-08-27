@@ -523,8 +523,6 @@ async function battle(username, _target, blockId, trxId, hash) {
             console.log('Error : Battle User: ' + username + ' tried to battle themselves');
             return true;
         }
-
-        var db = client.db(dbName);
         var collection = db.collection('players');
         //load target user
         var user = await collection.findOne({ username : username });
