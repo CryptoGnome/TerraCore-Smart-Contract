@@ -427,27 +427,26 @@ async function checkTransactions() {
 
 //claim favorcheckDodge
 async function claim(username) {
-    try{
-        let collection = db.collection('players');
-        //make sure user exists and has claims left
-        let user = await collection.findOne({ username : username });
+    try {
+        const collection = db.collection('players');
+        const user = await collection.findOne({ username });
 
         if (!user) {
             console.log('User ' + username + ' does not exist');
-            return true;
+            return false;
         }
-        if (user.claims == 0) {
+
+        if (user.claims === 0) {
             console.log('User ' + username + ' has no claims left');
-            return true;
+            return false;
         }
+
         if ((Date.now() - user.lastPayout) < 30000) {
             return true;
         }
 
-        //transfer scrap to user from terracore
-        let qty = user.scrap.toFixed(8);
-        //create custom_json to issue scrap to user
-        var data = {
+        const qty = user.scrap.toFixed(8);
+        const data = {
             contractName: 'tokens',
             contractAction: 'issue',
             contractPayload: {
@@ -458,62 +457,46 @@ async function claim(username) {
             }
         };
 
-        
-        try{
-            //reset payout time
-            var claim = await hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
-            if (claim) {
-                const updateResult = await collection.findOneAndUpdate(
-                    { username, claims: { $gt: 0 }, lastPayout: { $lt: Date.now() - 30000 } },
-                    {
-                        $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() },
-                        $inc: { version: 1 }
-                    },
-                    { returnOriginal: false } // Return the updated document
-                );
-            
-                if (updateResult.value) {
-                    const updatedUser = updateResult.value;
-                    await storeClaim(username, qty);
-                    webhook("Scrap Claimed", `${username} claimed ${qty} SCRAP`, '#6130ff');
-                    return true;
-                } else {
-                    await changeNode();
-                    webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
-                    return false;
-                }
-            } else {
-                await changeNode();
-                webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
-                return false;
-            }
-            
+        const claimSuccess = await hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
 
-        }
-        catch (err) {
-            console.log(err);
+        if (!claimSuccess) {
             await changeNode();
-            webhook("Error", "Error claiming scrap for user line:489 " + username + " Error: " + err, '#ff0000');
+            //webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
             return false;
         }
-                            
-        
-    }
-    catch (err) {
-        if(err instanceof MongoTopologyClosedError) {
+
+        const updateResult = await collection.findOneAndUpdate(
+            { username, claims: { $gt: 0 }, lastPayout: { $lt: Date.now() - 30000 } },
+            {
+                $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() },
+                $inc: { version: 1 }
+            },
+            { returnOriginal: false }
+        );
+
+        if (!updateResult.value) {
+            await changeNode();
+            webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
+            return false;
+        }
+
+        await storeClaim(username, qty);
+        webhook("Scrap Claimed", `${username} claimed ${qty} SCRAP`, '#6130ff');
+        return true;
+    } catch (err) {
+        if (err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
             client.close();
             process.exit(1);
         }
-        else {
-            console.log(err);
-            //switch hive node
-            webhook("Error", "Error claiming scrap for user line:502 " + username + " Error: " + err, '#ff0000');
-            return false;
-        }
-    }
 
+        
+        await changeNode();
+        //webhook("Error", `Error claiming scrap for user ${username}. Error: ${err}`, '#ff0000');
+        return false;
+    }
 }
+
 
 //battle function
 async function battle(username, _target, blockId, trxId, hash) {
