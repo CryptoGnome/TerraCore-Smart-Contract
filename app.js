@@ -424,24 +424,6 @@ async function checkTransactions() {
     }
 }
 
-//broadcast claim
-async function broadcastClaim(username, data, user, qty) {
-    try {
-        const result = await hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', data);
-        if (result.id) {
-            return true;
-        }
-        else {
-            console.log("No result id");
-            webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-            return false;
-        }
-    } catch (err) {
-        //send error webhook
-        webhook("Error", "Error claiming scrap for user " + username + " Error: " + err, '#ff0000');
-        return false;
-    }
-}
 
 //claim favorcheckDodge
 async function claim(username) {
@@ -479,34 +461,33 @@ async function claim(username) {
         
         try{
             //reset payout time
-            var claim = await broadcastClaim(username, JSON.stringify(data), user, qty);
-            if(claim) {
-                let maxAttempts = 5;
-                let delay = 200;
-                for (let i = 0; i < maxAttempts; i++) {
-                    const updateResult = await collection.updateOne(
-                        { username },
-                        {
-                            $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() },
-                            $inc: { version: 1 }
-                        }
-                    );
-        
-                    if (updateResult.acknowledged && updateResult.modifiedCount === 1) {
-                        await storeClaim(username, qty);
-                        webhook("Scrap Claimed", `${username} claimed ${qty} SCRAP`, '#6130ff');
-                        return true;
-                    }
-
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 1.25; // exponential backoff  
+            var claim = await hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
+            if (claim) {
+                const updateResult = await collection.findOneAndUpdate(
+                    { username, claims: { $gt: 0 }, lastPayout: { $lt: Date.now() - 30000 } },
+                    {
+                        $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() },
+                        $inc: { version: 1 }
+                    },
+                    { returnOriginal: false } // Return the updated document
+                );
+            
+                if (updateResult.value) {
+                    const updatedUser = updateResult.value;
+                    await storeClaim(username, qty);
+                    webhook("Scrap Claimed", `${username} claimed ${qty} SCRAP`, '#6130ff');
+                    return true;
+                } else {
+                    await changeNode();
+                    webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
+                    return false;
                 }
-            }
-            else {
+            } else {
                 await changeNode();
-                webhook("Error", "Error claiming scrap for user line:482 " + username + " Please try again", '#ff0000');
+                webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
                 return false;
             }
+            
 
         }
         catch (err) {
