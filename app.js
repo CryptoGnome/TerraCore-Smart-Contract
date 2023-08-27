@@ -42,6 +42,8 @@ async function testNodeEndpoints(nodes) {
     
       // Test each endpoint for response time
       for (const endpoint of nodes) {
+        lastevent = Date.now();
+        lastCheck = Date.now(); 
         hive.api.setOptions({ url: endpoint });
         const startTime = Date.now();
     
