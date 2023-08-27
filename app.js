@@ -324,89 +324,59 @@ async function sendTransaction(username, type, target, blockId, trxId, hash) {
 }
 
 //create a function that can be called to send all transactions in the queue
-async function sendTransactions() {
-    try{
-        lastCheck = Date.now();
-        let collection = db.collection('transactions');
-        let transactions = await collection.find({})
-        .sort({ time: 1 })
-        .toArray()
+const TIMEOUT_DURATION = 3000; // Timeout duration in milliseconds
 
-        //check if there are any transactions to send
-        if(transactions.length != 0) {
-            console.log('-------------------------------------------------------')
+async function sendTransactions() {
+    try {
+        lastCheck = Date.now();
+        const collection = db.collection('transactions');
+        const transactions = await collection.find({}).sort({ time: 1 }).toArray();
+
+        if (transactions.length !== 0) {
+            console.log('-------------------------------------------------------');
             console.log('Sending ' + transactions.length + ' transactions');
-            console.log('-------------------------------------------------------')
-            for (let i = 0; i < transactions.length; i++) {
+            console.log('-------------------------------------------------------');
+
+            const promises = transactions.map(async (transaction, i) => {
                 lastCheck = Date.now();
-                let transaction = transactions[i];
-                console.log('Sending ' + transaction.type + ' transaction ' + (i+ 1).toString() + ' of ' + transactions.length.toString());
-                if(transaction.type == 'claim') {
-                    while(true){
-                        //const result = await Promise.race([claim(transaction.username), timeout(5000)]);
-                        const result = await claim(transaction.username);
-                        if(result) {
-                            let maxAttempts = 5;
-                            let delay = 200;
-                            for (let i = 0; i < maxAttempts; i++) {
-                                let clear = await collection.deleteOne({ _id: transaction._id });
-                                if(clear.deletedCount == 1){
-                                    break;
-                                }
-                                await new Promise(resolve => setTimeout(resolve, delay));
-                                delay *= 1.5; // exponential backoff  
-                                
-                            }
-                        }
-                        break;
-                    }
-                }
-                else if(transaction.type == 'battle') {
-                    while(true){
-                        //const result = await Promise.race([battle(transaction.username, transaction.target), timeout(5000)]);
-                        var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash);
-                        if(result2) {
-                            let maxAttempts = 5;
-                            let delay = 200;
-                            for (let i = 0; i < maxAttempts; i++) {
-                                let clear = await collection.deleteOne({ _id: transaction._id });
-                                if(clear.deletedCount == 1){
-                                    break;
-                                }
-                                await new Promise(resolve => setTimeout(resolve, delay));
-                                delay *= 1.5; // exponential backoff
-                            }
-                        }
-                        break;
-                    }
-                }
-                else if(transaction.type == 'progress') {
+                console.log('Sending ' + transaction.type + ' transaction ' + (i + 1).toString() + ' of ' + transactions.length.toString());
+
+                if (transaction.type === 'claim') {
+                    const claimPromise = claim(transaction.username);
+                    await withTimeout(claimPromise);
+                } else if (transaction.type === 'battle') {
+                    const battlePromise = battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash);
+                    await withTimeout(battlePromise);
+                } else if (transaction.type === 'progress') {
                     await progressQuest(transaction.username, transaction.blockId, transaction.trxId);
-                    await collection.deleteOne({ _id: transaction._id });
-                }
-                else if(transaction.type == 'complete') {
+                } else if (transaction.type === 'complete') {
                     await completeQuest(transaction.username);
-                    await collection.deleteOne({ _id: transaction._id });
                 }
-            }
+
+                await collection.deleteOne({ _id: transaction._id });
+            });
+
+            await Promise.all(promises);
+
             console.log('Completed Sending Transactions');
             return true;
-        }
-        else {
+        } else {
             return true;
         }
-    }
-    catch (err) {
-        if(err instanceof MongoTopologyClosedError) {
+    } catch (err) {
+        if (err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
             client.close();
             process.exit(1);
-        }
-        else {
+        } else {
             console.log(err);
             return true;
         }
     }
+}
+
+async function withTimeout(promise) {
+    return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), TIMEOUT_DURATION))]);
 }
 
 //call send transactions and wait for it to return true then call check transactions
