@@ -350,7 +350,7 @@ async function sendTransactions() {
             for (let i = 0; i < transactions.length; i++) {
                 lastCheck = Date.now();
                 let transaction = transactions[i];
-                console.log('Sending transaction ' + (i+ 1).toString() + ' of ' + transactions.length.toString());
+                console.log('Sending ' + transaction.type + ' transaction ' + (i+ 1).toString() + ' of ' + transactions.length.toString());
                 if(transaction.type == 'claim') {
                     while(true){
                         //const result = await Promise.race([claim(transaction.username), timeout(5000)]);
