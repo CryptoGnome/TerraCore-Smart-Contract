@@ -662,7 +662,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                 let newAttacks = user.attacks - 1;
                 //modify target scrap & add to user scrap
                 let maxAttempts = 5;
-                let delay = 200;
+                let delay = 500;
                 for (let i = 0; i < maxAttempts; i++) {
                     //inc versions
                     const bulkOps = [
