@@ -457,7 +457,12 @@ async function claim(username) {
             }
         };
 
-        const claimSuccess = await hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
+        const claimPromise = hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
+        const timeoutPromise = new Promise((resolve) => {
+            setTimeout(() => resolve(false), 5000); //  timeout
+        });
+
+        const claimSuccess = await Promise.race([claimPromise, timeoutPromise]);
 
         if (!claimSuccess) {
             await changeNode();
