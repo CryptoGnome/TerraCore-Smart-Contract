@@ -346,7 +346,7 @@ async function sendTransactions() {
                         //const result = await Promise.race([claim(transaction.username), timeout(5000)]);
                         const result = await claim(transaction.username);
                         if(result) {
-                            let maxAttempts = 5;
+                            let maxAttempts = 3;
                             let delay = 200;
                             for (let i = 0; i < maxAttempts; i++) {
                                 let clear = await collection.deleteOne({ _id: transaction._id });
@@ -354,7 +354,7 @@ async function sendTransactions() {
                                     break;
                                 }
                                 await new Promise(resolve => setTimeout(resolve, delay));
-                                delay *= 1.5; // exponential backoff  
+                                delay *= 1.2; // exponential backoff  
                                 
                             }
                         }
