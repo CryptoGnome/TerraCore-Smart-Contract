@@ -450,9 +450,16 @@ async function claim(username) {
             return true;
         }
 
+        //check if user.lastPayout exists if not add it to the user object
+        if (!user.lastPayout) {
+            await collection.updateOne({ username }, { $set: { lastPayout: Date.now() - 60000 } });
+        }
+            
+
         if ((Date.now() - user.lastPayout) < 30000) {
             return true;
         }
+        
 
         const qty = user.scrap.toFixed(8);
         const data = {
@@ -1264,7 +1271,7 @@ var lastevent = Date.now();
 var lastCheck = Date.now();
 //aysncfunction to start listening for events
 async function listen() {
-    await clearFirst();
+    //await clearFirst();
     await changeNode();
     checkTransactions();
 
