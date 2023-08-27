@@ -639,8 +639,8 @@ async function battle(username, _target, blockId, trxId, hash) {
                 let newTargetScrap = target.scrap - scrapToSteal;
                 let newAttacks = user.attacks - 1;
                 //modify target scrap & add to user scrap
-                let maxAttempts = 5;
-                let delay = 500;
+                let maxAttempts = 3;
+                let delay = 300;
                 for (let i = 0; i < maxAttempts; i++) {
                     //inc versions
                     const bulkOps = [
@@ -655,7 +655,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                         return true;
                     }
                     await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2; // exponential backoff
+                    delay *= 1.2; // exponential backoff
                 }
 
                 //if we get here then we failed to update the database return 
