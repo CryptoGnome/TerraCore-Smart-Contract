@@ -324,7 +324,7 @@ async function sendTransaction(username, type, target, blockId, trxId, hash) {
 }
 
 //create a function that can be called to send all transactions in the queue
-const TIMEOUT_DURATION = 3000; // Timeout duration in milliseconds
+const TIMEOUT_DURATION = 5000; // Timeout duration in milliseconds
 
 async function sendTransactions() {
     try {
