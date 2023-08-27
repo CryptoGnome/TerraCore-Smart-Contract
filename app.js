@@ -621,6 +621,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (isNaN(scrapToSteal)) {
                 //shoot error webhook
                 webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is NaN, please try again", '#6385ff')
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
                 return true;
             }
 
@@ -628,6 +629,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (scrapToSteal <= 0) {
                 //shoot error webhook
                 webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than or = 0, please try again", '#6385ff')
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
                 return true;
             }
 
