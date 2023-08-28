@@ -424,7 +424,7 @@ async function checkTransactions() {
         //check if there are any transactions in the queue, if no return in 3 seconds kill the process
         let done = await sendTransactions();
         if(done) {
-            setTimeout(checkTransactions, 1000);
+            setTimeout(checkTransactions, 200);
         }
     }
     catch (err) {
