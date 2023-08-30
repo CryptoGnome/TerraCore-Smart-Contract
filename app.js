@@ -554,7 +554,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (Date.now() - target.registrationTime < 86400000) {
                 //send webhook stating target is has new user protection inc version
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
-                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, dodged:false, timestamp: Date.now()});
                 webhook("New User Protection", "User " + username + " tried to attack " + _target + " but they have new user protection", '#ff6eaf')
                 return true;
             }
@@ -566,7 +566,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (Date.now() - target.consumables.protection[0] < 86400000) {
                 //send webhook stating target is has protection inc version
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
-                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, dodged:false, timestamp: Date.now()});
                 webhook("Protection Potion Active!", "User " + username + " tried to attack " + _target + " but they have protection", '#ff6eaf')
                 return true;
                 
@@ -586,7 +586,7 @@ async function battle(username, _target, blockId, trxId, hash) {
         //make sure target is not getting attacked withing 60 seconds of last payout
         if (Date.now() - target.lastBattle < 60000) {
             await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
-            await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
+            await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, dodged:false, timestamp: Date.now()});
             //webhook("Unable to attack target", "User " + username + " tried to attack " + _target + " but they are not back at the base yet...", '#ff6eaf')
             return true;
         }
