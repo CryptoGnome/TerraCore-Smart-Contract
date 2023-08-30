@@ -647,7 +647,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                 let newAttacks = user.attacks - 1;
                 //modify target scrap & add to user scrap
                 let maxAttempts = 3;
-                let delay = 300;
+                let delay = 700;
                 for (let i = 0; i < maxAttempts; i++) {
                     //inc versions
                     const bulkOps = [
@@ -656,7 +656,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                     ];
                     const result = await collection.bulkWrite(bulkOps);
                     //check if update was successful frim above result
-                    if (result.nModified == 2 && result.nMatched == 2 && result.ok == 1) {
+                    if (result.modifiedCount == 2) {
                         await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: scrapToSteal, seed: seed, roll: roll, timestamp: Date.now()});
                         webhook("New Battle Log", 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2).toString() + '% roll chance', '#f55a42');
                         return true;
