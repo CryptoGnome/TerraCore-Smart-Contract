@@ -447,7 +447,7 @@ async function performUpdate(collection, username, user) {
         if (updateResult.value) {
             return true; // Successful update
         }
-        await changeNode(); // Assuming you have a changeNode function defined
+
     }
 }
 
