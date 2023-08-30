@@ -356,7 +356,7 @@ async function sendTransactions() {
                         const result = await claim(transaction.username);
                         if(result) {
                             let maxAttempts = 3;
-                            let delay = 700;
+                            let delay = 3000;
                             for (let i = 0; i < maxAttempts; i++) {
                                 let clear = await collection.deleteOne({ _id: transaction._id });
                                 if(clear.deletedCount == 1){
@@ -376,7 +376,7 @@ async function sendTransactions() {
                         //const result2 = await Promise.race([battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash), timeout(3000)]);
                         if(result2) {
                             let maxAttempts = 3;
-                            let delay = 700;
+                            let delay = 3000;
                             for (let i = 0; i < maxAttempts; i++) {
                                 let clear = await collection.deleteOne({ _id: transaction._id });
                                 if(clear.deletedCount == 1){
