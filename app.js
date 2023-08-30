@@ -433,6 +433,23 @@ async function checkTransactions() {
     }
 }
 
+async function performUpdate(collection, username, user) {
+    while (true) {
+        const updateResult = await collection.findOneAndUpdate(
+            { username, claims: { $gt: 0 }, lastPayout: { $lt: Date.now() - 30000 } },
+            {
+                $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() },
+                $inc: { version: 1 }
+            },
+            { returnOriginal: false }
+        );
+
+        if (updateResult.value) {
+            return true; // Successful update
+        }
+        await changeNode(); // Assuming you have a changeNode function defined
+    }
+}
 
 //claim favorcheckDodge
 async function claim(username) {
@@ -481,25 +498,10 @@ async function claim(username) {
         const claimSuccess = await Promise.race([claimPromise, timeoutPromise]);
 
         if (!claimSuccess) {
-            //await changeNode();
-            //webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
             return false;
         }
 
-        const updateResult = await collection.findOneAndUpdate(
-            { username, claims: { $gt: 0 }, lastPayout: { $lt: Date.now() - 30000 } },
-            {
-                $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() },
-                $inc: { version: 1 }
-            },
-            { returnOriginal: false }
-        );
-
-        if (!updateResult.value) {
-            //await changeNode();
-            webhook("Error", `Error claiming scrap for user ${username}. Please try again`, '#ff0000');
-            return false;
-        }
+        await performUpdate(collection, username, user);
 
         await storeClaim(username, qty);
         webhook("Scrap Claimed", `${username} claimed ${qty} SCRAP`, '#6130ff');
@@ -516,7 +518,6 @@ async function claim(username) {
         return false;
     }
 }
-
 
 //battle function
 async function battle(username, _target, blockId, trxId, hash) {
@@ -604,7 +605,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (checkDodge(target) && user.consumables.focus == 0) {
                 //send webhook stating target dodged attack
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1 , version: 1 } });
-                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, seed: seed, roll: roll, timestamp: Date.now()});
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, seed: seed, roll: roll, dodged:true, timestamp: Date.now()});
                 webhook("Attack Dodged", "User " + username + " tried to attack " + _target + " but they dodged the attack", '#ff6eaf')
                 return true;
             }
@@ -628,7 +629,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (isNaN(scrapToSteal)) {
                 //shoot error webhook
                 webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is NaN, please try again", '#6385ff')
-                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, dodged:false, timestamp: Date.now()});
                 return true;
             }
 
@@ -636,7 +637,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (scrapToSteal <= 0) {
                 //shoot error webhook
                 webhook("New Error", "User " + username + " tried to attack " + _target + " but scrapToSteal is less than or = 0, please try again", '#6385ff')
-                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, timestamp: Date.now()});
+                await db.collection('battle_logs').insertOne({username: username, attacked: _target, scrap: 0, dodged:false, timestamp: Date.now()});
                 return true;
             }
 
