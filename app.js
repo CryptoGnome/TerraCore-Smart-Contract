@@ -373,9 +373,18 @@ async function sendTransactions() {
                 else if(transaction.type == 'battle') {
                     while(true){
                         var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash);
-                        
+                        //const result2 = await Promise.race([battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash), timeout(3000)]);
                         if(result2) {
-                            await collection.deleteOne({ _id: transaction._id });
+                            let maxAttempts = 3;
+                            let delay = 3000;
+                            for (let i = 0; i < maxAttempts; i++) {
+                                let clear = await collection.deleteOne({ _id: transaction._id });
+                                if(clear.deletedCount == 1){
+                                    break;
+                                }
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                                delay *= 1.2; // exponential backoff
+                            }
                         }
                         break;
                     }
@@ -519,9 +528,15 @@ async function battle(username, _target, blockId, trxId, hash) {
             return true;
         }
         var collection = db.collection('players');
-
-        var user = collection.findOne({ username: username });
-        var target = collection.findOne({ username: _target });
+        var result = await collection.find({
+            $or: [
+                { username: username },
+                { username: _target }
+            ]
+        }).toArray();
+        
+        var user = result.find(entry => entry.username === username);
+        var target = result.find(entry => entry.username === _target);
         
         if (!user) {
             console.log('User ' + username + ' does not exist');
