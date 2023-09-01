@@ -20,7 +20,7 @@ async function distributeRewards(user) {
     //mint scrap to the user
     var adjusted = user.reward;
     var reward = adjusted.toFixed(8);
-    console.log("Distributing " + reward+ " to " + user.username);
+    console.log("Distributing " + reward + " to " + user.username);
     
     try {
         var data = {
@@ -57,7 +57,7 @@ async function getRewards() {
         const stats = await collection.findOne({ date: "global" });
         const rewardTime = stats.rewardtime;
 
-        //see ifcurrent timestamp is greater than reward time
+        //see if current timestamp is greater than reward time
         if (Date.now() < rewardTime) {
             console.log("Not Time to Distribute Rewards");
             return;
@@ -89,7 +89,7 @@ async function getRewards() {
         }
 
         //reset the rewardtime in the stats collection
-        const newRewardTime = Date.now() + 86400000;
+        var newRewardTime = Date.now() + 86400000;
         collection = db.collection('stats');
         await collection.updateOne({ date: "global" }, { $set: { rewardtime: newRewardTime } });
         console.log("Leaderboard Rewards Fully Distributed");
@@ -103,12 +103,12 @@ async function getRewards() {
 
 
 
-//run getRewards() once per hour
+//run getRewards() once per 15 minutes
 async function run() {
     try {
         while (true) {
             await getRewards();
-            await sleep(3600000);
+            await sleep(900000);
         }
     } catch (err) {
         console.log(err.stack);
