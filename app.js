@@ -492,7 +492,7 @@ async function claim(username) {
 
         const claimPromise = hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
         const timeoutPromise = new Promise((resolve) => {
-            setTimeout(() => resolve(false), 3500); //  timeout
+            setTimeout(() => resolve(false), 7500); //  timeout
         });
 
         const claimSuccess = await Promise.race([claimPromise, timeoutPromise]);
