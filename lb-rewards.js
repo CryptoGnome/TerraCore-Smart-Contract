@@ -90,8 +90,8 @@ async function getRewards() {
 
         //reset the rewardtime in the stats collection
         var newRewardTime = Date.now() + 86400000;
-        collection = db.collection('stats');
-        await collection.updateOne({ date: "global" }, { $set: { rewardtime: newRewardTime } });
+        
+        await db.collection('stats').updateOne({ date: "global" }, { $set: { rewardtime: newRewardTime } });
         console.log("Leaderboard Rewards Fully Distributed");
         return;
 
