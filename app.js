@@ -492,13 +492,14 @@ async function claim(username) {
 
         const claimPromise = hive.broadcast.customJsonAsync(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
         const timeoutPromise = new Promise((resolve) => {
-            setTimeout(() => resolve(false), 7500); //  timeout
+            setTimeout(() => resolve(false), 6000); //  timeout
         });
 
         const claimSuccess = await Promise.race([claimPromise, timeoutPromise]);
 
         if (!claimSuccess) {
-            return false;
+            await collection.insertOne({username: username, qty: 'failed', time: Date.now()});
+            return true;
         }
 
         await performUpdate(collection, username, user);
