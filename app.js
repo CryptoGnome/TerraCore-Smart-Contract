@@ -340,6 +340,10 @@ async function sendTransactions() {
         let transactions = await collection.find({})
         .sort({ time: 1 })
         .toArray()
+        //check if length of transactions is more than 25 change node if so
+        if(transactions.length > 25) {
+            changeNode();
+        }
 
         //check if there are any transactions to send
         if(transactions.length != 0) {
