@@ -1,6 +1,7 @@
 const { MongoClient, MongoTopologyClosedError } = require('mongodb');
 var hive = require('@hiveio/hive-js');
 require('dotenv').config();
+const fetch = require('node-fetch');
 
 
 const wif = process.env.ACTIVE_KEY;

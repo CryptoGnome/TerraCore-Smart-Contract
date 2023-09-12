@@ -1393,9 +1393,7 @@ try{
     console.log('-------------------------------------------------------')
     console.log('Starting to Listening for events on HIVE...');
     console.log('-------------------------------------------------------')
-    listen();
-    
-    
+    listen();  
 
 }
 catch(err){
