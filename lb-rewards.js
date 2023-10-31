@@ -102,6 +102,190 @@ async function getRewards() {
     }
 }
 
+/////////////////////////////////////
+//// Game Revenue Distribution //////
+////////////////////////////////////
+//check the hive balance on the @terracore account
+async function checkBalance() {
+    try {
+        var balance = await hive.api.getAccountsAsync(['terracore']);
+        var hiveBalance = balance[0].balance;
+        //remove HIVE from balance
+        hiveBalance = hiveBalance.split(' ')[0];
+        //remove any spaces
+        hiveBalance = hiveBalance.replace(/\s/g, '');
+        console.log("Current Hive Balance: " + hiveBalance);
+        return hiveBalance;
+    } catch (err) {
+        console.log(err.stack);
+    }
+}
+
+//function to send hive
+async function sendHive(to, amount, memo) {
+    console.log("Sending " + amount + " HIVE to " + to);
+    hive.broadcast.transfer(wif, 'terracore', to, amount + ' HIVE', memo, function (err, result) {
+        if (err) {
+            console.log(err);
+        }
+        else {
+            console.log(result);
+        }
+    });
+}
+
+//distribute to developers and to H-E for $FLUX stabilization
+async function distributeRevenue(hiveBalance) {
+    var hive_balance = await checkBalance();
+    //convert to float
+    var balance = parseFloat(hive_balance);
+    console.log("Current Hive Balance: " + balance);
+    if (balance > 25) {
+        //send 5% to hive engine to support $FLUX ecosystem
+        var swap = balance * .05;
+        var swap = swap.toFixed(3);
+        await sendHive('hiveswap', swap, 'hive-engine');
+        await sleep(30000);
+        var hive_balance = await checkBalance();
+        var new_balance = parseFloat(hive_balance);
+        ///send 70% to crypt0gnome
+        var gnome = new_balance * .7;
+        var gnome = gnome.toFixed(3);
+        //send 30% to asgarth
+        var asgarth = new_balance * .3;
+        var asgarth = asgarth.toFixed(3);
+
+        //send to crypt0gnome
+        await sendHive('crypt0gnome', gnome, 'terracore_revenue_distribution');
+        await sendHive('asgarth', asgarth, 'terracore_revenue_distribution');
+
+        await buyback();
+    }
+    else{
+        console.log("Not enough Hive to distribute");
+    }
+}
+
+async function engineBalance(username, token) {
+    //make a list of nodes to try
+    const nodes = ["https://engine.rishipanthee.com", "https://herpc.dtools.dev", "https://api.primersion.com"];
+    var node;
+
+    //try each node until one works, just try for a response
+    for (let i = 0; i < nodes.length; i++) {
+        try {
+            const response = await fetch(nodes[i], {
+                method: "GET",
+                headers:{'Content-type' : 'application/json'},
+            });
+            const data = await response.json()
+            node = nodes[i];
+            break;
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+                
+
+    const response = await fetch(node + "/contracts", {
+      method: "POST",
+      headers:{'Content-type' : 'application/json'},
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "find",
+        params: {
+          contract: "tokens",
+          table: "balances",
+          query: {
+            "account":username,
+            "symbol":token    
+          }
+        },
+        "id": 1,
+      })
+    });
+    const data = await response.json()
+    if (data.result.length > 0) {
+        return parseFloat(data.result[0].balance);
+    } else {
+        return 0;
+    }
+}
+
+async function swap(amount) {
+    console.log("Swapping " + amount + " SWAP.HIVE for FLUX");
+    const json = {
+        "contractName": "marketpools",
+        "contractAction": "swapTokens",
+        "contractPayload": {
+            "tokenPair": "SWAP.HIVE:FLUX",
+            "tokenSymbol": "SWAP.HIVE",
+            "tokenAmount": amount.toFixed(8).toString(),
+            "tradeType": "exactInput",
+            "maxSlippage": "5.000",
+            "beeswap": "3.1.4"
+        }
+    };
+
+    //convert json to string
+    const data = JSON.stringify(json);
+
+    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', data, function (err, result) {
+        console.log(err, result);
+    });
+
+}
+
+async function transfer(to, amount, account) {
+    const json = {
+        "contractName": "tokens",
+        "contractAction": "transfer",
+        "contractPayload": {
+            "symbol": "FLUX",
+            "to": to,
+            "quantity": amount.toFixed(8).toString(),
+            "memo": "burn $FLUX"
+        }
+    };
+
+    //convert json to string
+    const data = JSON.stringify(json);
+
+    hive.broadcast.customJson(account.active_key, ['terracore'], [], 'ssc-mainnet-hive', data, function(err, result) {
+    });
+
+}
+
+async function buyback(){
+    //get SWAP.HIVE balance
+    var balance = await engineBalance('terracore', 'SWAP.HIVE');
+
+    //check if balance is greater than 1
+    if(balance < 1){
+        console.log("Not enough SWAP.HIVE to buyback FLUX");
+        return;
+    }
+    //swap
+    await swap(balance);
+    //get FLUX balance
+    var flux = await engineBalance('terracore', 'FLUX');
+
+    //add this amount of FLUX to the daily burnt in stats collection
+    const db = client.db('terracore');
+    const collection = db.collection('stats');
+
+    //get current date new Date().toISOString().slice(0, 10)
+    var date = new Date().toISOString().slice(0, 10);
+    //update the stats collection
+    await collection.updateOne({ date: date }, { $inc: { burnt: flux } });
+
+    //send to @null
+    await transfer('null', flux, 'terracore');
+
+}
+
+
 
 
 //run getRewards() once per 15 minutes
@@ -109,6 +293,7 @@ async function run() {
     try {
         while (true) {
             await getRewards();
+            await distributeRevenue();
             await sleep(900000);
         }
     } catch (err) {
