@@ -135,7 +135,7 @@ async function sendHive(to, amount, memo) {
 }
 
 //distribute to developers and to H-E for $FLUX stabilization
-async function distributeRevenue(hiveBalance) {
+async function distributeRevenue() {
     var hive_balance = await checkBalance();
     //convert to float
     var balance = parseFloat(hive_balance);
@@ -245,7 +245,7 @@ async function transfer(to, amount, account) {
             "symbol": "FLUX",
             "to": to,
             "quantity": amount.toFixed(8).toString(),
-            "memo": "burn $FLUX"
+            "memo": "BuyBack & Burn $FLUX"
         }
     };
 
