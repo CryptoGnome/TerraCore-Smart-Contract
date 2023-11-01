@@ -159,7 +159,7 @@ async function distributeRevenue() {
         await sendHive('crypt0gnome', gnome, 'terracore_revenue_distribution');
         await sendHive('asgarth', asgarth, 'terracore_revenue_distribution');
 
-        await buyback();
+        await check_he();
     }
     else{
         console.log("Not enough Hive to distribute");
@@ -237,6 +237,27 @@ async function swap(amount) {
 
 }
 
+async function distributeRewards(amount) {
+    console.log("Distributing " + amount + " SWAP.HIVE to distribution contract");
+    const json = {
+        "contractName": "distribution",
+        "contractAction": "deposit",
+        "contractPayload": {
+            "id": 127,
+            "symbol": "SWAP.HIVE",
+            "quantity": amount.toFixed(8).toString()
+        }
+    };
+
+    //convert json to string
+    const data = JSON.stringify(json);
+
+    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', data, function (err, result) {
+        console.log(err, result);
+    });
+
+}
+
 async function transfer(to, amount, account) {
     const json = {
         "contractName": "tokens",
@@ -257,31 +278,18 @@ async function transfer(to, amount, account) {
 
 }
 
-async function buyback(){
+async function check_he(){
     //get SWAP.HIVE balance
     var balance = await engineBalance('terracore', 'SWAP.HIVE');
 
     //check if balance is greater than 1
     if(balance < 1){
-        console.log("Not enough SWAP.HIVE to buyback FLUX");
+        console.log("Not enough SWAP.HIVE");
         return;
     }
-    //swap
-    await swap(balance);
-    //get FLUX balance
-    var flux = await engineBalance('terracore', 'FLUX');
 
-    //add this amount of FLUX to the daily burnt in stats collection
-    const db = client.db('terracore');
-    const collection = db.collection('stats');
-
-    //get current date new Date().toISOString().slice(0, 10)
-    var date = new Date().toISOString().slice(0, 10);
-    //update the stats collection
-    await collection.updateOne({ date: date }, { $inc: { burnt: flux } });
-
-    //send to @null
-    await transfer('null', flux, 'terracore');
+    //add to distribution contract
+    await distributeRewards(balance);
 
 }
 
