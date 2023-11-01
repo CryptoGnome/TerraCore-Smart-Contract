@@ -24,54 +24,55 @@ const db = client.db(dbName);
 const nodes = ['https://hive-api.arcange.eu', 'https://api.deathwing.me', 'https://api.hive.blog', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://api.hive.blue', 'https://techcoderx.com'];
 
 
+var lastUsedEndpoint = '';
+
 async function testNodeEndpoints(nodes) {
     let fastestEndpoint = '';
     let fastestResponseTime = Infinity;
+    let endpointsToTest = nodes.filter(endpoint => endpoint !== lastUsedEndpoint);
 
-
-    for (const endpoint of nodes) {
+    for (const endpoint of endpointsToTest) {
         hive.api.setOptions({ url: endpoint });
         const startTime = Date.now();
 
         try {
-          await Promise.race([
-              new Promise((resolve, reject) => {
-                  hive.api.call('condenser_api.get_state', [''], (err, result) => { // Adjusted this line
-                      if (err) {
-                          console.error(`${endpoint} error: ${err.message}`);
-                          reject(err);
-                      } else {
-                          const responseTime = Date.now() - startTime;
-                          console.log(`${endpoint}: ${responseTime}ms`);
-                          
-                          if (responseTime < fastestResponseTime) {
-                              fastestResponseTime = responseTime;
-                              fastestEndpoint = endpoint;
-                          }
-          
-                          resolve(result);
-                      }
-                  });
-              }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 1.5 seconds')), 1500))
-          ]);
-
+            await Promise.race([
+                new Promise((resolve, reject) => {
+                    hive.api.call('condenser_api.get_state', [''], (err, result) => {
+                        if (err) {
+                            console.error(`${endpoint} error: ${err.message}`);
+                            reject(err);
+                        } else {
+                            const responseTime = Date.now() - startTime;
+                            console.log(`${endpoint}: ${responseTime}ms`);
+                            
+                            if (responseTime < fastestResponseTime) {
+                                fastestResponseTime = responseTime;
+                                fastestEndpoint = endpoint;
+                            }
+            
+                            resolve(result);
+                        }
+                    });
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 1.5 seconds')), 1500))
+            ]);
         } catch (error) {
             console.log(`${endpoint} error: ${error.message}`);
         }
     }
     
-    if (fastestEndpoint === "") {
-        // If no fastest endpoint is found, choose a random endpoint
-        fastestEndpoint = nodes[Math.floor(Math.random() * nodes.length)];
-        console.log(`No fastest endpoint found. Randomly selected endpoint: ${fastestEndpoint}`);
-    } else {
+    if (fastestEndpoint) {
         console.log(`Fastest endpoint: ${fastestEndpoint} (${fastestResponseTime}ms)`);
+        lastUsedEndpoint = fastestEndpoint;
+    } else {
+        let remainingEndpoints = nodes.filter(endpoint => endpoint !== lastUsedEndpoint);
+        fastestEndpoint = remainingEndpoints[Math.floor(Math.random() * remainingEndpoints.length)];
+        console.log(`No fastest endpoint found. Randomly selected endpoint: ${fastestEndpoint}`);
+        lastUsedEndpoint = fastestEndpoint;
     }
-    
-    hive.api.setOptions({ url: fastestEndpoint });
 
-    return;
+    hive.api.setOptions({ url: fastestEndpoint });
 }
 
 async function changeNode() {
