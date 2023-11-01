@@ -21,42 +21,56 @@ const wif = process.env.ACTIVE_KEY;
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 30000, serverSelectionTimeoutMS: 30000 });
 const db = client.db(dbName);
 
-const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://api.hive.blue', 'https://techcoderx.com', 'https://hive-api.arcange.eu'];
+const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://techcoderx.com', 'https://hive-api.arcange.eu'];
 
 
-var lastUsedEndpoint = '';
+async function getLastUsedEndpoint() {
+        const db = client.db(dbName);
+        const collection = db.collection('lastUsedEndpoint');
+        const lastUsed = await collection.findOne({}, { sort: { _id: -1 } });
+        return lastUsed ? lastUsed.endpoint : null;
+}
+
+async function updateLastUsedEndpoint(endpoint) {
+    
+    const db = client.db(dbName);
+    const collection = db.collection('lastUsedEndpoint');
+    await collection.insertOne({ endpoint: endpoint, timestamp: new Date() });
+
+}
 
 async function testNodeEndpoints(nodes) {
     let fastestEndpoint = '';
     let fastestResponseTime = Infinity;
+    const lastUsedEndpoint = await getLastUsedEndpoint();
     let endpointsToTest = nodes.filter(endpoint => endpoint !== lastUsedEndpoint);
 
     for (const endpoint of endpointsToTest) {
-        hive.api.setOptions({ url: endpoint });
         const startTime = Date.now();
-
         try {
-            await Promise.race([
-                new Promise((resolve, reject) => {
-                    hive.api.call('condenser_api.get_state', [''], (err, result) => {
-                        if (err) {
-                            console.error(`${endpoint} error: ${err.message}`);
-                            reject(err);
-                        } else {
-                            const responseTime = Date.now() - startTime;
-                            console.log(`${endpoint}: ${responseTime}ms`);
-                            
-                            if (responseTime < fastestResponseTime) {
-                                fastestResponseTime = responseTime;
-                                fastestEndpoint = endpoint;
-                            }
-            
-                            resolve(result);
-                        }
-                    });
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    method: "condenser_api.get_dynamic_global_properties",
+                    params: [],
+                    id: 1
                 }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 2.5 seconds')), 2500))
-            ]);
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+
+            if (response.ok) {
+                const responseTime = Date.now() - startTime;
+                console.log(`${endpoint}: ${responseTime}ms`);
+                
+                if (responseTime < fastestResponseTime) {
+                    fastestResponseTime = responseTime;
+                    fastestEndpoint = endpoint;
+                }
+            } else {
+                throw new Error(`Response error: ${response.statusText}`);
+            }
         } catch (error) {
             console.log(`${endpoint} error: ${error.message}`);
         }
@@ -64,19 +78,21 @@ async function testNodeEndpoints(nodes) {
     
     if (fastestEndpoint) {
         console.log(`Fastest endpoint: ${fastestEndpoint} (${fastestResponseTime}ms)`);
-        lastUsedEndpoint = fastestEndpoint;
+        await updateLastUsedEndpoint(fastestEndpoint);
     } else {
         let remainingEndpoints = nodes.filter(endpoint => endpoint !== lastUsedEndpoint);
         fastestEndpoint = remainingEndpoints[Math.floor(Math.random() * remainingEndpoints.length)];
         console.log(`No fastest endpoint found. Randomly selected endpoint: ${fastestEndpoint}`);
-        lastUsedEndpoint = fastestEndpoint;
+        await updateLastUsedEndpoint(fastestEndpoint);
     }
 
     hive.api.setOptions({ url: fastestEndpoint });
 }
 
 async function changeNode() {
-    await testNodeEndpoints(nodes);
+    (async () => {
+        await testNodeEndpoints(nodes);
+    })();
 }
 
 async function webhook(title, message, color) {
@@ -1397,6 +1413,7 @@ setInterval(function() {
         console.log('No events received in 30 seconds, shutting down so pm2 can restart');
         client.close();
         process.exit();
+     
     }
 }, 1000);
 
