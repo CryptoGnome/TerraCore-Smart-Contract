@@ -21,7 +21,7 @@ const wif = process.env.ACTIVE_KEY;
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, connectTimeoutMS: 30000, serverSelectionTimeoutMS: 30000 });
 const db = client.db(dbName);
 
-const nodes = ['https://hive-api.arcange.eu', 'https://api.deathwing.me', 'https://api.hive.blog', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://api.hive.blue', 'https://techcoderx.com'];
+const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://api.hive.blue', 'https://techcoderx.com', 'https://hive-api.arcange.eu'];
 
 
 var lastUsedEndpoint = '';
@@ -55,7 +55,7 @@ async function testNodeEndpoints(nodes) {
                         }
                     });
                 }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 1.5 seconds')), 1500))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 2.5 seconds')), 2500))
             ]);
         } catch (error) {
             console.log(`${endpoint} error: ${error.message}`);
