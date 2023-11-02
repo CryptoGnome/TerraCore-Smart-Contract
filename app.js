@@ -1287,8 +1287,7 @@ async function listen() {
             if (!result || !result.transactions || !result.block_id) {
                 return;
             }
-            
-
+        
             const blockId = result.block_id
     
             for (const transaction of result.transactions) {
@@ -1298,6 +1297,7 @@ async function listen() {
                     //timestamp of last event
                     lastevent = Date.now();
                     lastCheck = Date.now(); 
+                    
                     //console.log(operation);
                     if (operation[0] == 'transfer' && operation[1].to === 'terracore') {
                         //grab hash from memo

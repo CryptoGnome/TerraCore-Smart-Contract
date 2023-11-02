@@ -237,7 +237,7 @@ async function swap(amount) {
 
 }
 
-async function distributeRewards(amount) {
+async function distributeLPRewards(amount) {
     console.log("Distributing " + amount + " SWAP.HIVE to distribution contract");
     const json = {
         "contractName": "distribution",
@@ -289,7 +289,7 @@ async function check_he(){
     }
 
     //add to distribution contract
-    await distributeRewards(balance);
+    await distributeLPRewards(balance);
 
 }
 
