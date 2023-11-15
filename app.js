@@ -894,7 +894,11 @@ async function selectQuest(round, user) {
             }
         }
 
-
+        var common_relics = 0;
+        var uncommon_relics = 0;
+        var rare_relics = 0;
+        var epic_relics = 0;
+        var legendary_relics = 0;
         
         //if round is greater than 1 roll for rewards, rewards should scale based on round
         if (round > 0) {
@@ -913,27 +917,32 @@ async function selectQuest(round, user) {
                 if (roll < 0.5) {
                     relic_types = 2;
                 }
+                var floor_roll = 250;
                 for (let i = 0; i < relic_types; i++) {
                     //make  roll for relics
                     roll = await rollDice(1);
                     //4% chance for epic relic
                     if (roll <= 0.04) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * multiplier/128;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128;
+                        epic_relics = (roll * 10) * multiplier/divisor;
                     }
                     //15% chance for rare relic
                     else if (roll <= 0.19) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * multiplier/128;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128;
+                        rare_relics = (roll * 10) * multiplier/divisor;
                     }
                     //22% chance for uncommon relic
                     else if (roll <= 0.41) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * multiplier/128;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128;
+                        uncommon_relics = (roll * 10) * multiplier/divisor;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * multiplier/128;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128;
+                        common_relics = (roll * 10) * multiplier/divisor;
                     }
                 
                 }
@@ -945,31 +954,36 @@ async function selectQuest(round, user) {
                 else if (roll < 0.5) {
                     relic_types = 2;
                 }
+                var floor_roll = 500;
                 for (let i = 0; i < relic_types; i++) {
                    roll = await rollDice(1);
                     //2.5% chance for legendary relic
                     if (roll <= 0.025) {
-                        roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * multiplier/256;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256;
+                        legendary_relics = (roll * 10) * multiplier/divisor;
                     }
                     //7.5% chance for epic relic
                     else if (roll <= 0.1) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * multiplier/256;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256;
+                        epic_relics = (roll * 10) * multiplier/divisor;
                     }
                     //15% chance for rare relic
                     else if (roll <= 0.25) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * multiplier/256;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256;
+                        rare_relics = (roll * 10) * multiplier/divisor;
                     }
                     //25% chance for uncommon relic
                     else if (roll <= 0.525) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * multiplier/256;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256;
+                        uncommon_relics = (roll * 10) * multiplier/divisor;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * multiplier/128;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128;
+                        common_relics = (roll * 10) * multiplier/divisor;
                     }
                    
                 }
@@ -986,32 +1000,37 @@ async function selectQuest(round, user) {
                 else if (roll < 0.25) {
                     relic_types = 3;
                 }
-
+                var floor_roll = 750;
                 for (let i = 0; i < relic_types; i++) {
                     roll = await rollDice(1);
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * multiplier/256;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256;
+                        legendary_relics = (roll * 10) * multiplier/divisor;
                     }
                     //10% chance for epic relic
                     else if (roll <= 0.15) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * multiplier/256;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256;
+                        epic_relics = (roll * 10) * multiplier/divisor;
                     }
                     //20% chance for rare relic
                     else if (roll <= 0.35) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * multiplier/128;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128;
+                        rare_relics = (roll * 10) * multiplier/divisor;
                     }
                     //30% chance for uncommon relic
                     else if (roll <= 0.65) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * multiplier/64;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 64 + 1)) + 64;
+                        uncommon_relics = (roll * 10) * multiplier/divisor;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * multiplier/64;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 64 + 1)) + 64;
+                        common_relics = (roll * 10) * multiplier/divisor;
                     }
                 }
             }
@@ -1029,62 +1048,72 @@ async function selectQuest(round, user) {
                 else if (roll < 0.20) { 
                     relic_types = 5;
                 }
-
+                var floor_roll = 1000;
                 for (let i = 0; i < relic_types; i++) {
                     roll = await rollDice(1);
                     //5% chance for legendary relic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        legendary_relics = (roll * 10) * multiplier/128;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256;
+                        legendary_relics = (roll * 10) * multiplier/divisor;
                     }
                     //10% chance for epic relic
                     else if (roll <= 0.15) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * multiplier/128;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256;
+                        epic_relics = (roll * 10) * multiplier/divisor;
                     }
                     //20% chance for rare relic
                     else if (roll <= 0.35) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * multiplier/64;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128;
+                        rare_relics = (roll * 10) * multiplier/divisor;
                     }
                     //30% chance for uncommon relic
                     else if (roll <= 0.65) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * multiplier/64;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 64 + 1)) + 64;
+                        uncommon_relics = (roll * 10) * multiplier/divisor;
                     }
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * round/32;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 64 + 1)) + 64;
+                        common_relics = (roll * 10) * multiplier/divisor;
                     }
                 }
 
             }
             else{
                 relic_types = 1;
+                var floor_roll = 128;
                 for (let i = 0; i < relic_types; i++) {
                     //make  roll for relics
                     roll = await rollDice(1);
                     // 5% epic
                     if (roll <= 0.05) {
                         roll = await rollDice(1);
-                        epic_relics = (roll * 10) * multiplier/64;
+                        //64 - 128
+                        var divisor = Math.floor(Math.random() * (floor_roll - 64 + 1)) + 64;
+                        epic_relics = (roll * 10) * multiplier/divisor;
                     }
                     // 15% rare
                     else if (roll <= 0.2) {
                         roll = await rollDice(1);
-                        rare_relics = (roll * 10) * multiplier/64;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 64 + 1)) + 64;
+                        rare_relics = (roll * 10) * multiplier/divisor;
                     }
                     // 30% uncommon
                     else if (roll <= 0.5) {
                         roll = await rollDice(1);
-                        uncommon_relics = (roll * 10) * multiplier/32;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 32 + 1)) + 32;
+                        uncommon_relics = (roll * 10) * multiplier/divisor;
                     }
                     // 50% common
                     else {
                         roll = await rollDice(1);
-                        common_relics = (roll * 10) * multiplier/16;
+                        var divisor = Math.floor(Math.random() * (floor_roll - 16 + 1)) + 16;
+                        common_relics = (roll * 10) * multiplier/divisor;
                     }
-
              
                 }
             }
@@ -1092,13 +1121,7 @@ async function selectQuest(round, user) {
 
 
         }
-        else {
-            var common_relics = 0;
-            var uncommon_relics = 0;
-            var rare_relics = 0;
-            var epic_relics = 0;
-            var legendary_relics = 0;
-        }
+
 
         //log scraps, and shards to console
         console.log('------------------------------------------------------');

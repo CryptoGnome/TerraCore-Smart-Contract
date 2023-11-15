@@ -289,7 +289,8 @@ async function check_he(){
     }
 
     //add to distribution contract
-    await distributeLPRewards(balance);
+    //await distributeLPRewards(balance);
+    await swap(balance);
 
 }
 
