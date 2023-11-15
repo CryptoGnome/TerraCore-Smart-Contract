@@ -917,7 +917,7 @@ async function selectQuest(round, user) {
                 if (roll < 0.5) {
                     relic_types = 2;
                 }
-                var floor_roll = 250;
+                var floor_roll = 192;
                 for (let i = 0; i < relic_types; i++) {
                     //make  roll for relics
                     roll = await rollDice(1);
@@ -1085,7 +1085,7 @@ async function selectQuest(round, user) {
             }
             else{
                 relic_types = 1;
-                var floor_roll = 128;
+                var floor_roll = 96;
                 for (let i = 0; i < relic_types; i++) {
                     //make  roll for relics
                     roll = await rollDice(1);
