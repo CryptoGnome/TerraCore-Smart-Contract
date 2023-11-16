@@ -211,6 +211,9 @@ async function payReferrer(referrer, username, amount) {
                 console.log(result);
             }
         });
+        //add to referrer collection in DB to keep track of who referred who and how much they got paid
+        let collection = db.collection('referrers');
+        await collection.insertOne({referrer: referrer, username: username, amount: amount, time: Date.now()});
         return;
     } catch (error) {
         console.log(error);
@@ -245,10 +248,24 @@ async function register(username, referrer, amount) {
         await collection.insertOne({username: username , favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering:1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now(), lastBattle: Date.now()});
         console.log('New User ' + username + ' now registered');
         collection = db.collection('stats');
-        //increment global player count
-        await collection.updateOne({ date: 'global' }, { $inc: { players: 1 } });
-        //increment todays date player count
-        await collection.updateOne({ date: new Date().toISOString().slice(0, 10) }, { $inc: { players: 1 } }, { upsert: true });
+        const bulkOps = [
+            {
+                updateOne: {
+                    filter: { date: 'global' },
+                    update: { $inc: { players: 1 } }
+                }
+            },
+            {
+                updateOne: {
+                    filter: { date: new Date().toISOString().slice(0, 10) },
+                    update: { $inc: { players: 1 } },
+                    upsert: true
+                }
+            }
+        ];
+    
+        // Perform the bulk operation
+        await collection.bulkWrite(bulkOps);
 
 
         if (referrer != 'terracore' && referrer != username && referrer !== undefined) {
