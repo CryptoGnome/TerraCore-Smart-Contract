@@ -384,7 +384,7 @@ async function manageFlux() {
             var price = ask + (ask * .05 * i);
             price = price.toFixed(3);
             await place_order(price, order, 'sell', 'FLUX');
-            await sleep(500);
+            await sleep(2500);
         }
 
     }
