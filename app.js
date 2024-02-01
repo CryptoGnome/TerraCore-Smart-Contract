@@ -672,7 +672,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                 let maxAttempts = 3;
                 let delay = 700;
                 for (let i = 0; i < maxAttempts; i++) {
-                    //inc versions
+                    //inc versions update lastClaim for t
                     const bulkOps = [
                         { updateOne: { filter: { username: _target }, update: { $set: { scrap: newTargetScrap }, $inc: { version: 1 } } } },
                         { updateOne: { filter: { username: username }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } , $inc: { version: 1 } } } }

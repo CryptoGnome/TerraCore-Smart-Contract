@@ -2,19 +2,80 @@ const { MongoClient, MongoTopologyClosedError } = require('mongodb');
 var hive = require('@hiveio/hive-js');
 require('dotenv').config();
 const fetch = require('node-fetch');
+const SSC = require('sscjs');
 
 
 const wif = process.env.ACTIVE_KEY;
 var client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 7000 });
 
+var ssc;
+const nodes = ["https://engine.deathwing.me", "https://enginerpc.com", "https://ha.herpc.dtools.dev", "https://herpc.tribaldex.com", "https://ctpmain.com", "https://engine.hive.pizza", "https://he.atexoras.com:2083",  "https://api2.hive-engine.com/rpc", "https://api.primersion.com", "https://engine.beeswap.tools", "https://herpc.dtools.dev", "https://api.hive-engine.com/rpc", "https://he.sourov.dev"];
+var node;
 
+//HE NODE MANAGEMENT
+function fetchWithTimeout(url, timeout = 3500) {
+    return Promise.race([
+        fetch(url),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), timeout)
+        )
+    ]);
+}
+
+function checkNode(node) {
+    return new Promise((resolve) => {
+        const start = Date.now();
+        fetchWithTimeout(node)
+            .then(response => {
+                const duration = Date.now() - start;
+                if (response.ok) {
+                    resolve({ node, duration, status: 'Success' });
+                } else {
+                    resolve({ node, duration, status: 'Failed: Response not OK' });
+                }
+            })
+            .catch(error => resolve({ node, duration: Date.now() - start, status: 'Failed: ' + error.message }));
+    });
+}
+
+async function findNode() {
+    const promises = nodes.map(node => checkNode(node));
+    try {
+        const results = await Promise.allSettled(promises);
+
+        // Print all results
+        results.forEach(result => {
+            if (result.status === 'fulfilled') {
+                //console.log(`${result.value.node}: ${result.value.status}, Time: ${result.value.duration}ms`);
+            } else {
+                //console.log(`Error: ${result.reason}`);
+            }
+        });
+
+        const successfulResults = results
+            .filter(result => result.status === 'fulfilled' && result.value.status === 'Success')
+            .map(result => result.value);
+        
+        if (successfulResults.length === 0) throw new Error('No nodes are available');
+        
+        // Set the fastest node
+        const fastestNode = successfulResults.sort((a, b) => a.duration - b.duration)[0].node;
+        node = fastestNode;
+        console.log('Fastest node is: ' + node);
+        return node;
+    } catch (error) {
+        console.error('Error finding the fastest node:', error.message);
+    }
+}
+
+
+//LB
 //sleep function
 function sleep(ms) {
     return new Promise((resolve) => {
         setTimeout(resolve, ms);
     });
 }
-
 
 //distriubte rewards
 async function distributeRewards(user) {
@@ -105,7 +166,7 @@ async function getRewards() {
 /////////////////////////////////////
 //// Game Revenue Distribution //////
 ////////////////////////////////////
-//check the hive balance on the @terracore account
+//HIVE
 async function checkBalance() {
     try {
         var balance = await hive.api.getAccountsAsync(['terracore']);
@@ -134,32 +195,52 @@ async function sendHive(to, amount, memo) {
     });
 }
 
+async function withdrawSwapHive() {
+    console.log("Withdrawing SWAP.HIVE");
+    var amount = await engineBalance('terracore', 'SWAP.HIVE');
+    amount = amount.toFixed(3);
+    console.log("Current SWAP.HIVE Balance: " + amount);
+    if (amount > 1) {
+    
+        const json = {
+            "contractName": "hivepegged",
+            "contractAction": "withdraw",
+            "contractPayload": {
+                "quantity": amount.toString()
+            }
+        };
+
+        //convert json to string
+        const data = JSON.stringify(json);
+
+        hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', data, function(err, result) {
+            console.log(err, result);
+        });
+
+        await sleep(120000);
+    }
+}
+
+
+
+//HE
 //distribute to developers and to H-E for $FLUX stabilization
 async function distributeRevenue() {
     var hive_balance = await checkBalance();
     //convert to float
     var balance = parseFloat(hive_balance);
     console.log("Current Hive Balance: " + balance);
-    if (balance > 25) {
-        //send 5% to hive engine to support $FLUX ecosystem
-        var swap = balance * .05;
-        var swap = swap.toFixed(3);
-        await sendHive('hiveswap', swap, 'hive-engine');
-        await sleep(30000);
-        var hive_balance = await checkBalance();
-        var new_balance = parseFloat(hive_balance);
+    if (balance > 20) {
         ///send 70% to crypt0gnome
-        var gnome = new_balance * .7;
+        var gnome = balance * .7;
         var gnome = gnome.toFixed(3);
         //send 30% to asgarth
-        var asgarth = new_balance * .3;
+        var asgarth = balance * .3;
         var asgarth = asgarth.toFixed(3);
 
         //send to crypt0gnome
         await sendHive('crypt0gnome', gnome, 'terracore_revenue_distribution');
         await sendHive('asgarth', asgarth, 'terracore_revenue_distribution');
-
-        await check_he();
     }
     else{
         console.log("Not enough Hive to distribute");
@@ -213,51 +294,6 @@ async function engineBalance(username, token) {
     }
 }
 
-async function swap(amount) {
-    console.log("Swapping " + amount + " SWAP.HIVE for FLUX");
-    const json = {
-        "contractName": "marketpools",
-        "contractAction": "swapTokens",
-        "contractPayload": {
-            "tokenPair": "SWAP.HIVE:FLUX",
-            "tokenSymbol": "SWAP.HIVE",
-            "tokenAmount": amount.toFixed(8).toString(),
-            "tradeType": "exactInput",
-            "maxSlippage": "5.000",
-            "beeswap": "3.1.4"
-        }
-    };
-
-    //convert json to string
-    const data = JSON.stringify(json);
-
-    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', data, function (err, result) {
-        console.log(err, result);
-    });
-
-}
-
-async function distributeLPRewards(amount) {
-    console.log("Distributing " + amount + " SWAP.HIVE to distribution contract");
-    const json = {
-        "contractName": "distribution",
-        "contractAction": "deposit",
-        "contractPayload": {
-            "id": 127,
-            "symbol": "SWAP.HIVE",
-            "quantity": amount.toFixed(8).toString()
-        }
-    };
-
-    //convert json to string
-    const data = JSON.stringify(json);
-
-    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', data, function (err, result) {
-        console.log(err, result);
-    });
-
-}
-
 async function transfer(to, amount, account) {
     const json = {
         "contractName": "tokens",
@@ -266,31 +302,95 @@ async function transfer(to, amount, account) {
             "symbol": "FLUX",
             "to": to,
             "quantity": amount.toFixed(8).toString(),
-            "memo": "BuyBack & Burn $FLUX"
+            "memo": "Burn $FLUX"
         }
     };
 
     //convert json to string
     const data = JSON.stringify(json);
 
-    hive.broadcast.customJson(account.active_key, ['terracore'], [], 'ssc-mainnet-hive', data, function(err, result) {
+    hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', data, function(err, result) {
     });
 
 }
 
-async function check_he(){
-    //get SWAP.HIVE balance
-    var balance = await engineBalance('terracore', 'SWAP.HIVE');
 
-    //check if balance is greater than 1
-    if(balance < 1){
-        console.log("Not enough SWAP.HIVE");
-        return;
+//Dex
+async function place_order(price, quantity, side, symbol){
+    try {
+        console.log("Placing order for " + quantity + " at " + price);
+        const op = {
+            contractName: 'market',
+            contractAction: side,
+            contractPayload: {
+                symbol: symbol,
+                quantity: quantity.toString(),
+                price: price.toString()
+            }
+        };
+       await hive.broadcast.customJson(wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(op));
     }
+    catch (err) {
+        console.log(err);
+    }
+}
+async function fetch_prices(symbol){
+    //send post request to enginerpc.com/contracts
+    const response = await fetch(`${node}/contracts`, {
+        method: 'POST',
+        body: JSON.stringify({
+            "jsonrpc": "2.0",
+            "method": "find",
+            "params": {
+                "contract": "market",
+                "table": "metrics",
+                "query": {"symbol": symbol },
+                "limit": 1000,
+                "offset": 0,
+                "indexes": []
+            },
+            "id": 6969
+        }),
+        headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await response.json();
 
-    //add to distribution contract
-    //await distributeLPRewards(balance);
-    await swap(balance);
+    //from data.result[0].metrics get the highest bid and lowest ask
+    var bid = data.result[0].highestBid;
+    var ask = data.result[0].lowestAsk;
+    return {bid: bid, ask: ask};
+}
+
+async function manageFlux() {
+    //get balance of FLUX
+    var flux = await engineBalance('terracore', 'FLUX');
+    console.log("Current FLUX Balance: " + flux);
+
+    //if greater than 1 
+    if (flux > 5) {
+        //burn 80%
+        var burn = flux * .8;
+        //burn the FLUX
+        await transfer('null', burn, 'terracore');
+        //place flux in orderbook above highest ask
+        var amount = flux * .2;
+        var prices = await fetch_prices('FLUX');
+        var ask = parseFloat(prices.ask);
+        console.log("Current Ask: " + ask);
+        //split into 5 orders and ladder the sell orders each order should be 5% higher than the last starting at at 5% higher than the lowest ask
+        var order = amount / 10;
+        order = order.toFixed(3);
+        for (var i = 1; i < 11; i++) {
+            var price = ask + (ask * .05 * i);
+            price = price.toFixed(3);
+            await place_order(price, order, 'sell', 'FLUX');
+            await sleep(500);
+        }
+
+    }
+    else {
+        console.log("Not enough FLUX to manage");
+    }
 
 }
 
@@ -301,6 +401,9 @@ async function check_he(){
 async function run() {
     try {
         while (true) {
+            await findNode();
+            await manageFlux();
+            await withdrawSwapHive();
             await getRewards();
             await distributeRevenue();
             await sleep(900000);
