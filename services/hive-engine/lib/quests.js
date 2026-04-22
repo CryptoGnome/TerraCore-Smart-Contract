@@ -1,9 +1,6 @@
 const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
-
-function rollDice(index) {
-    return Math.random() * (index - 0.01 * index) + 0.01 * index;
-}
+const { rollDice } = require('../../../shared/rng');
 
 async function startQuest(username) {
     try {

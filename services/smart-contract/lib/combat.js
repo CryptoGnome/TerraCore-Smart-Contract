@@ -2,34 +2,7 @@ const { MongoTopologyClosedError } = require('mongodb');
 var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { webhook } = require('./webhooks');
-
-// RNG helpers — exported for use by quests.js
-function createSeed(blockId, trxId, hash) {
-    return blockId + '@' + trxId + '@' + hash;
-}
-
-function rollDice(index, seed = null) {
-    if (seed !== null) {
-        const rng = seedrandom(seed.toString(), { state: true });
-        return rng() * (index - 0.01 * index) + 0.01 * index;
-    }
-    return Math.random() * (index - 0.01 * index) + 0.01 * index;
-}
-
-function adjustedRoll(index, adjustment = 0, seed = null) {
-    let roll;
-    if (seed !== null) {
-        const rng = seedrandom(seed.toString(), { state: true });
-        roll = rng();
-    } else {
-        roll = Math.random();
-    }
-    let result = roll * (index - 0.01 * index) + 0.01 * index;
-    if (adjustment !== 0) {
-        result = Math.min(Math.max(result + adjustment, 0.01 * index), 0.99 * index);
-    }
-    return result;
-}
+const { createSeed, rollDice, adjustedRoll } = require('../../../shared/rng');
 
 function checkDodge(_target) {
     const roll = Math.floor(Math.random() * 100) + 1;

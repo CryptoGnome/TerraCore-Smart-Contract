@@ -1,7 +1,7 @@
 const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
 const { webhook3, webhook4 } = require('./webhooks');
-const { createSeed, rollDice, adjustedRoll } = require('./combat');
+const { createSeed, rollDice, adjustedRoll } = require('../../../shared/rng');
 
 async function issue(username, type, amount) {
     try {

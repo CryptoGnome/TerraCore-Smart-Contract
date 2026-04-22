@@ -1,21 +1,10 @@
 const { MongoTopologyClosedError } = require('mongodb');
-var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { webhook3 } = require('./webhooks');
+const { createSeed, generateRandomNumber } = require('../../../shared/rng');
 
 async function rollDice(index) {
     return Math.random() * (index - 0.10 * index) + 0.10 * index;
-}
-
-async function createSeed(blockId, trxId, hash) {
-    var seed = blockId + '@' + trxId + '@' + hash;
-    return seed;
-}
-
-async function generateRandomNumber(seed) {
-    const rng = seedrandom(seed.toString(), { state: true });
-    var randomNumber = Math.floor(rng() * 100000);
-    return randomNumber;
 }
 
 async function open_crate(owner, _rarity, blockId, trxId, hash) {
