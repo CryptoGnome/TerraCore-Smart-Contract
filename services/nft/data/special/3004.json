@@ -1,0 +1,31 @@
+{
+    "name": "Power Drill",
+    "id": 3004,
+    "item_number": null,
+    "edition": "Beta",
+    "print": null,
+    "max_supply": 10000,
+    "description": "Special items in Terracore are unique non-fungible tokens that provide players with powerful boosts and abilities that can significantly enhance their gaming experience. These items can be acquired through quests, battles, or trading, and each one has its own set of unique stats and abilities.",
+    "image": null,
+    "owner": "terracore",
+    "type": "special",
+    "rarity": null,
+    "attributes": {
+        "attack": 0,
+        "defense": 0,
+        "engineering": 0,
+        "stash": 0,
+        "dodge": 0,
+        "crit" : 0,
+        "luck": 0
+    },
+    "market": {
+        "listed": false,
+        "price": 0,
+        "seller": null,
+        "created": 0,
+        "expires": 0,
+        "sold": 0
+    }
+
+}

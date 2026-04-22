@@ -1,0 +1,31 @@
+{
+    "name": "Starship Saber",
+    "id": 4016,
+    "item_number": null,
+    "edition": "Beta",
+    "print": null,
+    "max_supply": 10000,
+    "description": "Ships in Terracore are unique non-fungible tokens that provide players with powerful advantages in space combat. Each ship is randomly generated with its own set of unique stats and abilities, allowing players to acquire ships that match their play style and strategy.",
+    "image": null,
+    "owner": "terracore",
+    "type": "ship",
+    "rarity": null,
+    "attributes": {
+        "attack": 0,
+        "defense": 0,
+        "engineering": 0,
+        "stash": 0,
+        "dodge": 0,
+        "crit" : 0,
+        "luck": 0
+    },
+    "market": {
+        "listed": false,
+        "price": 0,
+        "seller": null,
+        "created": 0,
+        "expires": 0,
+        "sold": 0
+    }
+
+}

@@ -1,0 +1,31 @@
+{
+    "name": "First Ascender",
+    "id": 41,
+    "item_number": null,
+    "edition": "Beta",
+    "print": null,
+    "max_supply": 10000,
+    "description": "Terracore Avatar NFT is a unique digital collectible that represents your in-game character in the world of Terracore. This NFT is a tradeable piece of digital art that you can own and display as a status symbol of your accomplishments in the game. It also grants you charecter stats that are rolled randomly.",
+    "image": null,
+    "owner": "terracore",
+    "type": "avatar",
+    "rarity": null,
+    "attributes": {
+        "attack": 0,
+        "defense": 0,
+        "engineering": 0,
+        "stash": 0,
+        "dodge": 0,
+        "crit" : 0,
+        "luck": 0
+    },
+    "market": {
+        "listed": false,
+        "price": 0,
+        "seller": null,
+        "created": 0,
+        "expires": 0,
+        "sold": 0
+    }
+
+}

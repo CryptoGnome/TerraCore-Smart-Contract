@@ -2,15 +2,15 @@ var hive = require('@hiveio/hive-js');
 const { MongoClient, MongoTopologyClosedError } = require('mongodb');
 const fetch = require('node-fetch');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 var seedrandom = require('seedrandom');
 
 //connect to Webhook using retry on limit
-const hook = new Webhook(process.env.DISCORD_WEBHOOK);
+const hook = new Webhook(process.env.SC_DISCORD_WEBHOOK);
 //seciondary webhook for registrations
-const hook2 = new Webhook(process.env.DISCORD_WEBHOOK_2);
+const hook2 = new Webhook(process.env.SC_DISCORD_WEBHOOK_2);
 //hook for quest completions
-const hook3 = new Webhook(process.env.DISCORD_WEBHOOK_3);
+const hook3 = new Webhook(process.env.SC_DISCORD_WEBHOOK_3);
 
 
 const dbName = 'terracore';

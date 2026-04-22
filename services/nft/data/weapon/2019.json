@@ -1,0 +1,31 @@
+{
+    "name": "Blackout",
+    "id": 2019,
+    "item_number": null,
+    "edition": "Beta",
+    "print": null,
+    "max_supply": 10000,
+    "description": "Weapons in Terracore are unique non-fungible tokens that provide powerful bonuses to your character's combat capabilities. Each weapon is randomly generated with its own set of unique stats and abilities, giving you the opportunity to acquire weapons that match your play style and strategy.",
+    "image": null,
+    "owner": "terracore",
+    "type": "weapon",
+    "rarity": null,
+    "attributes": {
+        "attack": 0,
+        "defense": 0,
+        "engineering": 0,
+        "stash": 0,
+        "dodge": 0,
+        "crit" : 0,
+        "luck": 0
+    },
+    "market": {
+        "listed": false,
+        "price": 0,
+        "seller": null,
+        "created": 0,
+        "expires": 0,
+        "sold": 0
+    }
+
+}

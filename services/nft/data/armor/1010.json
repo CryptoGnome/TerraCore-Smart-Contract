@@ -1,0 +1,31 @@
+{
+    "name": "Cargo Pants",
+    "id": 1010,
+    "item_number": null,
+    "edition": "Beta",
+    "print": null,
+    "max_supply": 10000,
+    "description": "Armor NFT items in Terracore are non-fungible tokens that represent unique pieces of armor that can be equipped to boost the stats of your character in the game. These items have the added benefit of being randomly generated, meaning that each piece of armor you obtain will have its own set of unique stats and abilities.",
+    "image": null,
+    "owner": "terracore",
+    "type": "armor",
+    "rarity": null,
+    "attributes": {
+        "attack": 0,
+        "defense": 0,
+        "engineering": 0,
+        "stash": 0,
+        "dodge": 0,
+        "crit" : 0,
+        "luck": 0
+    },
+    "market": {
+        "listed": false,
+        "price": 0,
+        "seller": null,
+        "created": 0,
+        "expires": 0,
+        "sold": 0
+    }
+
+}
