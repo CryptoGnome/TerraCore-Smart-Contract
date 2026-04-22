@@ -9,7 +9,24 @@
       "Bash(npm ls:*)",
       "Bash(wc -l *.js)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git -C \"/c/Users/oimap/Desktop/Terracore Hive-Engine\" status)",
+      "Bash(git -C \"/c/Users/oimap/Desktop/Terracore NFT\" status)",
+      "Bash(cp \"/c/Users/oimap/Desktop/TerraCore Smart Contract/app.js\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/smart-contract/app.js\")",
+      "Bash(cp \"/c/Users/oimap/Desktop/TerraCore Smart Contract/lb-rewards.js\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/lb-rewards/app.js\")",
+      "Bash(cp \"/c/Users/oimap/Desktop/Terracore NFT/app.js\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/app.js\")",
+      "Bash(cp \"/c/Users/oimap/Desktop/Terracore NFT/db.js\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/db.js\")",
+      "Bash(cp \"/c/Users/oimap/Desktop/Terracore NFT/dev.js\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/dev.js\")",
+      "Bash(cp \"/c/Users/oimap/Desktop/Terracore NFT/jslib.js\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/jslib.js\")",
+      "Bash(cp -r \"/c/Users/oimap/Desktop/Terracore NFT/data\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/data\")",
+      "Bash(cp -r \"/c/Users/oimap/Desktop/Terracore NFT/images\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/images\")",
+      "Bash(npm install *)",
+      "Bash(timeout 8 node services/smart-contract/app.js)",
+      "Bash(timeout 8 node services/lb-rewards/app.js)",
+      "Bash(timeout 10 node services/lb-rewards/app.js)",
+      "Bash(timeout 8 node services/hive-engine/app.js)",
+      "Bash(timeout 8 node services/nft/app.js)",
+      "Bash(grep -n \"^async function\\\\|^function\\\\|^const.*=.*async\\\\|// ===\\\\|//=====\\\\|// ---\\\\|//---\\\\|// MARKET\\\\|// NFT\\\\|// CRATE\\\\|// ITEM\\\\|// PLAYER\\\\|// BATTLE\\\\|// QUEST\\\\|ssc\\\\.\\\\|hive\\\\.\\\\|collection\\\\|Webhook\\\\|discord\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/app.js\")"
     ]
   }
 }
