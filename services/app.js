@@ -50,11 +50,14 @@ async function testL1Nodes() {
 
     for (const endpoint of toTest) {
         const start = Date.now();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         try {
             const response = await fetch(endpoint, {
                 method: 'POST',
                 body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_dynamic_global_properties', params: [], id: 1 }),
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
             });
             await response.json();
             if (response.ok) {
@@ -67,6 +70,8 @@ async function testL1Nodes() {
             }
         } catch (err) {
             console.log(`L1 ${endpoint} error: ${err.message}`);
+        } finally {
+            clearTimeout(timeoutId);
         }
     }
 

@@ -245,32 +245,25 @@ async function fetchWithJson(url, options) {
 
 async function engineBalance(username, token) {
     return await retryWithBackoff(async () => {
-        const nodes = [
-            'https://engine.rishipanthee.com',
-            'https://herpc.dtools.dev',
-            'https://api.primersion.com',
-        ];
-        let selectedNode = null;
-        for (let i = 0; i < nodes.length; i++) {
-            try {
-                const response = await fetchWithTimeout(nodes[i], 3500);
-                await response.json();
-                selectedNode = nodes[i];
-                console.log(`engineBalance using node: ${selectedNode}`);
-                break;
-            } catch (error) {
-                console.log(`engineBalance node ${nodes[i]} failed: ${error.message}`);
-            }
-        }
-        if (!selectedNode) throw new Error('All engineBalance nodes failed');
+        if (!node) node = await findNode();
+        validateNode(node, 'engineBalance');
+        console.log(`engineBalance using node: ${node}`);
 
-        const response = await fetch(selectedNode + '/contracts', {
-            method: 'POST',
-            headers: { 'Content-type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', method: 'find', params: { contract: 'tokens', table: 'balances', query: { account: username, symbol: token } }, id: 1 }),
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        let response;
+        try {
+            response = await fetch(node + '/contracts', {
+                method: 'POST',
+                headers: { 'Content-type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', method: 'find', params: { contract: 'tokens', table: 'balances', query: { account: username, symbol: token } }, id: 1 }),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
         const data = await response.json();
-        if (!data.result) throw new Error(`Invalid response format from ${selectedNode}`);
+        if (!data.result) throw new Error(`Invalid response format from ${node}`);
         return data.result.length > 0 ? parseFloat(data.result[0].balance) : 0;
     }, {
         maxAttempts: 3,
@@ -312,11 +305,19 @@ async function fetch_prices(symbol) {
             node = await findNode();
         }
         validateNode(node, 'fetch_prices');
-        const response = await fetch(`${node}/contracts`, {
-            method: 'POST',
-            body: JSON.stringify({ jsonrpc: '2.0', method: 'find', params: { contract: 'market', table: 'metrics', query: { symbol: symbol }, limit: 1000, offset: 0, indexes: [] }, id: 6969 }),
-            headers: { 'Content-Type': 'application/json' },
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        let response;
+        try {
+            response = await fetch(`${node}/contracts`, {
+                method: 'POST',
+                body: JSON.stringify({ jsonrpc: '2.0', method: 'find', params: { contract: 'market', table: 'metrics', query: { symbol: symbol }, limit: 1000, offset: 0, indexes: [] }, id: 6969 }),
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
         const data = await response.json();
         if (!data.result || data.result.length === 0) throw new Error(`No price data found for ${symbol}`);
         const bid = data.result[0].highestBid;
