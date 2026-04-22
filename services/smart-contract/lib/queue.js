@@ -1,13 +1,14 @@
 const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
-const { claim, battle, progressQuest, completeQuest } = require('./game');
+const { claim } = require('./claims');
+const { battle } = require('./combat');
+const { progressQuest, completeQuest } = require('./quests');
 
 async function sendTransaction(username, type, target, blockId, trxId, hash) {
     try {
         let collection = ctx.db.collection('transactions');
         let result = await collection.insertOne({ username: username, type: type, target: target, blockId: blockId, trxId: trxId, hash: hash, time: Date.now() });
         console.log('Transaction ' + result.insertedId + ' added to queue');
-        return;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
@@ -29,59 +30,58 @@ async function sendTransactions() {
             ctx.changeNode();
         }
 
-        if (transactions.length != 0) {
-            console.log('-------------------------------------------------------');
-            console.log('Sending ' + transactions.length + ' transactions');
-            console.log('-------------------------------------------------------');
+        if (transactions.length === 0) return true;
 
-            for (let i = 0; i < transactions.length; i++) {
-                ctx.lastCheck = Date.now();
-                let transaction = transactions[i];
-                console.log('Sending ' + transaction.type + ' transaction ' + (i + 1).toString() + ' of ' + transactions.length.toString());
+        console.log('-------------------------------------------------------');
+        console.log('Sending ' + transactions.length + ' transactions');
+        console.log('-------------------------------------------------------');
 
-                if (transaction.type == 'claim') {
-                    while (true) {
-                        const result = await claim(transaction.username);
-                        if (result) {
-                            let maxAttempts = 3;
-                            let delay = 3000;
-                            for (let i = 0; i < maxAttempts; i++) {
-                                let clear = await collection.deleteOne({ _id: transaction._id });
-                                if (clear.deletedCount == 1) break;
-                                await new Promise(resolve => setTimeout(resolve, delay));
-                                delay *= 1.2;
-                            }
+        for (let i = 0; i < transactions.length; i++) {
+            ctx.lastCheck = Date.now();
+            const tx = transactions[i];
+            console.log('Sending ' + tx.type + ' transaction ' + (i + 1) + ' of ' + transactions.length);
+
+            if (tx.type == 'claim') {
+                while (true) {
+                    const result = await claim(tx.username);
+                    if (result) {
+                        let maxAttempts = 3;
+                        let delay = 3000;
+                        for (let j = 0; j < maxAttempts; j++) {
+                            const clear = await collection.deleteOne({ _id: tx._id });
+                            if (clear.deletedCount == 1) break;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 1.2;
                         }
-                        break;
                     }
-                } else if (transaction.type == 'battle') {
-                    while (true) {
-                        var result2 = await battle(transaction.username, transaction.target, transaction.blockId, transaction.trxId, transaction.hash);
-                        if (result2) {
-                            let maxAttempts = 3;
-                            let delay = 3000;
-                            for (let i = 0; i < maxAttempts; i++) {
-                                let clear = await collection.deleteOne({ _id: transaction._id });
-                                if (clear.deletedCount == 1) break;
-                                await new Promise(resolve => setTimeout(resolve, delay));
-                                delay *= 1.2;
-                            }
-                        }
-                        break;
-                    }
-                } else if (transaction.type == 'progress') {
-                    await progressQuest(transaction.username, transaction.blockId, transaction.trxId);
-                    await collection.deleteOne({ _id: transaction._id });
-                } else if (transaction.type == 'complete') {
-                    await completeQuest(transaction.username);
-                    await collection.deleteOne({ _id: transaction._id });
+                    break;
                 }
+            } else if (tx.type == 'battle') {
+                while (true) {
+                    const result = await battle(tx.username, tx.target, tx.blockId, tx.trxId, tx.hash);
+                    if (result) {
+                        let maxAttempts = 3;
+                        let delay = 3000;
+                        for (let j = 0; j < maxAttempts; j++) {
+                            const clear = await collection.deleteOne({ _id: tx._id });
+                            if (clear.deletedCount == 1) break;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 1.2;
+                        }
+                    }
+                    break;
+                }
+            } else if (tx.type == 'progress') {
+                await progressQuest(tx.username, tx.blockId, tx.trxId);
+                await collection.deleteOne({ _id: tx._id });
+            } else if (tx.type == 'complete') {
+                await completeQuest(tx.username);
+                await collection.deleteOne({ _id: tx._id });
             }
-            console.log('Completed Sending Transactions');
-            return true;
-        } else {
-            return true;
         }
+
+        console.log('Completed Sending Transactions');
+        return true;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
@@ -96,7 +96,7 @@ async function sendTransactions() {
 
 async function checkTransactions() {
     try {
-        let done = await sendTransactions();
+        const done = await sendTransactions();
         if (done) {
             setTimeout(checkTransactions, 200);
         }
@@ -106,4 +106,22 @@ async function checkTransactions() {
     }
 }
 
-module.exports = { sendTransaction, sendTransactions, checkTransactions };
+async function clearTransactions() {
+    try {
+        await ctx.db.collection('transactions').deleteMany({});
+    } catch (err) {
+        if (err instanceof MongoTopologyClosedError) { console.log('MongoDB connection closed'); process.exit(1); }
+        else { console.log(err); }
+    }
+}
+
+async function clearFirst() {
+    try {
+        await ctx.db.collection('transactions').deleteOne({});
+    } catch (err) {
+        if (err instanceof MongoTopologyClosedError) { console.log('MongoDB connection closed'); process.exit(1); }
+        else { console.log(err); }
+    }
+}
+
+module.exports = { sendTransaction, sendTransactions, checkTransactions, clearTransactions, clearFirst };

@@ -1,5 +1,5 @@
 const ctx = require('../context');
-const { register, storeRegistration } = require('./game');
+const { register, storeRegistration } = require('./registration');
 const { sendTransaction } = require('./queue');
 
 async function handleOperation(operation, blockId, trxId) {
@@ -31,11 +31,10 @@ async function handleOperation(operation, blockId, trxId) {
 
     if (operation[0] == 'custom_json' && operation[1].id === 'terracore_battle') {
         var data = JSON.parse(operation[1].json);
-        var target = data.target;
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
-        await sendTransaction(user, 'battle', target, blockId, trxId, Date.now());
+        await sendTransaction(user, 'battle', data.target, blockId, trxId, Date.now());
     }
 
     if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_progress') {
