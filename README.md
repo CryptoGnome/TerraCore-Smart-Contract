@@ -1,22 +1,25 @@
-# TerraCore-Smart-Contract
+# TerraCore Smart Contract
 
+Blockchain game backend running on Hive and Hive Engine. Handles battles, quests, claims, NFTs, and leaderboard rewards in a single unified process.
 
+## Setup
+
+```bash
 git clone https://github.com/CryptoGnome/TerraCore-Smart-Contract.git
-
 cd TerraCore-Smart-Contract
-
 npm install
+cp .env.example .env   # fill in keys
+```
 
+## Start
 
-#update
---------
+```bash
+pm2 start ecosystem.config.js
+pm2 logs tc-terracore
+```
 
-cd TerraCore-Smart-Contract
+## Update
 
-git stash
-
-git pull
-
-#dev
----------
-cd TerraCore-Smart-Contract; pm2 stop 0; git pull; sleep 0.5; pm2 start 0; pm2 logs;
+```bash
+git pull && npm install && pm2 restart tc-terracore && pm2 logs tc-terracore
+```
