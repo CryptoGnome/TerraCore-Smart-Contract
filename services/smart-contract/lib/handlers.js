@@ -12,6 +12,7 @@ async function handleOperation(operation, blockId, trxId) {
             if (memo.hash.includes('terracore_register')) {
                 var hash = memo.hash.split('-')[1];
                 var referrer = memo.referrer;
+                console.log(`[SC] register: ${operation[1].from}` + (referrer ? ` (ref: ${referrer})` : ''));
                 var registered = await register(operation[1].from, referrer, operation[1].amount);
                 if (registered) {
                     await storeRegistration(hash, operation[1].from);
@@ -26,6 +27,7 @@ async function handleOperation(operation, blockId, trxId) {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
+        console.log(`[SC] claim: ${user}`);
         await sendTransaction(user, 'claim', 'none');
     }
 
@@ -34,6 +36,7 @@ async function handleOperation(operation, blockId, trxId) {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
+        console.log(`[SC] battle: ${user} → ${data.target}`);
         await sendTransaction(user, 'battle', data.target, blockId, trxId, Date.now());
     }
 
@@ -41,6 +44,7 @@ async function handleOperation(operation, blockId, trxId) {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
+        console.log(`[SC] quest-progress: ${user}`);
         await sendTransaction(user, 'progress', 'none', blockId, trxId, Date.now());
     }
 
@@ -48,6 +52,7 @@ async function handleOperation(operation, blockId, trxId) {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
+        console.log(`[SC] quest-complete: ${user}`);
         await sendTransaction(user, 'complete', 'none');
     }
 }

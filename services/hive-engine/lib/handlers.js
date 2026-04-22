@@ -22,12 +22,12 @@ async function handleTransaction(transaction) {
                 return;
             }
 
-            if      (event == 'terracore_engineering') { sendTransaction(from, quantity, 'engineering', hashStore); }
-            else if (event == 'terracore_damage')      { sendTransaction(from, quantity, 'damage',      hashStore); }
-            else if (event == 'terracore_defense')     { sendTransaction(from, quantity, 'defense',     hashStore); }
-            else if (event == 'terracore_contribute')  { sendTransaction(from, quantity, 'contribute',  hashStore); }
+            if      (event == 'terracore_engineering') { console.log(`[HE] engineering: ${from} (${quantity} SCRAP)`); sendTransaction(from, quantity, 'engineering', hashStore); }
+            else if (event == 'terracore_damage')      { console.log(`[HE] damage: ${from} (${quantity} SCRAP)`);      sendTransaction(from, quantity, 'damage',      hashStore); }
+            else if (event == 'terracore_defense')     { console.log(`[HE] defense: ${from} (${quantity} SCRAP)`);     sendTransaction(from, quantity, 'defense',     hashStore); }
+            else if (event == 'terracore_contribute')  { console.log(`[HE] contribute: ${from} (${quantity} SCRAP)`);  sendTransaction(from, quantity, 'contribute',  hashStore); }
             else if (event == 'tm_buy_crate') {
-                console.log('"Buy Crate" event detected');
+                console.log(`[HE] buy-crate: ${from} (${quantity} SCRAP)`);
                 sendTransaction(from, quantity, 'buy_crate', hashStore);
             } else {
                 console.log('Unknown SCRAP burn event: ' + event);
@@ -50,12 +50,12 @@ async function handleTransaction(transaction) {
                     const planetQtyMapping = { Terracore: 1, Oceana: 2, Celestia: 2, Arborealis: 2, Neptolith: 2, Solisar: 2 };
                     const { hash, planet } = payload.memo;
                     const quantity = parseFloat(payload.quantity);
-                    console.log('Boss Fight: planet=' + planet + ' qty=' + quantity + ' hash=' + hash);
+                    console.log(`[HE] boss-fight: ${from} → ${planet} (${quantity} FLUX)`);
 
                     if (planetQtyMapping[planet] == quantity) {
                         bossFight(from, planet)
                             .then(result => {
-                                console.log('Boss fight result:', result);
+                                console.log(`[HE] boss-fight result: ${from} → ${planet}:`, result);
                                 storeHash(hash, from, quantity);
                             })
                             .catch(err => console.error('Boss fight error:', err));
@@ -67,10 +67,10 @@ async function handleTransaction(transaction) {
                         return;
                     }
                     if (payload.quantity === '2') {
+                        console.log(`[HE] quest-start: ${from}`);
                         startQuest(from);
-                        console.log('Quest Start Event Detected for ' + from);
                     } else {
-                        console.log('Insufficient FLUX to start quest for ' + from);
+                        console.log(`[HE] quest-start rejected: ${from} (insufficient FLUX)`);
                     }
                 }
             } catch (err) {
@@ -82,8 +82,8 @@ async function handleTransaction(transaction) {
         // FLUX sent to terracore → item forge
         if (payload.to == 'terracore' && payload.symbol == 'FLUX') {
             const hashStore = payload.memo;
-            console.log('Forge Event Detected | Memo: ' + payload.memo);
             if (payload.memo.split('-')[0] == 'terracore_forge') {
+                console.log(`[HE] forge: ${transaction['sender']} (${payload.quantity} FLUX)`);
                 const from = transaction['sender'];
                 if (transaction.logs.includes('errors')) {
                     storeRejectedHash(hashStore, from);
@@ -105,6 +105,7 @@ async function handleTransaction(transaction) {
             if (transaction.logs.includes('errors')) {
                 storeRejectedHash(hashStore, sender);
             }
+            console.log(`[HE] stake: ${sender} (${qty} SCRAP)`);
             webhook('New Stake', sender + ' has staked ' + qty + ' SCRAP', '#FFA500');
             storeHash(hashStore, sender, qty);
         }
