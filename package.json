@@ -17,6 +17,10 @@
     "url": "https://github.com/CryptoGnome/TerraCore-Smart-Contract/issues"
   },
   "homepage": "https://github.com/CryptoGnome/TerraCore-Smart-Contract#readme",
+  "overrides": {
+    "axios": "^1.15.2",
+    "ws": "^8.20.0"
+  },
   "dependencies": {
     "@hiveio/hive-js": "^2.0.6",
     "chalk": "^4.1.2",
