@@ -27,6 +27,7 @@ async function performUpdate(collection, username, user) {
             { returnOriginal: false }
         );
         if (updateResult.value) return true;
+        else return false;
     }
 }
 

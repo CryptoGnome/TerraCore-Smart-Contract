@@ -112,7 +112,7 @@ async function startL1Stream() {
 
 async function startHEStream(node) {
     const ssc = new SSC(node);
-    ssc.stream((err, res) => {
+    ssc.stream(async (err, res) => {
         try {
             if (!res['transactions']) {
                 console.log('HE: No transactions');
@@ -121,7 +121,7 @@ async function startHEStream(node) {
             globalCtx.lastHEEvent = Date.now();
             try {
                 for (let i = 0; i < res['transactions'].length; i++) {
-                    heHandleOp(res['transactions'][i]);
+                    await heHandleOp(res['transactions'][i]);
                 }
             } catch (err) {
                 console.log(err);

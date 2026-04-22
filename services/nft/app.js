@@ -178,7 +178,7 @@ async function listen() {
                                 }
                                 var collection = ctx.db.collection('crates');
                                 var rarity = data.crate_type;
-                                let item = collection.findOne({ owner: user, crate_type: rarity });
+                                let item = await collection.findOne({ owner: user, crate_type: rarity });
                                 if (item != null) {
                                     queOpenCrates(user, rarity, blockId, trxId, Date.now());
                                 }
@@ -192,7 +192,7 @@ async function listen() {
                             }
                             var collection = ctx.db.collection('crates');
                             var rarity = data.crate_type;
-                            let item = collection.findOne({ owner: user, crate_type: rarity });
+                            let item = await collection.findOne({ owner: user, crate_type: rarity });
                             if (item != null) {
                                 queOpenCrates(user, rarity, blockId, trxId, hash);
                             }

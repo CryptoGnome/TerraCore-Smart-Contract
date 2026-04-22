@@ -132,7 +132,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             process.exit(1);
         } else {
             console.log(err);
-            webhook('New Error', 'Line: 681 Error: ' + err, '#6385ff');
+            webhook('New Error', 'Error in battle: ' + err, '#6385ff');
             return true;
         }
     }

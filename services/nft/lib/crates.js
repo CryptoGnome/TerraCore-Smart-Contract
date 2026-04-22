@@ -7,8 +7,12 @@ async function rollDice(index) {
     return Math.random() * (index - 0.10 * index) + 0.10 * index;
 }
 
-async function open_crate(owner, _rarity, blockId, trxId, hash) {
+async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
     try {
+        if (depth > 5) {
+            console.log('open_crate: max reroll depth reached for ' + owner + ' rarity=' + _rarity);
+            return;
+        }
         let types = ['avatar', 'armor', 'weapon', 'special', 'ship'];
         let ranges = [[0, 43], [1000, 1012], [2000, 2019], [3000, 3014], [4000, 4016]];
         let collection = ctx.db.collection('item-templates');
@@ -53,13 +57,14 @@ async function open_crate(owner, _rarity, blockId, trxId, hash) {
             let item = new Object();
             item.name = find.name;
             item.id = find.id;
-            if (item.print > find.max_supply) {
-                open_crate(owner, rarity, blockId, trxId);
-                return;
-            }
             item.edition = find.edition;
             item.print = await collection.countDocuments({ id: find.id }) + 1;
             item.max_supply = find.max_supply;
+            if (item.print > find.max_supply) {
+                console.log('Item ' + item_id + ' at max supply, rerolling');
+                open_crate(owner, rarity, blockId, trxId, hash, depth + 1);
+                return;
+            }
             item.description = find.description;
             item.image = find.image;
             item.owner = owner;
@@ -148,7 +153,7 @@ async function open_crate(owner, _rarity, blockId, trxId, hash) {
 
             if (att_count < rarity_index) {
                 console.log(rarity + ' ||  Attributes: ' + JSON.stringify(attribute_list) + '                    ||  Not enough attributes, rerolling');
-                open_crate(owner, rarity, blockId, trxId);
+                open_crate(owner, rarity, blockId, trxId, hash, depth + 1);
                 return;
             }
 

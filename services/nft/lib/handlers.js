@@ -47,14 +47,14 @@ async function handleOperation(operation, blockId, trxId, hash) {
         if (data.length != undefined) {
             for (let i = 0; i < data.length; i++) {
                 var rarity = data.crate_type;
-                let item = collection.findOne({ owner: user, crate_type: rarity });
+                let item = await collection.findOne({ owner: user, crate_type: rarity });
                 if (item != null) {
                     queOpenCrates(user, rarity, blockId, trxId, Date.now());
                 }
             }
         } else {
             var rarity = data.crate_type;
-            let item = collection.findOne({ owner: user, crate_type: rarity });
+            let item = await collection.findOne({ owner: user, crate_type: rarity });
             if (item != null) {
                 queOpenCrates(user, rarity, blockId, trxId, hash);
             }

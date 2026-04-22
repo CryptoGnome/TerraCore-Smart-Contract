@@ -12,9 +12,9 @@ async function handleOperation(operation, blockId, trxId) {
             if (memo.hash.includes('terracore_register')) {
                 var hash = memo.hash.split('-')[1];
                 var referrer = memo.referrer;
-                var registered = register(operation[1].from, referrer, operation[1].amount);
+                var registered = await register(operation[1].from, referrer, operation[1].amount);
                 if (registered) {
-                    storeRegistration(hash, operation[1].from);
+                    await storeRegistration(hash, operation[1].from);
                 }
             }
         } catch (err) {
@@ -41,14 +41,14 @@ async function handleOperation(operation, blockId, trxId) {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
-        sendTransaction(user, 'progress', 'none', blockId, trxId, Date.now());
+        await sendTransaction(user, 'progress', 'none', blockId, trxId, Date.now());
     }
 
     if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_complete') {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
-        sendTransaction(user, 'complete', 'none');
+        await sendTransaction(user, 'complete', 'none');
     }
 }
 

@@ -5,9 +5,7 @@ const { webhook2 } = require('./webhooks');
 async function payReferrer(referrer, username, amount) {
     try {
         console.log('Paying ' + referrer + ' for referring ' + username + ' ' + amount + ' HIVE');
-        await ctx.hive.broadcast.transfer(ctx.wif, 'terracore', referrer, amount, 'Here is your Refferal Bonus for inviting ' + username + ' to TerraCore!', function (err, result) {
-            if (err) console.log(err); else console.log(result);
-        });
+        await ctx.hive.broadcast.transferAsync(ctx.wif, 'terracore', referrer, amount, 'Here is your Refferal Bonus for inviting ' + username + ' to TerraCore!');
         await ctx.db.collection('referrers').insertOne({ referrer: referrer, username: username, amount: amount, time: Date.now() });
     } catch (error) {
         console.log(error);
@@ -34,7 +32,7 @@ async function register(username, referrer, amount) {
             return false;
         }
 
-        await collection.insertOne({ username: username, favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering: 1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now(), lastBattle: Date.now() });
+        await collection.insertOne({ username: username, favor: 0, scrap: 1, health: 10, damage: 10, defense: 10, engineering: 1, cooldown: Date.now(), minerate: 0.0001, attacks: 3, lastregen: Date.now(), claims: 3, lastclaim: Date.now(), registrationTime: Date.now(), lastBattle: Date.now(), stats: { damage: 10, defense: 10, engineering: 1, dodge: 0, crit: 0, luck: 0 }, consumables: { protection: 0, protection_times: [], focus: 0 }, hiveEngineStake: 0, items: {} });
         console.log('New User ' + username + ' now registered');
 
         const bulkOps = [
@@ -45,7 +43,7 @@ async function register(username, referrer, amount) {
 
         if (referrer != 'terracore' && referrer != username && referrer !== undefined) {
             webhook2('A New Citizen of Terracore has Registered', username + ' was invited by ' + referrer, 0x00ff00);
-            payReferrer(referrer, username, referrer_fee);
+            await payReferrer(referrer, username, referrer_fee);
         } else {
             webhook2('A New Citizen of Terracore has Registered', username, 0x00ff00);
         }
