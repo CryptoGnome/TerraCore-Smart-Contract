@@ -1,6 +1,9 @@
 const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
-const { engineering, defense, damage, contribute, buy_crate, upgradeItem, storeHash } = require('./game');
+const { engineering, defense, damage, contribute } = require('./upgrades');
+const { bossFight: _bossFight, buy_crate, issue: _issue } = require('./boss');
+const { upgradeItem } = require('./items');
+const { storeHash } = require('./hashes');
 
 async function sendTransaction(username, quantity, type, hash) {
     try {
@@ -24,37 +27,37 @@ async function sendTransactions() {
 
         for (let i = 0; i < transactions.length; i++) {
             ctx.lastCheck = Date.now();
-            let transaction = transactions[i];
+            const tx = transactions[i];
 
-            if (transaction.type == 'engineering') {
-                let result = await engineering(transaction.username, transaction.quantity);
-                if (result) await storeHash(transaction.hash, transaction.username, transaction.quantity);
-                await collection.deleteOne({ _id: transaction._id });
-            } else if (transaction.type == 'contribute') {
-                let result = await contribute(transaction.username, transaction.quantity);
-                if (result) await storeHash(transaction.hash, transaction.username, transaction.quantity);
-                await collection.deleteOne({ _id: transaction._id });
-            } else if (transaction.type == 'defense') {
-                let result = await defense(transaction.username, transaction.quantity);
-                if (result) await storeHash(transaction.hash, transaction.username, transaction.quantity);
-                await collection.deleteOne({ _id: transaction._id });
-            } else if (transaction.type == 'damage') {
-                let result = await damage(transaction.username, transaction.quantity);
-                if (result) await storeHash(transaction.hash, transaction.username, transaction.quantity);
-                await collection.deleteOne({ _id: transaction._id });
-            } else if (transaction.type == 'buy_crate') {
-                let result = await buy_crate(transaction.username, transaction.quantity);
-                if (result) await storeHash(transaction.hash, transaction.username, transaction.quantity);
-                await collection.deleteOne({ _id: transaction._id });
-            } else if (transaction.type == 'forge') {
-                let item_number = transaction.hash.split('-')[1];
-                console.log('Item Number: ' + item_number + ' Sent to forge');
-                let result = await upgradeItem(transaction.username, item_number, transaction.quantity);
-                if (result) await storeHash(transaction.hash, transaction.username, transaction.quantity);
-                await collection.deleteOne({ _id: transaction._id });
+            if (tx.type == 'engineering') {
+                const result = await engineering(tx.username, tx.quantity);
+                if (result) await storeHash(tx.hash, tx.username, tx.quantity);
+                await collection.deleteOne({ _id: tx._id });
+            } else if (tx.type == 'contribute') {
+                const result = await contribute(tx.username, tx.quantity);
+                if (result) await storeHash(tx.hash, tx.username, tx.quantity);
+                await collection.deleteOne({ _id: tx._id });
+            } else if (tx.type == 'defense') {
+                const result = await defense(tx.username, tx.quantity);
+                if (result) await storeHash(tx.hash, tx.username, tx.quantity);
+                await collection.deleteOne({ _id: tx._id });
+            } else if (tx.type == 'damage') {
+                const result = await damage(tx.username, tx.quantity);
+                if (result) await storeHash(tx.hash, tx.username, tx.quantity);
+                await collection.deleteOne({ _id: tx._id });
+            } else if (tx.type == 'buy_crate') {
+                const result = await buy_crate(tx.username, tx.quantity);
+                if (result) await storeHash(tx.hash, tx.username, tx.quantity);
+                await collection.deleteOne({ _id: tx._id });
+            } else if (tx.type == 'forge') {
+                const item_number = tx.hash.split('-')[1];
+                console.log('Item #' + item_number + ' sent to forge');
+                const result = await upgradeItem(tx.username, item_number, tx.quantity);
+                if (result) await storeHash(tx.hash, tx.username, tx.quantity);
+                await collection.deleteOne({ _id: tx._id });
             } else {
-                console.log('unknown transaction type');
-                await collection.deleteOne({ _id: transaction._id });
+                console.log('Unknown transaction type: ' + tx.type);
+                await collection.deleteOne({ _id: tx._id });
             }
         }
         return true;
@@ -70,7 +73,7 @@ async function sendTransactions() {
 }
 
 async function checkTransactions() {
-    let done = await sendTransactions();
+    const done = await sendTransactions();
     if (done) {
         ctx.lastCheck = Date.now();
         setTimeout(checkTransactions, 1000);

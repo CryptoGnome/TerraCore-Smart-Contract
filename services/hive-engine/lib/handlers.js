@@ -1,6 +1,7 @@
-const ctx = require('../context');
 const { sendTransaction } = require('./queue');
-const { storeHash, storeRejectedHash, bossFight, startQuest } = require('./game');
+const { storeHash, storeRejectedHash } = require('./hashes');
+const { bossFight } = require('./boss');
+const { startQuest } = require('./quests');
 const { webhook } = require('./webhooks');
 
 async function handleTransaction(transaction) {
@@ -9,12 +10,10 @@ async function handleTransaction(transaction) {
     if (transaction['action'] == 'transfer') {
         const payload = JSON.parse(transaction['payload']);
 
+        // SCRAP burned → stat upgrades or crate buy
         if (payload.to == 'null' && payload.symbol == 'SCRAP') {
-            const memo = {
-                event: payload.memo.split('-')[0],
-                hash: payload.memo.split('-')[1],
-            };
-            const from = transaction['sender'];
+            const event    = payload.memo.split('-')[0];
+            const from     = transaction['sender'];
             const quantity = payload.quantity;
             const hashStore = payload.memo;
 
@@ -23,88 +22,85 @@ async function handleTransaction(transaction) {
                 return;
             }
 
-            if (memo.event == 'terracore_engineering') {
-                sendTransaction(from, quantity, 'engineering', hashStore);
-            } else if (memo.event == 'terracore_damage') {
-                sendTransaction(from, quantity, 'damage', hashStore);
-            } else if (memo.event == 'terracore_defense') {
-                sendTransaction(from, quantity, 'defense', hashStore);
-            } else if (memo.event == 'terracore_contribute') {
-                sendTransaction(from, quantity, 'contribute', hashStore);
-            } else if (memo.event == 'tm_buy_crate') {
+            if      (event == 'terracore_engineering') { sendTransaction(from, quantity, 'engineering', hashStore); }
+            else if (event == 'terracore_damage')      { sendTransaction(from, quantity, 'damage',      hashStore); }
+            else if (event == 'terracore_defense')     { sendTransaction(from, quantity, 'defense',     hashStore); }
+            else if (event == 'terracore_contribute')  { sendTransaction(from, quantity, 'contribute',  hashStore); }
+            else if (event == 'tm_buy_crate') {
                 console.log('"Buy Crate" event detected');
                 sendTransaction(from, quantity, 'buy_crate', hashStore);
             } else {
-                console.log('Unknown event');
+                console.log('Unknown SCRAP burn event: ' + event);
             }
-        } else if (payload.to == 'null' && payload.symbol == 'FLUX') {
+            return;
+        }
+
+        // FLUX burned → boss fight or quest start
+        if (payload.to == 'null' && payload.symbol == 'FLUX') {
             try {
-                if (payload.memo.hash.split('-')[0] == 'terracore_boss_fight') {
+                const memoHash = payload.memo.hash ? payload.memo.hash.split('-')[0] : null;
+
+                if (memoHash == 'terracore_boss_fight') {
                     const from = transaction['sender'];
-                    const hashStore = payload.memo;
                     if (transaction.logs.includes('errors')) {
-                        storeRejectedHash(hashStore, from);
+                        storeRejectedHash(payload.memo, from);
                         return;
                     }
 
-                    const planetQtyMapping = {
-                        Terracore: 1, Oceana: 2, Celestia: 2,
-                        Arborealis: 2, Neptolith: 2, Solisar: 2,
-                    };
-
+                    const planetQtyMapping = { Terracore: 1, Oceana: 2, Celestia: 2, Arborealis: 2, Neptolith: 2, Solisar: 2 };
                     const { hash, planet } = payload.memo;
                     const quantity = parseFloat(payload.quantity);
-                    const sender = transaction['sender'];
-                    const bossFightHash = hash.split('-')[1];
-                    console.log('Boss Fight Event Detected');
-                    console.log('Planet: ' + planet);
-                    console.log('Quantity: ' + quantity);
-                    console.log('Hash: ' + hash);
+                    console.log('Boss Fight: planet=' + planet + ' qty=' + quantity + ' hash=' + hash);
 
                     if (planetQtyMapping[planet] == quantity) {
-                        console.log('Correct amount of flux sent');
-                        bossFight(sender, planet, bossFightHash)
+                        bossFight(from, planet)
                             .then(result => {
                                 console.log('Boss fight result:', result);
-                                storeHash(hash, sender, quantity);
+                                storeHash(hash, from, quantity);
                             })
-                            .catch(error => console.error('Error in boss fight:', error));
+                            .catch(err => console.error('Boss fight error:', err));
                     }
-                } else if (payload.memo.hash.split('-')[0] == 'terracore_quest_start') {
+                } else if (memoHash == 'terracore_quest_start') {
                     const from = transaction['sender'];
-                    const hashStore = payload.memo;
                     if (transaction.logs.includes('errors')) {
-                        storeRejectedHash(hashStore, from);
+                        storeRejectedHash(payload.memo, from);
                         return;
                     }
                     if (payload.quantity === '2') {
-                        startQuest(transaction['sender']);
-                        console.log('Quest Start Event Detected');
+                        startQuest(from);
+                        console.log('Quest Start Event Detected for ' + from);
                     } else {
-                        console.log('Not Enough Flux was Sent to Start Quest');
+                        console.log('Insufficient FLUX to start quest for ' + from);
                     }
                 }
             } catch (err) {
                 console.log(err);
             }
-        } else if (payload.to == 'terracore' && payload.symbol == 'FLUX') {
+            return;
+        }
+
+        // FLUX sent to terracore → item forge
+        if (payload.to == 'terracore' && payload.symbol == 'FLUX') {
             const hashStore = payload.memo;
-            console.log('Forge Event Detected');
-            console.log('Memo: ' + payload.memo);
+            console.log('Forge Event Detected | Memo: ' + payload.memo);
             if (payload.memo.split('-')[0] == 'terracore_forge') {
                 const from = transaction['sender'];
                 if (transaction.logs.includes('errors')) {
                     storeRejectedHash(hashStore, from);
                     return;
                 }
-                sendTransaction(transaction['sender'], payload.quantity, 'forge', hashStore);
+                sendTransaction(from, payload.quantity, 'forge', hashStore);
             }
+            return;
         }
-    } else if (transaction['action'] == 'stake') {
+    }
+
+    // SCRAP staked → log and notify
+    if (transaction['action'] == 'stake') {
         const payload = JSON.parse(transaction['payload']);
         if (payload.symbol == 'SCRAP') {
-            const sender = transaction['sender'];
-            const qty = payload.quantity;
+            const sender    = transaction['sender'];
+            const qty       = payload.quantity;
             const hashStore = payload.memo;
             if (transaction.logs.includes('errors')) {
                 storeRejectedHash(hashStore, sender);
