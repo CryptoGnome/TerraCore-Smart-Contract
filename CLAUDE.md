@@ -2,6 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Ecosystem Awareness
+
+This module is one of three interconnected parts of TerraCore. Changes here are the highest-impact because this is the **sole writer** to MongoDB and the source of all on-chain actions.
+
+| Module | Location | Impact on this module |
+|--------|----------|-----------------------|
+| **API** | `../TerraCore API/` | Reads every MongoDB field this module writes — renaming, removing, or restructuring a field breaks API responses immediately |
+| **Frontend** | `../Terracore FE/` | Reflects game mechanics in its UI — changes to battle math, reward amounts, quest logic, or new operation types need corresponding frontend updates |
+
+**Before renaming or removing a MongoDB field:** grep `../TerraCore API/app.js` for the field name.
+**Before changing token amounts, cooldowns, or game mechanics:** check `../Terracore FE/src/` for hardcoded values or logic that mirrors those rules.
+**Before adding a new custom JSON operation type:** the frontend will need a new signing flow and the API may need a new endpoint to expose its state.
+**Before changing a collection name or schema shape:** both the API and any frontend polling that collection will break.
+
+The root `../CLAUDE.md` has the full system architecture overview.
+
+---
+
 ## Project Overview
 
 TerraCore is a blockchain-based game backend built on the **Hive blockchain** with **Hive Engine** smart contracts. Players register, battle, and complete quests to earn SCRAP tokens. This is a production Node.js monorepo running as a **single unified process**.
