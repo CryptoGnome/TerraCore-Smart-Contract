@@ -1,61 +1,69 @@
-# Monorepo Consolidation Plan
+# TerraCore Monorepo Implementation Plan
 
-Merge all three TerraCore repos into this repo to simplify deployment (one `git pull`, one `npm install`) and eliminate duplicated infrastructure code (~400 lines shared across repos).
+**Goal:** Merge all three repos onto one server → one `git pull`, one `pm2 restart`, lower hosting costs.
 
-**Repos to merge:**
-- `~/Desktop/TerraCore Smart Contract` (this repo) — https://github.com/CryptoGnome/TerraCore-Smart-Contract
-- `~/Desktop/Terracore Hive-Engine` — https://github.com/CryptoGnome/Terracore-Hive-Engine
-- `~/Desktop/Terracore NFT` — https://github.com/CryptoGnome/Terracore-NFT
+**Repos being merged:**
+- `~/Desktop/TerraCore Smart Contract` (this repo) — main repo, destination
+- `~/Desktop/Terracore Hive-Engine`
+- `~/Desktop/Terracore NFT`
 
----
+**Where work happens:**
+- **Phase 0 (all code changes) → done here on this dev machine, then pushed to GitHub**
+- **Phases 1–5 (PM2 cutover) → done on the production server after `git pull`**
 
-## Target Structure
-
-```
-TerraCore Smart Contract/
-├── package.json              ← single root install, merged deps
-├── ecosystem.config.js       ← PM2 for all 4 processes
-├── .env                      ← prefixed webhook variable names
-├── shared/
-│   ├── retry.js              ← retryWithBackoff + sleep
-│   ├── he-node.js            ← beacon-based HE node selection
-│   └── hive-node.js          ← Hive L1 endpoint selection
-└── services/
-    ├── smart-contract/app.js
-    ├── lb-rewards/app.js
-    ├── hive-engine/app.js
-    └── nft/
-        ├── app.js
-        ├── db.js
-        ├── dev.js
-        ├── jslib.js
-        ├── data/             ← 225 JSON item templates (seeding only, not runtime)
-        └── images/           ← 117 PNGs (338MB — exclude from git via .gitignore)
-```
+**Ground rules:**
+- Old repos stay untouched on disk until 1 week of stable production
+- Cut over one service at a time, lowest risk first
+- Never touch PM2 until Phase 0 is 100% validated and pushed
 
 ---
 
-## Shared Modules to Extract
+## Progress Tracker
 
-**`shared/retry.js`** — Source: `lb-rewards.js` ~lines 174–199
-- `retryWithBackoff(fn, options)` and `sleep(ms)` — identical copies exist in both `lb-rewards.js` and `hive-engine/app.js`
+### Phase 0 — Setup (zero production impact)
 
-**`shared/he-node.js`** — Source: `lb-rewards.js` ~lines 14–162 (the more mature beacon-based version)
-- `findNode()`, `updateNodesFromBeacon()`, `fetchWithTimeout()`, `checkNode()`, `validateNode()`, `fallbackNodes[]`
+#### 0.1 Pre-flight checks
+- [ ] Confirm all 3 current PM2 processes are running and healthy (`pm2 list`)
+- [ ] Push Hive-Engine to GitHub (it is 1 commit ahead of origin)
+- [ ] Note current PM2 process names/IDs for all running services
 
-**`shared/hive-node.js`** — Source: `smart-contract/app.js` `testNodeEndpoints()`
-- Hive L1 endpoint selection via fetch POST to `condenser_api`
+#### 0.2 Create directory structure in this repo
+- [ ] `mkdir -p services/smart-contract`
+- [ ] `mkdir -p services/lb-rewards`
+- [ ] `mkdir -p services/hive-engine`
+- [ ] `mkdir -p services/nft`
+- [ ] `mkdir -p shared`
 
-**Do NOT share:**
-- `sendTransaction()` — different queue collection in each service (`transactions`, `he-transactions`, `market-transactions`)
-- `rollDice()` / `createSeed()` — deterministic RNG with subtly different implementations per service; sharing risks breaking blockchain-verifiable reproducibility
-- Discord webhook helpers — different fields per service, not worth abstracting
+#### 0.3 Copy Smart Contract files into services/
+- [ ] `cp app.js services/smart-contract/app.js`
+- [ ] `cp lb-rewards.js services/lb-rewards/app.js`
 
----
+#### 0.4 Copy Hive-Engine files
+- [ ] Copy `~/Desktop/Terracore Hive-Engine/app.js` → `services/hive-engine/app.js`
 
-## Root `package.json`
+#### 0.5 Copy NFT files
+- [ ] Copy `~/Desktop/Terracore NFT/app.js` → `services/nft/app.js`
+- [ ] Copy `~/Desktop/Terracore NFT/db.js` → `services/nft/db.js`
+- [ ] Copy `~/Desktop/Terracore NFT/dev.js` → `services/nft/dev.js`
+- [ ] Copy `~/Desktop/Terracore NFT/jslib.js` → `services/nft/jslib.js`
+- [ ] Copy `~/Desktop/Terracore NFT/data/` → `services/nft/data/` (225 JSON templates)
+- [ ] Copy `~/Desktop/Terracore NFT/images/` → `services/nft/images/` (338MB — disk only, gitignored)
 
-Single root `package.json`, no npm workspaces. Merged dependencies:
+#### 0.6 Update .gitignore
+- [ ] Add `services/nft/images/` to `.gitignore` (338MB too large for git)
+- [ ] Verify `node_modules` is still ignored
+
+#### 0.7 Audit NFT dependencies (no package.json exists — must check manually)
+- [ ] Check `chalk` version installed in `~/Desktop/Terracore NFT/node_modules/chalk/package.json`
+- [ ] Check `node-fetch` version installed there
+- [ ] Check `sharp` version installed there
+- [ ] Check `seedrandom` version installed there
+- [ ] Confirm all are compatible with pins in step 0.8
+
+#### 0.8 Create root package.json
+- [ ] Write root `package.json` with merged, pinned deps (see template below)
+- [ ] Run `npm install` from repo root
+- [ ] Confirm zero `MODULE_NOT_FOUND` or version conflict errors
 
 ```json
 {
@@ -77,51 +85,57 @@ Single root `package.json`, no npm workspaces. Merged dependencies:
 }
 ```
 
-**Critical pins:** `chalk@4` and `node-fetch@2` — v5/v3 are ESM-only and break `require()`.
+> **Critical pins:** `chalk@4` and `node-fetch@2` are pinned to major version — v5/v3 are ESM-only and break `require()`.
 
-**Note:** Terracore NFT has no `package.json` — audit its `node_modules` for actual installed versions before writing the merged root `package.json`.
+#### 0.9 Update .env with prefixed webhook names
+Current `.env` has `DISCORD_WEBHOOK` pointing to different channels in each repo — this collides. Add prefixed versions:
 
----
+- [ ] Add `SC_DISCORD_WEBHOOK` (was `DISCORD_WEBHOOK` in Smart Contract)
+- [ ] Add `SC_DISCORD_WEBHOOK_2` (was `DISCORD_WEBHOOK_2`)
+- [ ] Add `SC_DISCORD_WEBHOOK_3` (was `DISCORD_WEBHOOK_3`)
+- [ ] Add `HE_DISCORD_WEBHOOK` (was `DISCORD_WEBHOOK` in Hive Engine)
+- [ ] Add `HE_MARKET_WEBHOOK` (was `MARKET_WEBHOOK`)
+- [ ] Add `HE_BOSS_WEBHOOK` (was `BOSS_WEBHOOK`)
+- [ ] Add `HE_FORGE_WEBHOOK` (was `FORGE_WEBHOOK`)
+- [ ] Add `NFT_DISCORD_WEBHOOK` (was `DISCORD_WEBHOOK` in NFT)
+- [ ] Add `NFT_DISCORD_WEBHOOK2` (was `DISCORD_WEBHOOK2`)
+- [ ] Add `NFT_DISCORD_WEBHOOK3` (was `DISCORD_WEBHOOK3`)
+- [ ] Add `NFT_DISCORD_WEBHOOK4` (was `DISCORD_WEBHOOK4`)
+- [ ] Shared keys stay unchanged: `MONGO_URL`, `POSTING_KEY`, `ACTIVE_KEY`, `ACTIVE_KEY2`, `FUNKY_POSTING`, `FUNKY_ACTIVE`
 
-## Environment Variables
+#### 0.10 Fix dotenv path in all 4 service files
+Each file moves two directories deeper — dotenv can't find `.env` without an explicit path.
 
-`DISCORD_WEBHOOK` collides across all three repos (each points to a different channel). Rename with service prefixes:
-
-```
-# Shared
-MONGO_URL=...
-POSTING_KEY=...
-ACTIVE_KEY=...
-ACTIVE_KEY2=...
-FUNKY_POSTING=...
-FUNKY_ACTIVE=...
-
-# Smart Contract
-SC_DISCORD_WEBHOOK=...
-SC_DISCORD_WEBHOOK_2=...
-SC_DISCORD_WEBHOOK_3=...
-
-# Hive Engine
-HE_DISCORD_WEBHOOK=...
-HE_MARKET_WEBHOOK=...
-HE_BOSS_WEBHOOK=...
-HE_FORGE_WEBHOOK=...
-
-# NFT
-NFT_DISCORD_WEBHOOK=...
-NFT_DISCORD_WEBHOOK2=...
-NFT_DISCORD_WEBHOOK3=...
-NFT_DISCORD_WEBHOOK4=...
-```
-
-**dotenv path fix required in all 4 service app.js files:**
+Change this line in all 4 files:
 ```javascript
+// Before
+require('dotenv').config();
+
+// After
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 ```
 
----
+- [ ] `services/smart-contract/app.js`
+- [ ] `services/lb-rewards/app.js`
+- [ ] `services/hive-engine/app.js`
+- [ ] `services/nft/app.js`
 
-## PM2 Config (`ecosystem.config.js`)
+#### 0.11 Update webhook variable references in each service file
+- [ ] `services/smart-contract/app.js` — replace `DISCORD_WEBHOOK` → `SC_DISCORD_WEBHOOK`, `DISCORD_WEBHOOK_2` → `SC_DISCORD_WEBHOOK_2`, `DISCORD_WEBHOOK_3` → `SC_DISCORD_WEBHOOK_3`
+- [ ] `services/hive-engine/app.js` — replace `DISCORD_WEBHOOK` → `HE_DISCORD_WEBHOOK`, `MARKET_WEBHOOK` → `HE_MARKET_WEBHOOK`, `BOSS_WEBHOOK` → `HE_BOSS_WEBHOOK`, `FORGE_WEBHOOK` → `HE_FORGE_WEBHOOK`
+- [ ] `services/nft/app.js` — replace `DISCORD_WEBHOOK` → `NFT_DISCORD_WEBHOOK`, `DISCORD_WEBHOOK2` → `NFT_DISCORD_WEBHOOK2`, `DISCORD_WEBHOOK3` → `NFT_DISCORD_WEBHOOK3`, `DISCORD_WEBHOOK4` → `NFT_DISCORD_WEBHOOK4`
+
+#### 0.12 Extract shared modules
+- [ ] Create `shared/retry.js` — extract `retryWithBackoff()` and `sleep()` from `lb-rewards.js` (~lines 174–199)
+- [ ] Create `shared/he-node.js` — extract `findNode()`, `updateNodesFromBeacon()`, `fetchWithTimeout()`, `checkNode()`, `validateNode()`, `fallbackNodes[]` from `lb-rewards.js` (~lines 14–162)
+- [ ] Create `shared/hive-node.js` — extract `testNodeEndpoints()` from `services/smart-contract/app.js`
+- [ ] Update `services/lb-rewards/app.js` to `require('../../shared/retry')` and `require('../../shared/he-node')` instead of inline copies
+- [ ] Update `services/hive-engine/app.js` to require the same shared modules
+
+> **Do NOT share:** `sendTransaction()` (different queue collection per service), `rollDice()`/`createSeed()` (deterministic RNG — different per service, must not change), Discord webhook helpers (different shape per service).
+
+#### 0.13 Create ecosystem.config.js
+- [ ] Write `ecosystem.config.js` at repo root (see template below)
 
 ```javascript
 module.exports = {
@@ -134,56 +148,91 @@ module.exports = {
 };
 ```
 
----
+#### 0.14 Validate all 4 services load without errors
+Run each manually (Ctrl+C once it starts connecting — just checking for startup errors):
+- [ ] `node services/smart-contract/app.js` — confirm no crash, Hive stream connects
+- [ ] `node services/lb-rewards/app.js` — confirm no crash, MongoDB connects
+- [ ] `node services/hive-engine/app.js` — confirm no crash
+- [ ] `node services/nft/app.js` — confirm no crash
 
-## Migration Order (Production-Safe)
-
-### Phase 0 — Restructure (zero production impact)
-1. Create `services/smart-contract/`, `services/lb-rewards/`, `services/hive-engine/`, `services/nft/`, `shared/` directories
-2. Copy `app.js` → `services/smart-contract/app.js`, `lb-rewards.js` → `services/lb-rewards/app.js`
-3. Copy `~/Desktop/Terracore Hive-Engine/app.js` → `services/hive-engine/app.js`
-4. Copy `~/Desktop/Terracore NFT/{app,db,dev,jslib}.js` → `services/nft/`; copy `data/` directory
-5. Add `services/nft/images/` to `.gitignore`; copy the 338MB `images/` directory to disk only
-6. Write root `package.json`; run `npm install`; verify no `MODULE_NOT_FOUND`
-7. Update `.env` with prefixed webhook variable names
-8. Fix `dotenv` path in all 4 service files; update webhook variable references throughout
-9. Write `ecosystem.config.js`
-10. Extract `shared/` modules; update `lb-rewards/app.js` and `hive-engine/app.js` to require them
-
-### Phase 1 — lb-rewards (lowest blast radius — 15-min cycle, no real-time player impact)
-1. `node services/lb-rewards/app.js` — run manually, verify one full cycle
-2. `pm2 stop tc-lb-rewards && pm2 start ecosystem.config.js --only tc-lb-rewards`
-3. Monitor 2 cycles (~30 min); confirm SCRAP distribution in Discord
-
-### Phase 2 — Hive Engine
-1. `pm2 stop tc-hive-engine && pm2 start ecosystem.config.js --only tc-hive-engine`
-2. Watch upgrade/boss fight Discord events for 30 min
-
-### Phase 3 — NFT (2,100+ lines, 8 queue types — all collections isolated)
-1. Note: `db.js` uses `__dirname`-relative paths for `data/` — automatically correct after copy
-2. `pm2 stop tc-nft && pm2 start ecosystem.config.js --only tc-nft`
-3. Watch marketplace and crate opens for 1 hour
-
-### Phase 4 — Smart Contract (last — real-time player impact, highest blast radius)
-1. `pm2 stop tc-smart-contract && pm2 start ecosystem.config.js --only tc-smart-contract`
-2. Watch battles, quests, and claims in Discord for 1 hour
+#### 0.15 Commit Phase 0 to git
+- [ ] `git add services/ shared/ ecosystem.config.js package.json`
+- [ ] Verify `.env` is NOT staged (it's gitignored)
+- [ ] `git commit -m "feat: restructure into monorepo"`
+- [ ] `git push`
 
 ---
 
-## Key Risks
+### Phase 1 — Cut over lb-rewards ✦ LOWEST RISK
+*All steps below happen on the production server after pulling from GitHub.*
+*15-min cycle, no real-time player impact. Best service to test first.*
+
+- [ ] `git pull && npm install`
+- [ ] Run manually first: `node services/lb-rewards/app.js` — let it complete one full 15-min cycle
+- [ ] Confirm SCRAP distribution fired in Discord
+- [ ] Stop old process: `pm2 stop <old-lb-rewards-id>`
+- [ ] Start new: `pm2 start ecosystem.config.js --only tc-lb-rewards`
+- [ ] Monitor for 2 full cycles (~30 min) — confirm distributions continue normally
+- [ ] `pm2 save` to persist new process list
+
+---
+
+### Phase 2 — Cut over Hive Engine
+*HE transaction queue (`he-transactions` collection) is isolated — no overlap with other services.*
+
+- [ ] `pm2 stop <old-hive-engine-id>`
+- [ ] `pm2 start ecosystem.config.js --only tc-hive-engine`
+- [ ] Monitor 30 min — watch for upgrade/boss fight/forge Discord notifications
+- [ ] Confirm no errors in `pm2 logs tc-hive-engine`
+- [ ] `pm2 save`
+
+---
+
+### Phase 3 — Cut over NFT
+*Most complex service (2,100+ lines, 8 transaction queue types). Give it 1 hour of observation.*
+
+- [ ] Verify `services/nft/images/` exists on server disk (338MB was copied, not in git)
+- [ ] `pm2 stop <old-nft-id>`
+- [ ] `pm2 start ecosystem.config.js --only tc-nft`
+- [ ] Monitor 1 hour — watch marketplace listings, crate opens, item transfers in Discord
+- [ ] Confirm `pm2 logs tc-nft` is clean
+- [ ] `pm2 save`
+
+---
+
+### Phase 4 — Cut over Smart Contract ✦ HIGHEST RISK
+*Real-time player impact. Do this during low-traffic hours (late night). Have rollback command ready.*
+
+**Rollback command (if anything goes wrong):**
+```bash
+pm2 stop tc-smart-contract && pm2 start <old-smart-contract-script>
+```
+
+- [ ] Schedule during off-peak hours
+- [ ] `pm2 stop <old-smart-contract-id>`
+- [ ] `pm2 start ecosystem.config.js --only tc-smart-contract`
+- [ ] Monitor 1 hour — watch battles, quest completions, token claims in Discord
+- [ ] Confirm `pm2 logs tc-smart-contract` is clean
+- [ ] `pm2 save`
+
+---
+
+### Phase 5 — Cleanup (after 1 week stable)
+- [ ] Confirm all 4 processes have been running stable for 7+ days
+- [ ] Archive or delete old server deployments for Hive-Engine and NFT repos
+- [ ] Update GitHub repo description to reflect monorepo
+- [ ] Update README.md with new startup commands (`pm2 start ecosystem.config.js`)
+- [ ] Optionally: archive the old GitHub repos (don't delete — keep as historical reference)
+
+---
+
+## Key Risks Reference
 
 | Risk | Mitigation |
 |------|-----------|
-| `chalk@5` / `node-fetch@3` break `require()` | Pin exact major versions in root package.json |
-| NFT has no `package.json` — unknown installed versions | Audit NFT `node_modules` for actual versions before writing root package.json |
-| dotenv can't find `.env` from subdirectory | Explicit `path.join(__dirname, '../../.env')` in all service app.js files |
-| 338MB NFT images blow up git repo | Add `services/nft/images/` to `.gitignore` before first commit |
-| Old repos needed if monorepo breaks | Keep all three desktop repos intact for at least one week post-cutover |
+| `chalk@5` / `node-fetch@3` break `require()` | Pinned to `^4` / `^2` in root package.json |
+| NFT has no `package.json` — unknown versions | Step 0.7: audit actual installed versions before writing package.json |
+| dotenv can't find `.env` from subdirectory | Explicit `path.join(__dirname, '../../.env')` in all service files (step 0.10) |
+| 338MB NFT images blow up git repo | `services/nft/images/` in `.gitignore` (step 0.6) |
+| Production breaks during cutover | Old repos untouched on disk; rollback = restart old PM2 process |
 | `db.js` `__dirname` paths break after move | Already uses `__dirname`-relative paths — self-corrects automatically |
-| Hive Engine is 1 commit ahead of origin | Push Hive Engine before starting (separate concern, not blocking) |
-
----
-
-## Static Assets (NFT)
-
-The 225 JSON templates in `data/` and 117 PNG images in `images/` (338MB total) are **only used by `db.js`** for initial database seeding. Production `app.js` reads from the `item-templates` MongoDB collection; images are served from a CDN. These files are inert at runtime — keep `data/` in the repo, exclude `images/` via `.gitignore`.
