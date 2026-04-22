@@ -675,7 +675,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                     //inc versions update lastClaim for t
                     const bulkOps = [
                         { updateOne: { filter: { username: _target }, update: { $set: { scrap: newTargetScrap }, $inc: { version: 1 } } } },
-                        { updateOne: { filter: { username: username }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() } , $inc: { version: 1 } } } }
+                        { updateOne: { filter: { username: username }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() }, $inc: { version: 1 } } } }
                     ];
                     const result = await collection.bulkWrite(bulkOps);
                     //check if update was successful frim above result
@@ -754,6 +754,27 @@ async function createSeed(blockId, trxId, hash) {
     return seed;
 }
 
+async function adjustedRoll(index, adjustment = 0, seed = null) {
+    let roll;
+    
+    // If seed is provided, use it to generate a deterministic random number
+    if (seed !== null) {
+        const rng = seedrandom(seed.toString(), {state: true});
+        roll = rng();
+    } else {
+        roll = Math.random();
+    }
+    
+    // Calculate base result
+    let result = roll * (index - 0.01 * index) + 0.01 * index;
+    
+    // Apply adjustment if any, ensuring result stays within bounds
+    if (adjustment !== 0) {
+        result = Math.min(Math.max(result + adjustment, 0.01 * index), 0.99 * index);
+    }
+    
+    return result;
+}
 async function rollDice(index, seed = null) {
 
     //if there is a seed value then use it to generate a random number
@@ -770,32 +791,32 @@ async function rollDice(index, seed = null) {
     return result;
 }
   
+  
 
 async function progressQuest(username, blockId, trxId) {
-    //check if user has a quest already
-    //if so return false else insert quest into active-quests collection
-    try{
-        //check if user is in active-quests collection
+    try {
         let collection = db.collection('active-quests');
         let quest = await collection.findOne({ username: username });
-        //get username from players collection
         let _username = await db.collection('players').findOne({ username: username });
 
         if (quest) {
-            //check if quest has time if not add time
+            // Add time if missing
             if (!quest.time) {
-                //create unix timestamp
-                console.log('Quest does not have time');
                 quest.time = Date.now();
-                //update quest with time
                 await collection.updateOne({ username: username }, { $set: { time: quest.time } });
             }
 
-            //make sure more 3 sec
             if (quest.time + 3000 < Date.now()) {
-                //before progressing quest let's make a roll to see if the quest is successful
                 var seed = await createSeed(blockId, trxId, quest.round.toString());
-                var roll = await rollDice(1, seed);
+                var roll;
+
+                // Apply adjustment only after round 10
+                if (quest.round > 10) {
+                    roll = await adjustedRoll(1, 0.25, seed);
+                } else {
+                    roll = await rollDice(1, seed);
+                }
+
                 if(roll < quest.success_chance) {
                     console.log('Quest was successful for user ' + username, ' with a roll of ' + roll.toFixed(2).toString() + ' and a success chance of ' + quest.success_chance.toFixed(2).toString());
                     //quest was successful
@@ -1243,7 +1264,7 @@ async function completeQuest(username) {
 
 //issue relic tokens to player collection
 async function issue(username, type, amount){
-    try{
+    try {
         //see if user exists
         var db = client.db(dbName);
         var collection = db.collection('relics');

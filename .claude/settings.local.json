@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"^async function\\\\|^function\\\\|app\\\\\\\\.listen\\\\|app\\\\\\\\.post\\\\|app\\\\\\\\.get\" app.js)",
+      "Bash(grep -r \"require\\\\|import\" *.js)",
+      "Bash(grep -h \"require\\(\" *.js)",
+      "Bash(xargs cat:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(npm ls:*)",
+      "Bash(wc -l *.js)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ]
+  }
+}
