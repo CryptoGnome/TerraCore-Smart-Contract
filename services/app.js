@@ -33,6 +33,10 @@ const { sleep }    = require('../shared/retry');
 // HE node selection
 const { findNode, updateNodesFromBeacon } = require('../shared/he-node');
 
+// Error logging
+const errorLogger = require('../shared/error-logger');
+const { logError } = require('../shared/error-logger');
+
 // L1 Hive nodes
 const l1Nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://techcoderx.com', 'https://hive-api.arcange.eu'];
 
@@ -110,7 +114,7 @@ async function startL1Stream() {
                 }
             }
         } catch (err) {
-            console.log(err);
+            logError('SYS_L1_STREAM_STALE', err, { fn: 'startL1Stream', service: 'SYS' });
         }
     });
 }
@@ -129,7 +133,7 @@ async function startHEStream(node) {
                     await heHandleOp(res['transactions'][i]);
                 }
             } catch (err) {
-                console.log(err);
+                logError('SYS_HE_STREAM_STALE', err, { fn: 'startHEStream', service: 'SYS' });
             }
         } catch (err) {
             if (!(err instanceof TypeError)) console.log(err);
@@ -147,7 +151,7 @@ async function runLbRewards() {
             console.log('[lb-rewards] Sleeping 15 minutes...');
             await sleep(900000);
         } catch (err) {
-            console.error('[lb-rewards] Error:', err.stack);
+            logError('LB_CYCLE_FAIL', err, { fn: 'runLbRewards', service: 'LB' });
             await sleep(120000);
         }
     }
@@ -160,6 +164,11 @@ async function main() {
     });
     await client.connect();
     const db = client.db('terracore');
+
+    if (process.env.ERROR_DISCORD_WEBHOOK) {
+        errorLogger.setErrorHook(new Webhook(process.env.ERROR_DISCORD_WEBHOOK));
+    }
+    errorLogger.setErrorDb(db);
 
     console.log('-------------------------------------------------------');
     console.log('TerraCore unified process starting...');
@@ -213,30 +222,30 @@ async function main() {
     startHEStream(heNode);
 
     // Start lb-rewards cycle in the background
-    runLbRewards().catch(err => console.error('[lb-rewards] Fatal:', err));
+    runLbRewards().catch(err => logError('LB_CYCLE_FAIL', err, { fn: 'runLbRewards', service: 'LB' }, 'FATAL'));
 
     console.log('-------------------------------------------------------');
     console.log('All services started — single process tc-terracore');
     console.log('-------------------------------------------------------');
 }
 
-main().catch(err => { console.error('FATAL startup error:', err); process.exit(1); });
+main().catch(err => { logError('SYS_STARTUP_FAIL', err, { fn: 'main', service: 'SYS' }, 'FATAL'); process.exit(1); });
 
 // Unified heartbeat — restart if either stream is silent > 30s
 setInterval(function () {
     const l1Age = Date.now() - globalCtx.lastL1Event;
     const heAge = Date.now() - globalCtx.lastHEEvent;
     if (l1Age > 30000) {
-        console.log(`Hive L1 stream stale (${l1Age}ms) — restarting`);
+        logError('SYS_L1_STREAM_STALE', new Error(`L1 stream silent for ${l1Age}ms`), { fn: 'heartbeat', service: 'SYS' }, 'FATAL');
         process.exit(1);
     }
     if (heAge > 30000) {
-        console.log(`Hive Engine stream stale (${heAge}ms) — restarting`);
+        logError('SYS_HE_STREAM_STALE', new Error(`HE stream silent for ${heAge}ms`), { fn: 'heartbeat', service: 'SYS' }, 'FATAL');
         process.exit(1);
     }
 }, 3000);
 
 // Refresh HE node list from beacon every 30 minutes
 setInterval(function () {
-    updateNodesFromBeacon().catch(err => console.log('HE beacon update failed:', err.message));
+    updateNodesFromBeacon().catch(err => logError('SYS_BEACON_UPDATE_FAIL', err, { fn: 'beaconRefresh', service: 'SYS' }));
 }, 1800000);

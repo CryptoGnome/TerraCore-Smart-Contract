@@ -3,6 +3,7 @@ var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { webhook } = require('./webhooks');
 const { createSeed, rollDice, adjustedRoll } = require('../../../shared/rng');
+const { logError } = require('../../../shared/error-logger');
 
 function checkDodge(_target) {
     const roll = Math.floor(Math.random() * 100) + 1;
@@ -87,11 +88,13 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (user.scrap + scrapToSteal > staked + 1) scrapToSteal = (staked + 1) - user.scrap;
 
             if (isNaN(scrapToSteal)) {
+                logError('SC_BATTLE_SCRAP_NAN', new Error('scrapToSteal is NaN'), { fn: 'battle', username, blockId });
                 webhook('New Error', 'User ' + username + ' attacked ' + _target + ' but scrapToSteal is NaN', '#6385ff');
                 await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
                 return true;
             }
             if (scrapToSteal <= 0) {
+                logError('SC_BATTLE_SCRAP_ZERO', new Error('scrapToSteal <= 0'), { fn: 'battle', username, blockId });
                 webhook('New Error', 'User ' + username + ' attacked ' + _target + ' but scrapToSteal <= 0', '#6385ff');
                 await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
                 return true;
@@ -119,6 +122,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                 }
                 return true;
             } catch (e) {
+                logError('SC_BATTLE_BULK_WRITE_FAIL', e, { fn: 'battle', username, blockId });
                 webhook('New Error', 'Error: ' + e, '#6385ff');
                 return true;
             }
@@ -127,11 +131,11 @@ async function battle(username, _target, blockId, trxId, hash) {
         }
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
-            console.log('MongoDB connection closed');
+            logError('SYS_MONGO_CLOSED', err, { fn: 'battle', username, service: 'SC' }, 'FATAL');
             ctx.client.close();
             process.exit(1);
         } else {
-            console.log(err);
+            logError('SC_BATTLE_UNEXPECTED', err, { fn: 'battle', username, blockId });
             webhook('New Error', 'Error in battle: ' + err, '#6385ff');
             return true;
         }

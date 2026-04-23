@@ -3,6 +3,7 @@ const { storeHash, storeRejectedHash } = require('./hashes');
 const { bossFight } = require('./boss');
 const { startQuest } = require('./quests');
 const { webhook } = require('./webhooks');
+const { logError } = require('../../../shared/error-logger');
 
 async function handleTransaction(transaction) {
     if (transaction['contract'] != 'tokens') return;
@@ -58,7 +59,7 @@ async function handleTransaction(transaction) {
                                 console.log(`[HE] boss-fight result: ${from} → ${planet}:`, result);
                                 storeHash(hash, from, quantity);
                             })
-                            .catch(err => console.error('Boss fight error:', err));
+                            .catch(err => logError('HE_BOSS_FIGHT_FAIL', err, { fn: 'bossFight', username: from, service: 'HE' }));
                     }
                 } else if (memoHash == 'terracore_quest_start') {
                     const from = transaction['sender'];
@@ -74,7 +75,7 @@ async function handleTransaction(transaction) {
                     }
                 }
             } catch (err) {
-                console.log(err);
+                logError('HE_HANDLER_FLUX_PARSE', err, { fn: 'handleTransaction', service: 'HE' });
             }
             return;
         }

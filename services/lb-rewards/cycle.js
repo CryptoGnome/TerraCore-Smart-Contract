@@ -2,6 +2,7 @@ const fetch = require('node-fetch');
 const ctx = require('./context');
 const { findNode, validateNode, fetchWithTimeout } = require('../../shared/he-node');
 const { sleep, retryWithBackoff } = require('../../shared/retry');
+const { logError } = require('../../shared/error-logger');
 
 var node;
 
@@ -87,8 +88,7 @@ async function getRewards() {
         initialDelay: 3000,
         functionName: 'getRewards',
     }).catch(err => {
-        console.error(`getRewards failed after all retries: ${err.stack}`);
-        console.log('Skipping reward distribution for this iteration');
+        logError('LB_CYCLE_FAIL', err, { fn: 'getRewards', service: 'LB' });
     });
 }
 
@@ -147,8 +147,7 @@ async function withdrawSwapHive() {
         initialDelay: 2000,
         functionName: 'withdrawSwapHive',
     }).catch(err => {
-        console.error(`withdrawSwapHive failed after all retries: ${err.message}`);
-        console.log('Skipping SWAP.HIVE processing for this iteration');
+        logError('LB_SWAP_HIVE_FAIL', err, { fn: 'withdrawSwapHive', service: 'LB' });
     });
 }
 
@@ -207,8 +206,7 @@ async function distributeRevenue() {
         initialDelay: 2000,
         functionName: 'distributeRevenue',
     }).catch(err => {
-        console.error(`distributeRevenue failed after all retries: ${err.message}`);
-        console.log('Skipping revenue distribution for this iteration');
+        logError('LB_REVENUE_DIST_FAIL', err, { fn: 'distributeRevenue', service: 'LB' });
     });
 }
 

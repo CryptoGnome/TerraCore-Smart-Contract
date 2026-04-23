@@ -2,6 +2,7 @@ const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
 const { webhook3, webhook4 } = require('./webhooks');
 const { createSeed, rollDice, adjustedRoll } = require('../../../shared/rng');
+const { logError } = require('../../../shared/error-logger');
 
 async function issue(username, type, amount) {
     try {
@@ -120,8 +121,8 @@ async function selectQuest(round, user) {
             epic_relics: epic_relics, legendary_relics: legendary_relics, time: Date.now()
         };
     } catch (err) {
-        if (err instanceof MongoTopologyClosedError) { console.log('MongoDB connection closed'); ctx.client.close(); process.exit(1); }
-        else { console.log(err); return false; }
+        if (err instanceof MongoTopologyClosedError) { logError('SYS_MONGO_CLOSED', err, { fn: 'selectQuest', service: 'SC' }, 'FATAL'); ctx.client.close(); process.exit(1); }
+        else { logError('SC_QUEST_SELECT_FAIL', err, { fn: 'selectQuest', username: user ? user.username : null }); return false; }
     }
 }
 
@@ -174,8 +175,8 @@ async function progressQuest(username, blockId, trxId) {
             return false;
         }
     } catch (err) {
-        if (err instanceof MongoTopologyClosedError) { console.log('MongoDB connection closed'); ctx.client.close(); process.exit(1); }
-        else { console.log(err); return false; }
+        if (err instanceof MongoTopologyClosedError) { logError('SYS_MONGO_CLOSED', err, { fn: 'progressQuest', service: 'SC' }, 'FATAL'); ctx.client.close(); process.exit(1); }
+        else { logError('SC_QUEST_PROGRESS_FAIL', err, { fn: 'progressQuest', username, blockId }); return false; }
     }
 }
 
@@ -200,8 +201,8 @@ async function completeQuest(username) {
         webhook3('User ' + username + ' completed their quest at round ' + user.round, user.common_relics.toString(), user.uncommon_relics.toString(), user.rare_relics.toString(), user.epic_relics.toString(), user.legendary_relics.toString());
         return true;
     } catch (err) {
-        if (err instanceof MongoTopologyClosedError) { console.log('MongoDB connection closed'); ctx.client.close(); process.exit(1); }
-        else { console.log(err); return false; }
+        if (err instanceof MongoTopologyClosedError) { logError('SYS_MONGO_CLOSED', err, { fn: 'completeQuest', service: 'SC' }, 'FATAL'); ctx.client.close(); process.exit(1); }
+        else { logError('SC_QUEST_COMPLETE_FAIL', err, { fn: 'completeQuest', username }); return false; }
     }
 }
 

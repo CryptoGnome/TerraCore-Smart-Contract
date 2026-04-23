@@ -3,6 +3,7 @@ const ctx = require('../context');
 const { claim } = require('./claims');
 const { battle } = require('./combat');
 const { progressQuest, completeQuest } = require('./quests');
+const { logError } = require('../../../shared/error-logger');
 
 async function sendTransaction(username, type, target, blockId, trxId, hash) {
     try {
@@ -11,11 +12,11 @@ async function sendTransaction(username, type, target, blockId, trxId, hash) {
         console.log('Transaction ' + result.insertedId + ' added to queue');
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
-            console.log('MongoDB connection closed');
+            logError('SYS_MONGO_CLOSED', err, { fn: 'sendTransaction', service: 'SC' }, 'FATAL');
             ctx.client.close();
             process.exit(1);
         } else {
-            console.log(err);
+            logError('SC_QUEUE_TX_FAIL', err, { fn: 'sendTransaction', service: 'SC' });
         }
     }
 }
@@ -84,11 +85,11 @@ async function sendTransactions() {
         return true;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
-            console.log('MongoDB connection closed');
+            logError('SYS_MONGO_CLOSED', err, { fn: 'sendTransactions', service: 'SC' }, 'FATAL');
             ctx.client.close();
             process.exit(1);
         } else {
-            console.log(err);
+            logError('SC_QUEUE_TX_FAIL', err, { fn: 'sendTransactions', service: 'SC' });
             return true;
         }
     }
