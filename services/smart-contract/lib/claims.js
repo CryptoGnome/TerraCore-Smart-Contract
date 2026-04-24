@@ -47,11 +47,23 @@ async function claim(username) {
         if (!user.lastPayout) {
             await collection.updateOne({ username }, { $set: { lastPayout: Date.now() - 60000 } });
         }
-        if ((Date.now() - user.lastPayout) < 30000) {
+
+        const qty = user.scrap.toFixed(8);
+
+        // Atomic reserve: decrement claims and lock lastPayout BEFORE broadcasting.
+        // A concurrent claim will fail this update because lastPayout will already be now.
+        const now = Date.now();
+        const reserved = await collection.findOneAndUpdate(
+            { username, claims: { $gt: 0 }, lastPayout: { $lt: now - 30000 } },
+            { $set: { scrap: 0, lastPayout: now }, $inc: { claims: -1, version: 1 } },
+            { returnOriginal: false }
+        );
+
+        if (!reserved.value) {
+            console.log('[SC] claim: conditions not met for ' + username + ' (cooldown or no claims)');
             return true;
         }
 
-        const qty = user.scrap.toFixed(8);
         const data = {
             contractName: 'tokens',
             contractAction: 'issue',
@@ -61,12 +73,16 @@ async function claim(username) {
         const claimSuccess = await ctx.hive.broadcast.customJsonAsync(ctx.wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
 
         if (!claimSuccess) {
+            // Revert the atomic reserve so the player can retry
+            await collection.updateOne({ username }, {
+                $set: { scrap: user.scrap, lastPayout: user.lastPayout || 0 },
+                $inc: { claims: 1, version: 1 }
+            });
             console.error('[SC] claim broadcast failed for ' + username);
             await ctx.db.collection('claims').insertOne({ username: username, qty: 0, status: 'failed', time: Date.now() });
             return true;
         }
 
-        await performUpdate(collection, username, user);
         await storeClaim(username, qty);
         webhook('Scrap Claimed', `${username} claimed ${qty} SCRAP`, '#6130ff');
         return true;

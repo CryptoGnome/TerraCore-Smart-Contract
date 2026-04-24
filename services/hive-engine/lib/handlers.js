@@ -1,5 +1,5 @@
 const { sendTransaction } = require('./queue');
-const { storeHash, storeRejectedHash } = require('./hashes');
+const { storeHash, storeRejectedHash, checkHash } = require('./hashes');
 const { bossFight } = require('./boss');
 const { startQuest } = require('./quests');
 const { webhook } = require('./webhooks');
@@ -54,10 +54,15 @@ async function handleTransaction(transaction) {
                     console.log(`[HE] boss-fight: ${from} → ${planet} (${quantity} FLUX)`);
 
                     if (planetQtyMapping[planet] == quantity) {
-                        bossFight(from, planet)
-                            .then(async result => {
+                        if (await checkHash(hash)) {
+                            console.warn(`[HE] duplicate boss-fight hash skipped: ${hash} user=${from}`);
+                            return;
+                        }
+                        // Store hash before fight to prevent replay
+                        await storeHash(hash, from, quantity);
+                        bossFight(from, planet, hash)
+                            .then(result => {
                                 console.log(`[HE] boss-fight result: ${from} → ${planet}:`, result);
-                                await storeHash(hash, from, quantity);
                             })
                             .catch(err => logError('HE_BOSS_FIGHT_FAIL', err, { fn: 'bossFight', username: from, service: 'HE' }));
                     }
@@ -68,8 +73,14 @@ async function handleTransaction(transaction) {
                         return;
                     }
                     if (payload.quantity === '2') {
+                        const questHash = payload.memo.hash;
+                        if (questHash && await checkHash(questHash)) {
+                            console.warn(`[HE] duplicate quest-start hash skipped: ${questHash} user=${from}`);
+                            return;
+                        }
+                        if (questHash) await storeHash(questHash, from, payload.quantity);
                         console.log(`[HE] quest-start: ${from}`);
-                        startQuest(from);
+                        startQuest(from, questHash);
                     } else {
                         console.log(`[HE] quest-start rejected: ${from} (insufficient FLUX)`);
                     }

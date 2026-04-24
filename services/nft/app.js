@@ -10,6 +10,12 @@ const { purchaseItem, listItem, cancelItem, transferItem } = require('./lib/mark
 const { queOpenCrates, queEquip, queCombine, queUse } = require('./lib/queue');
 const { salvageNFT } = require('./lib/items');
 
+function extractUser(op) {
+    const auths = Array.isArray(op.required_auths) ? op.required_auths : [];
+    const posting = Array.isArray(op.required_posting_auths) ? op.required_posting_auths : [];
+    return auths[0] || posting[0] || null;
+}
+
 // Populate shared context
 ctx.hive = hive;
 ctx.wif  = process.env.NFT_ACTIVE_KEY;
@@ -135,34 +141,24 @@ async function listen() {
 
                     if (operation[0] == 'custom_json' && operation[1].id == 'tm_create') {
                         var data = JSON.parse(operation[1].json);
-                        var user;
-                        if (operation[1].required_auths[0] == undefined) {
-                            // ignore — needs active key
-                        } else {
-                            user = operation[1].required_auths[0];
-                            await listItem(data, user);
+                        const auths_create = Array.isArray(operation[1].required_auths) ? operation[1].required_auths : [];
+                        if (auths_create[0]) {
+                            await listItem(data, auths_create[0]);
                         }
                     }
 
                     if (operation[0] == 'custom_json' && operation[1].id == 'tm_cancel') {
                         var data = JSON.parse(operation[1].json);
                         var user;
-                        if (operation[1].required_auths[0] == undefined) {
-                            user = operation[1].required_posting_auths[0];
-                        } else {
-                            user = operation[1].required_auths[0];
-                        }
+                        user = extractUser(operation[1]);
                         await cancelItem(data, user);
                     }
 
                     if (operation[0] == 'custom_json' && operation[1].id == 'tm_transfer') {
                         var data = JSON.parse(operation[1].json);
-                        var user;
-                        if (operation[1].required_auths[0] == undefined) {
-                            // ignore — needs active key
-                        } else {
-                            user = operation[1].required_auths[0];
-                            await transferItem(data, user);
+                        const auths_transfer = Array.isArray(operation[1].required_auths) ? operation[1].required_auths : [];
+                        if (auths_transfer[0]) {
+                            await transferItem(data, auths_transfer[0]);
                         }
                     }
 
@@ -170,12 +166,8 @@ async function listen() {
                         var data = JSON.parse(operation[1].json);
                         if (data.length != undefined) {
                             for (let i = 0; i < data.length; i++) {
-                                var user;
-                                if (operation[1].required_auths[0] == undefined) {
-                                    user = operation[1].required_posting_auths[0];
-                                } else {
-                                    user = operation[1].required_auths[0];
-                                }
+                                var user = extractUser(operation[1]);
+                                if (!user) continue;
                                 var collection = ctx.db.collection('crates');
                                 var rarity = data.crate_type;
                                 let item = await collection.findOne({ owner: user, crate_type: rarity });
@@ -184,17 +176,14 @@ async function listen() {
                                 }
                             }
                         } else {
-                            var user;
-                            if (operation[1].required_auths[0] == undefined) {
-                                user = operation[1].required_posting_auths[0];
-                            } else {
-                                user = operation[1].required_auths[0];
-                            }
-                            var collection = ctx.db.collection('crates');
-                            var rarity = data.crate_type;
-                            let item = await collection.findOne({ owner: user, crate_type: rarity });
-                            if (item != null) {
-                                queOpenCrates(user, rarity, blockId, trxId, hash);
+                            var user = extractUser(operation[1]);
+                            if (user) {
+                                var collection = ctx.db.collection('crates');
+                                var rarity = data.crate_type;
+                                let item = await collection.findOne({ owner: user, crate_type: rarity });
+                                if (item != null) {
+                                    queOpenCrates(user, rarity, blockId, trxId, hash);
+                                }
                             }
                         }
                     }
@@ -203,22 +192,13 @@ async function listen() {
                         var data = JSON.parse(operation[1].json);
                         if (data.length != undefined) {
                             for (var i = 0; i < data.length; i++) {
-                                var user;
-                                if (operation[1].required_auths[0] == undefined) {
-                                    user = operation[1].required_posting_auths[0];
-                                } else {
-                                    user = operation[1].required_auths[0];
-                                }
+                                var user = extractUser(operation[1]);
+                                if (!user) continue;
                                 queEquip(user, data[i].item_number, 'equip');
                             }
                         } else {
-                            var user;
-                            if (operation[1].required_auths[0] == undefined) {
-                                user = operation[1].required_posting_auths[0];
-                            } else {
-                                user = operation[1].required_auths[0];
-                            }
-                            queEquip(user, data.item_number, 'equip');
+                            var user = extractUser(operation[1]);
+                            if (user) queEquip(user, data.item_number, 'equip');
                         }
                     }
 
@@ -226,57 +206,38 @@ async function listen() {
                         var data = JSON.parse(operation[1].json);
                         if (data.length != undefined) {
                             for (var i = 0; i < data.length; i++) {
-                                var user;
-                                if (operation[1].required_auths[0] == undefined) {
-                                    user = operation[1].required_posting_auths[0];
-                                } else {
-                                    user = operation[1].required_auths[0];
-                                }
+                                var user = extractUser(operation[1]);
+                                if (!user) continue;
                                 queEquip(user, data[i].item_number, 'unequip');
                             }
                         } else {
-                            var user;
-                            if (operation[1].required_auths[0] == undefined) {
-                                user = operation[1].required_posting_auths[0];
-                            } else {
-                                user = operation[1].required_auths[0];
-                            }
-                            queEquip(user, data.item_number, 'unequip');
+                            var user = extractUser(operation[1]);
+                            if (user) queEquip(user, data.item_number, 'unequip');
                         }
                     }
 
                     if (operation[0] == 'custom_json' && operation[1].id == 'terracore_salvage') {
                         var data = JSON.parse(operation[1].json);
-                        var user;
-                        if (operation[1].required_auths[0] == undefined) {
-                            // ignore — needs active key
-                        } else {
-                            user = operation[1].required_auths[0];
-                            salvageNFT(user, data.item_number);
+                        const auths_salvage = Array.isArray(operation[1].required_auths) ? operation[1].required_auths : [];
+                        if (auths_salvage[0]) {
+                            salvageNFT(auths_salvage[0], data.item_number);
                         }
                     }
 
                     if (operation[0] == 'custom_json' && operation[1].id == 'terracore_combine') {
                         var data = JSON.parse(operation[1].json);
                         var type = data.type;
-                        var user;
-                        if (operation[1].required_auths[0] == undefined) {
-                            // ignore — needs active key
-                        } else {
-                            user = operation[1].required_auths[0];
+                        const auths_combine = Array.isArray(operation[1].required_auths) ? operation[1].required_auths : [];
+                        if (auths_combine[0]) {
+                            queCombine(auths_combine[0], type);
                         }
-                        queCombine(user, type);
                     }
 
                     if (operation[0] == 'custom_json' && operation[1].id == 'terracore_use_consumable') {
                         var data = JSON.parse(operation[1].json);
                         var type = data.type;
                         var user;
-                        if (operation[1].required_auths[0] == undefined) {
-                            user = operation[1].required_posting_auths[0];
-                        } else {
-                            user = operation[1].required_auths[0];
-                        }
+                        user = extractUser(operation[1]);
                         queUse(user, type);
                     }
                 }

@@ -3,11 +3,23 @@ const ctx = require('../context');
 const { engineering, defense, damage, contribute } = require('./upgrades');
 const { bossFight: _bossFight, buy_crate, issue: _issue } = require('./boss');
 const { upgradeItem } = require('./items');
-const { storeHash } = require('./hashes');
+const { storeHash, checkHash } = require('./hashes');
 
 async function sendTransaction(username, quantity, type, hash) {
     try {
         let collection = ctx.db.collection('he-transactions');
+
+        // Reject already-queued or already-processed hashes
+        const inQueue = await collection.findOne({ hash: hash });
+        if (inQueue) {
+            console.warn(`[HE] duplicate tx skipped (in queue): hash=${hash} type=${type} user=${username}`);
+            return;
+        }
+        if (await checkHash(hash)) {
+            console.warn(`[HE] duplicate tx skipped (already processed): hash=${hash} type=${type} user=${username}`);
+            return;
+        }
+
         let result = await collection.insertOne({ username: username, quantity: quantity, type: type, hash: hash, time: new Date() });
         console.log('Transaction ' + result.insertedId + ' added to queue');
     } catch (err) {

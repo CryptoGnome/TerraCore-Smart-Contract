@@ -5,8 +5,9 @@ const { webhook } = require('./webhooks');
 const { createSeed, rollDice, adjustedRoll } = require('../../../shared/rng');
 const { logError } = require('../../../shared/error-logger');
 
-function checkDodge(_target) {
-    const roll = Math.floor(Math.random() * 100) + 1;
+function checkDodge(_target, seed) {
+    const rng  = seedrandom(seed + '-dodge');
+    const roll = Math.floor(rng() * 100) + 1;
     return roll <= _target.stats.dodge;
 }
 
@@ -73,7 +74,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             const roll   = rollAttack(user, seed);
             let scrapToSteal = target.scrap * (roll / 100);
 
-            if (checkDodge(target) && user.consumables.focus == 0) {
+            if (checkDodge(target, seed) && user.consumables.focus == 0) {
                 await collection.updateOne({ username: username }, { $inc: { attacks: -1, version: 1 } });
                 await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, seed: seed, roll: roll, dodged: true, timestamp: Date.now() });
                 webhook('Attack Dodged', 'User ' + username + ' tried to attack ' + _target + ' but they dodged', '#ff6eaf');
@@ -125,9 +126,10 @@ async function battle(username, _target, blockId, trxId, hash) {
                     const newTargetScrap = parseFloat(Math.max(currentTarget.scrap - currentSteal, 0).toFixed(3));
                     const newAttacks     = currentUser.attacks - 1;
 
+                    const battleNow = Date.now();
                     const bulkOps = [
-                        { updateOne: { filter: { username: _target,  version: currentTarget.version }, update: { $set: { scrap: newTargetScrap }, $inc: { version: 1 } } } },
-                        { updateOne: { filter: { username: username, version: currentUser.version   }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() }, $inc: { version: 1 } } } }
+                        { updateOne: { filter: { username: _target,  version: currentTarget.version }, update: { $set: { scrap: newTargetScrap, lastBattle: battleNow }, $inc: { version: 1 } } } },
+                        { updateOne: { filter: { username: username, version: currentUser.version   }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: battleNow }, $inc: { version: 1 } } } }
                     ];
                     const res = await collection.bulkWrite(bulkOps);
                     if (res.modifiedCount === 2) {

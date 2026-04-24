@@ -1,4 +1,5 @@
 const { MongoTopologyClosedError } = require('mongodb');
+var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { webhook3, webhook4 } = require('./webhooks');
 const { createSeed, rollDice, adjustedRoll } = require('../../../shared/rng');
@@ -20,15 +21,16 @@ async function issue(username, type, amount) {
     }
 }
 
-async function selectQuest(round, user) {
+async function selectQuest(round, user, seed) {
     try {
+        const rng = seedrandom((seed || 'fallback') + '-' + round);
         const quests = await ctx.db.collection('quest-template').find({}).toArray();
-        const random_quest = quests[Math.floor(Math.random() * quests.length)];
+        const random_quest = quests[Math.floor(rng() * quests.length)];
 
         let availableAttributes = ['damage', 'defense', 'engineering', 'dodge', 'crit', 'luck'];
-        const attribute_one = availableAttributes[Math.floor(Math.random() * availableAttributes.length)];
+        const attribute_one = availableAttributes[Math.floor(rng() * availableAttributes.length)];
         availableAttributes = availableAttributes.filter(item => item !== attribute_one);
-        const attribute_two = availableAttributes[Math.floor(Math.random() * availableAttributes.length)];
+        const attribute_two = availableAttributes[Math.floor(rng() * availableAttributes.length)];
 
         const base_stats = { damage: 20 * round, defense: 20 * round, engineering: 2 * round, dodge: round, crit: round, luck: round };
         let success_chance = 0.80;
@@ -56,11 +58,11 @@ async function selectQuest(round, user) {
                 const floor_roll = 1000;
                 for (let i = 0; i < relic_types; i++) {
                     roll = rollDice(1);
-                    if      (roll <= 0.05) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256; legendary_relics = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.15) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256; epic_relics      = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.35) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128; rare_relics      = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.65) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll -  64 + 1)) +  64; uncommon_relics  = (roll * 10) * multiplier / d; }
-                    else                  { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll -  64 + 1)) +  64; common_relics    = (roll * 10) * multiplier / d; }
+                    if      (roll <= 0.05) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 256 + 1)) + 256; legendary_relics = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.15) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 256 + 1)) + 256; epic_relics      = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.35) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 128 + 1)) + 128; rare_relics      = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.65) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll -  64 + 1)) +  64; uncommon_relics  = (roll * 10) * multiplier / d; }
+                    else                  { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll -  64 + 1)) +  64; common_relics    = (roll * 10) * multiplier / d; }
                 }
             } else if (round > 15) {
                 if      (roll < 0.95) relic_types = 1;
@@ -69,11 +71,11 @@ async function selectQuest(round, user) {
                 const floor_roll = 750;
                 for (let i = 0; i < relic_types; i++) {
                     roll = rollDice(1);
-                    if      (roll <= 0.05) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256; legendary_relics = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.15) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256; epic_relics      = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.35) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128; rare_relics      = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.65) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll -  64 + 1)) +  64; uncommon_relics  = (roll * 10) * multiplier / d; }
-                    else                  { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll -  64 + 1)) +  64; common_relics    = (roll * 10) * multiplier / d; }
+                    if      (roll <= 0.05) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 256 + 1)) + 256; legendary_relics = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.15) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 256 + 1)) + 256; epic_relics      = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.35) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 128 + 1)) + 128; rare_relics      = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.65) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll -  64 + 1)) +  64; uncommon_relics  = (roll * 10) * multiplier / d; }
+                    else                  { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll -  64 + 1)) +  64; common_relics    = (roll * 10) * multiplier / d; }
                 }
             } else if (round > 9) {
                 if      (roll < 0.75) relic_types = 1;
@@ -81,30 +83,30 @@ async function selectQuest(round, user) {
                 const floor_roll = 500;
                 for (let i = 0; i < relic_types; i++) {
                     roll = rollDice(1);
-                    if      (roll <= 0.025) { const d = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256; legendary_relics = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.1)   { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256; epic_relics      = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.25)  { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256; rare_relics      = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.525) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 256 + 1)) + 256; uncommon_relics  = (roll * 10) * multiplier / d; }
-                    else                   { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128; common_relics    = (roll * 10) * multiplier / d; }
+                    if      (roll <= 0.025) { const d = Math.floor(rng() * (floor_roll - 256 + 1)) + 256; legendary_relics = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.1)   { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 256 + 1)) + 256; epic_relics      = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.25)  { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 256 + 1)) + 256; rare_relics      = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.525) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 256 + 1)) + 256; uncommon_relics  = (roll * 10) * multiplier / d; }
+                    else                   { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 128 + 1)) + 128; common_relics    = (roll * 10) * multiplier / d; }
                 }
             } else if (round > 4) {
                 if (roll < 0.5) relic_types = 2;
                 const floor_roll = 192;
                 for (let i = 0; i < relic_types; i++) {
                     roll = rollDice(1);
-                    if      (roll <= 0.04) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128; epic_relics     = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.19) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128; rare_relics     = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.41) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128; uncommon_relics = (roll * 10) * multiplier / d; }
-                    else                  { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 128 + 1)) + 128; common_relics   = (roll * 10) * multiplier / d; }
+                    if      (roll <= 0.04) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 128 + 1)) + 128; epic_relics     = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.19) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 128 + 1)) + 128; rare_relics     = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.41) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 128 + 1)) + 128; uncommon_relics = (roll * 10) * multiplier / d; }
+                    else                  { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 128 + 1)) + 128; common_relics   = (roll * 10) * multiplier / d; }
                 }
             } else {
                 const floor_roll = 96;
                 for (let i = 0; i < relic_types; i++) {
                     roll = rollDice(1);
-                    if      (roll <= 0.05) { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 64 + 1)) + 64; epic_relics     = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.2)  { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 64 + 1)) + 64; rare_relics     = (roll * 10) * multiplier / d; }
-                    else if (roll <= 0.5)  { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 32 + 1)) + 32; uncommon_relics = (roll * 10) * multiplier / d; }
-                    else                  { roll = rollDice(1); const d = Math.floor(Math.random() * (floor_roll - 16 + 1)) + 16; common_relics   = (roll * 10) * multiplier / d; }
+                    if      (roll <= 0.05) { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 64 + 1)) + 64; epic_relics     = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.2)  { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 64 + 1)) + 64; rare_relics     = (roll * 10) * multiplier / d; }
+                    else if (roll <= 0.5)  { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 32 + 1)) + 32; uncommon_relics = (roll * 10) * multiplier / d; }
+                    else                  { roll = rollDice(1); const d = Math.floor(rng() * (floor_roll - 16 + 1)) + 16; common_relics   = (roll * 10) * multiplier / d; }
                 }
             }
         }
@@ -159,7 +161,7 @@ async function progressQuest(username, blockId, trxId) {
                 console.log('User ' + username + ' does not exist');
                 return false;
             }
-            const activeQuest = await selectQuest(quest.round + 1, player);
+            const activeQuest = await selectQuest(quest.round + 1, player, seed);
             activeQuest.common_relics    += quest.common_relics;
             activeQuest.uncommon_relics  += quest.uncommon_relics;
             activeQuest.rare_relics      += quest.rare_relics;

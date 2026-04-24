@@ -159,7 +159,6 @@ async function runLbRewards() {
 
 async function main() {
     const client = new MongoClient(process.env.MONGO_URL, {
-        useNewUrlParser: true, useUnifiedTopology: true,
         connectTimeoutMS: 30000, serverSelectionTimeoutMS: 30000,
     });
     await client.connect();

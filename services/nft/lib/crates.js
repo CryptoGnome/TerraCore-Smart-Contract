@@ -1,11 +1,8 @@
 const { MongoTopologyClosedError } = require('mongodb');
+var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { webhook3 } = require('./webhooks');
 const { createSeed, generateRandomNumber } = require('../../../shared/rng');
-
-async function rollDice(index) {
-    return Math.random() * (index - 0.10 * index) + 0.10 * index;
-}
 
 async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
     try {
@@ -16,11 +13,13 @@ async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
         let types = ['avatar', 'armor', 'weapon', 'special', 'ship'];
         let ranges = [[0, 43], [1000, 1012], [2000, 2019], [3000, 3014], [4000, 4016]];
         let collection = ctx.db.collection('item-templates');
-        let type = types[Math.floor(Math.random() * types.length)];
 
         var seed = await createSeed(blockId, trxId, hash);
+        const rng = seedrandom(seed + '-' + depth);
         var roll = await generateRandomNumber(seed);
         const originalRandom = roll;
+
+        let type = types[Math.floor(rng() * types.length)];
 
         var rarity = 'common';
         if (_rarity == 'common') {
@@ -46,7 +45,7 @@ async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
         }
 
         let range = ranges[types.indexOf(type)];
-        let item_id = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+        let item_id = Math.floor(rng() * (range[1] - range[0] + 1)) + range[0];
         let find = await collection.findOne({ id: item_id });
 
         var attributes = ["damage", "defense", "engineering", "dodge", "crit", "luck"];
@@ -79,7 +78,7 @@ async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
             } else if (rarity == 'rare') {
                 rarity_index = 3;
             } else if (rarity == 'epic') {
-                let roll = Math.floor(Math.random() * 100) + 1;
+                let roll = Math.floor(rng() * 100) + 1;
                 rarity_index = (roll <= 50) ? 4 : 5;
             } else if (rarity == 'legendary') {
                 rarity_index = 6;
@@ -96,20 +95,20 @@ async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
                         attributes_chosen.push('defense');
                         attributes.splice(1, 1);
                     } else if (type == 'ship') {
-                        let roll = Math.floor(Math.random() * attributes.length);
+                        let roll = Math.floor(rng() * attributes.length);
                         attributes_chosen.push(attributes[roll]);
                         attributes.splice(roll, 1);
                     } else if (type == 'special') {
-                        let roll = Math.floor(Math.random() * attributes.length);
+                        let roll = Math.floor(rng() * attributes.length);
                         attributes_chosen.push(attributes[roll]);
                         attributes.splice(roll, 1);
                     } else if (type == 'avatar') {
-                        let roll = Math.floor(Math.random() * attributes.length);
+                        let roll = Math.floor(rng() * attributes.length);
                         attributes_chosen.push(attributes[roll]);
                         attributes.splice(roll, 1);
                     }
                 } else {
-                    var roll = Math.floor(Math.random() * attributes.length);
+                    var roll = Math.floor(rng() * attributes.length);
                     attributes_chosen.push(attributes[roll]);
                     attributes.splice(roll, 1);
                 }
@@ -118,27 +117,27 @@ async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
             let attribute_list = new Object();
             for (var i = 0; i < attributes_chosen.length; i++) {
                 if (attributes_chosen[i] == 'damage') {
-                    let roll = await rollDice(rarity_index);
+                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
                     attribute_list.damage = (roll * 10);
                     att_count += 1;
                 } else if (attributes_chosen[i] == 'defense') {
-                    let roll = await rollDice(rarity_index);
+                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
                     attribute_list.defense = (roll * 10);
                     att_count += 1;
                 } else if (attributes_chosen[i] == 'engineering') {
-                    let roll = await rollDice(rarity_index);
+                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
                     attribute_list.engineering = roll;
                     att_count += 1;
                 } else if (attributes_chosen[i] == 'dodge') {
-                    let roll = await rollDice(rarity_index);
+                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
                     attribute_list.dodge = roll;
                     att_count += 1;
                 } else if (attributes_chosen[i] == 'crit') {
-                    let roll = await rollDice(rarity_index);
+                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
                     attribute_list.crit = roll;
                     att_count += 1;
                 } else if (attributes_chosen[i] == 'luck') {
-                    let roll = await rollDice(rarity_index);
+                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
                     attribute_list.luck = roll;
                     att_count += 1;
                 }
@@ -195,4 +194,4 @@ async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
     }
 }
 
-module.exports = { rollDice, createSeed, generateRandomNumber, open_crate };
+module.exports = { createSeed, generateRandomNumber, open_crate };

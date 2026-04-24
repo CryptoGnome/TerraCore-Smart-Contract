@@ -24,6 +24,10 @@ async function ensureMongoConnection() {
 }
 
 async function distributeRewards(user) {
+    if (!Number.isFinite(user.reward) || user.reward <= 0) {
+        console.warn(`[LB] skipping invalid reward for ${user.username}: ${user.reward}`);
+        return;
+    }
     var reward = user.reward.toFixed(8);
     console.log('Distributing ' + reward + ' to ' + user.username);
     try {

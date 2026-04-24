@@ -31,4 +31,20 @@ async function storeRejectedHash(hash, username) {
     }
 }
 
-module.exports = { storeHash, storeRejectedHash };
+async function checkHash(hash) {
+    try {
+        const collection = ctx.db.collection('hashes');
+        const existing = await collection.findOne({ hash: hash });
+        return !!existing;
+    } catch (err) {
+        if (err instanceof MongoTopologyClosedError) {
+            console.log('MongoDB connection closed');
+            process.exit(1);
+        } else {
+            console.log(err);
+            return false;
+        }
+    }
+}
+
+module.exports = { storeHash, storeRejectedHash, checkHash };

@@ -298,11 +298,14 @@ async function purchaseItem(memo, price, buyer) {
                     const session = ctx.client.startSession();
                     try {
                         await session.withTransaction(async () => {
-                            await collection.updateOne(
-                                { item_number: check.item_number },
+                            const updateResult = await collection.updateOne(
+                                { item_number: check.item_number, 'market.listed': true, owner: memo.seller },
                                 { $set: { owner: buyer, market: { listed: false, seller: null, price: 0, sold: Date.now() } } },
                                 { session }
                             );
+                            if (updateResult.modifiedCount === 0) {
+                                throw new Error('Item no longer available — concurrent purchase');
+                            }
 
                             let amount = parseFloat(price.split(' ')[0]);
                             let seller_amount = amount * 0.95;

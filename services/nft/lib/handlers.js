@@ -2,6 +2,13 @@ const ctx = require('../context');
 const { purchaseItem, listItem, cancelItem, transferItem } = require('./marketplace');
 const { queOpenCrates, queEquip, queCombine, queUse } = require('./queue');
 const { salvageNFT } = require('./items');
+const { logError } = require('../../../shared/error-logger');
+
+function extractUser(op) {
+    const auths = Array.isArray(op.required_auths) ? op.required_auths : [];
+    const posting = Array.isArray(op.required_posting_auths) ? op.required_posting_auths : [];
+    return auths[0] || posting[0] || null;
+}
 
 async function handleOperation(operation, blockId, trxId, hash) {
     if (operation[0] === 'transfer' && operation[1].to == 'terracore.market') {
@@ -12,40 +19,40 @@ async function handleOperation(operation, blockId, trxId, hash) {
                 await purchaseItem(memo, operation[1].amount, operation[1].from);
             }
         } catch (err) {
-            // memo is not JSON
+            logError('NFT_MEMO_PARSE_FAIL', err, { fn: 'handleOperation', from: operation[1].from, service: 'NFT' });
         }
     }
 
     if (operation[0] === 'custom_json' && operation[1].id == 'tm_create') {
-        if (operation[1].required_auths[0] != undefined) {
+        const auths = Array.isArray(operation[1].required_auths) ? operation[1].required_auths : [];
+        if (auths[0]) {
             var data = JSON.parse(operation[1].json);
-            console.log(`[NFT] list-item: ${operation[1].required_auths[0]}`);
-            await listItem(data, operation[1].required_auths[0]);
+            console.log(`[NFT] list-item: ${auths[0]}`);
+            await listItem(data, auths[0]);
         }
     }
 
     if (operation[0] === 'custom_json' && operation[1].id == 'tm_cancel') {
         var data = JSON.parse(operation[1].json);
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const user = extractUser(operation[1]);
+        if (!user) return;
         console.log(`[NFT] cancel-listing: ${user}`);
         await cancelItem(data, user);
     }
 
     if (operation[0] === 'custom_json' && operation[1].id == 'tm_transfer') {
-        if (operation[1].required_auths[0] != undefined) {
+        const auths = Array.isArray(operation[1].required_auths) ? operation[1].required_auths : [];
+        if (auths[0]) {
             var data = JSON.parse(operation[1].json);
-            console.log(`[NFT] transfer-item: ${operation[1].required_auths[0]} → ${data.to}`);
-            await transferItem(data, operation[1].required_auths[0]);
+            console.log(`[NFT] transfer-item: ${auths[0]} → ${data.to}`);
+            await transferItem(data, auths[0]);
         }
     }
 
     if (operation[0] === 'custom_json' && operation[1].id == 'terracore_open_crate') {
         var data = JSON.parse(operation[1].json);
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const user = extractUser(operation[1]);
+        if (!user) return;
         var collection = ctx.db.collection('crates');
 
         if (data.length != undefined) {
@@ -69,9 +76,8 @@ async function handleOperation(operation, blockId, trxId, hash) {
 
     if (operation[0] === 'custom_json' && operation[1].id == 'terracore_equip') {
         var data = JSON.parse(operation[1].json);
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const user = extractUser(operation[1]);
+        if (!user) return;
         if (data.length != undefined) {
             console.log(`[NFT] equip: ${user} (${data.length} items)`);
             for (var i = 0; i < data.length; i++) {
@@ -85,9 +91,8 @@ async function handleOperation(operation, blockId, trxId, hash) {
 
     if (operation[0] === 'custom_json' && operation[1].id == 'terracore_unequip') {
         var data = JSON.parse(operation[1].json);
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const user = extractUser(operation[1]);
+        if (!user) return;
         if (data.length != undefined) {
             console.log(`[NFT] unequip: ${user} (${data.length} items)`);
             for (var i = 0; i < data.length; i++) {
@@ -100,26 +105,27 @@ async function handleOperation(operation, blockId, trxId, hash) {
     }
 
     if (operation[0] === 'custom_json' && operation[1].id == 'terracore_salvage') {
-        if (operation[1].required_auths[0] != undefined) {
+        const auths = Array.isArray(operation[1].required_auths) ? operation[1].required_auths : [];
+        if (auths[0]) {
             var data = JSON.parse(operation[1].json);
-            console.log(`[NFT] salvage: ${operation[1].required_auths[0]} item #${data.item_number}`);
-            await salvageNFT(operation[1].required_auths[0], data.item_number);
+            console.log(`[NFT] salvage: ${auths[0]} item #${data.item_number}`);
+            await salvageNFT(auths[0], data.item_number);
         }
     }
 
     if (operation[0] === 'custom_json' && operation[1].id == 'terracore_combine') {
-        if (operation[1].required_auths[0] != undefined) {
+        const auths = Array.isArray(operation[1].required_auths) ? operation[1].required_auths : [];
+        if (auths[0]) {
             var data = JSON.parse(operation[1].json);
-            console.log(`[NFT] combine: ${operation[1].required_auths[0]} (${data.type})`);
-            queCombine(operation[1].required_auths[0], data.type);
+            console.log(`[NFT] combine: ${auths[0]} (${data.type})`);
+            queCombine(auths[0], data.type);
         }
     }
 
     if (operation[0] === 'custom_json' && operation[1].id == 'terracore_use_consumable') {
         var data = JSON.parse(operation[1].json);
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const user = extractUser(operation[1]);
+        if (!user) return;
         console.log(`[NFT] use-consumable: ${user} (${data.type})`);
         queUse(user, data.type);
     }

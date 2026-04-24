@@ -1,8 +1,9 @@
 const { MongoTopologyClosedError } = require('mongodb');
+var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { rollDice } = require('../../../shared/rng');
 
-async function startQuest(username) {
+async function startQuest(username, seed) {
     try {
         const collection = ctx.db.collection('active-quests');
         const existing = await collection.findOne({ username: username });
@@ -18,7 +19,7 @@ async function startQuest(username) {
             return false;
         }
 
-        const activeQuest = await selectQuest(1, player);
+        const activeQuest = await selectQuest(1, player, seed);
         await collection.insertOne(activeQuest);
         await ctx.db.collection('quest-log').insertOne({ username: username, action: 'start', quest: activeQuest, time: new Date() });
         return true;
@@ -34,15 +35,16 @@ async function startQuest(username) {
     }
 }
 
-async function selectQuest(round, user) {
+async function selectQuest(round, user, seed) {
     try {
+        const rng = seedrandom((seed || 'fallback') + '-' + round);
         const quests = await ctx.db.collection('quest-template').find({}).toArray();
-        const random_quest = quests[Math.floor(Math.random() * quests.length)];
+        const random_quest = quests[Math.floor(rng() * quests.length)];
 
         let availableAttributes = ['damage', 'defense', 'engineering', 'dodge', 'crit', 'luck'];
-        const attribute_one = availableAttributes[Math.floor(Math.random() * availableAttributes.length)];
+        const attribute_one = availableAttributes[Math.floor(rng() * availableAttributes.length)];
         availableAttributes = availableAttributes.filter(a => a !== attribute_one);
-        const attribute_two = availableAttributes[Math.floor(Math.random() * availableAttributes.length)];
+        const attribute_two = availableAttributes[Math.floor(rng() * availableAttributes.length)];
 
         const base_stats = {
             damage: 20 * round, defense: 20 * round, engineering: 2 * round,

@@ -114,6 +114,10 @@ async function contribute(username, quantity) {
         if (!user) return true;
 
         let qty = parseFloat(quantity);
+        if (!Number.isFinite(qty) || qty <= 0) {
+            console.warn(`[HE] contribute: invalid quantity '${quantity}' from ${username}`);
+            return true;
+        }
         let newFavor = user.favor + qty;
 
         let maxAttempts = 3;

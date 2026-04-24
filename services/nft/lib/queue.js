@@ -25,11 +25,15 @@ async function sendTransactions() {
 
         for (let i = 0; i < transactions.length; i++) {
             ctx.lastCheck = Date.now();
+            // Delete by _id before broadcasting to prevent double-sends if the process restarts mid-loop
+            const deleted = await collection.findOneAndDelete({ _id: transactions[i]._id });
+            if (!deleted.value) continue; // already processed by a concurrent cycle
+
             const xfer = new Object();
             xfer.from = "terracore.market";
-            xfer.to = transactions[i].username;
-            xfer.amount = transactions[i].amount;
-            xfer.memo = transactions[i].type;
+            xfer.to = deleted.value.username;
+            xfer.amount = deleted.value.amount;
+            xfer.memo = deleted.value.type;
             await ctx.hive.broadcast.transfer(ctx.wif, xfer.from, xfer.to, xfer.amount, xfer.memo, function (err, result) {
                 if (err) {
                     console.log(err);
@@ -37,7 +41,6 @@ async function sendTransactions() {
                     console.log(result);
                 }
             });
-            await collection.deleteOne({ username: transactions[i].username, amount: transactions[i].amount, type: transactions[i].type, time: transactions[i].time });
         }
         return true;
     } catch (err) {
@@ -73,7 +76,7 @@ async function sendOpenCrates() {
         for (let i = 0; i < transactions.length; i++) {
             ctx.lastCheck = Date.now();
             await open_crate(transactions[i].username, transactions[i].rarity, transactions[i].blockId, transactions[i].trxId, transactions[i].hash);
-            await collection.deleteOne({ username: transactions[i].username, rarity: transactions[i].rarity, time: transactions[i].time });
+            await collection.deleteOne({ _id: transactions[i]._id });
         }
         return true;
     } catch (err) {
@@ -142,7 +145,7 @@ async function sendEquip() {
             } else if (transactions[i].type == 'unequip') {
                 await unequipItem(transactions[i].username, transactions[i].item);
             }
-            await collection.deleteOne({ username: transactions[i].username, item: transactions[i].item, type: transactions[i].type, time: transactions[i].time });
+            await collection.deleteOne({ _id: transactions[i]._id });
         }
         return true;
     } catch (err) {
@@ -178,7 +181,7 @@ async function sendCombine() {
         for (let i = 0; i < transactions.length; i++) {
             ctx.lastCheck = Date.now();
             await forgeCrate(transactions[i].username, transactions[i].type);
-            await collection.deleteOne({ username: transactions[i].username, type: transactions[i].type, time: transactions[i].time });
+            await collection.deleteOne({ _id: transactions[i]._id });
         }
         return true;
     } catch (err) {
@@ -214,7 +217,7 @@ async function sendUse() {
         for (let i = 0; i < transactions.length; i++) {
             ctx.lastCheck = Date.now();
             await useConsumable(transactions[i].username, transactions[i].type);
-            await collection.deleteOne({ username: transactions[i].username, type: transactions[i].type, time: transactions[i].time });
+            await collection.deleteOne({ _id: transactions[i]._id });
         }
         return true;
     } catch (err) {

@@ -2,6 +2,12 @@ const ctx = require('../context');
 const { register, storeRegistration } = require('./registration');
 const { sendTransaction } = require('./queue');
 
+function extractUser(op) {
+    const auths = Array.isArray(op.required_auths) ? op.required_auths : [];
+    const posting = Array.isArray(op.required_posting_auths) ? op.required_posting_auths : [];
+    return auths[0] || posting[0] || null;
+}
+
 async function handleOperation(operation, blockId, trxId) {
     ctx.lastevent = Date.now();
     ctx.lastCheck = Date.now();
@@ -25,36 +31,32 @@ async function handleOperation(operation, blockId, trxId) {
     }
 
     if (operation[0] === 'custom_json' && operation[1].id === 'terracore_claim') {
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const user = extractUser(operation[1]);
+        if (!user) return;
         console.log(`[SC] claim: ${user}`);
-        await sendTransaction(user, 'claim', 'none');
+        await sendTransaction(user, 'claim', 'none', blockId, trxId);
     }
 
     if (operation[0] === 'custom_json' && operation[1].id === 'terracore_battle') {
-        var data = JSON.parse(operation[1].json);
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const data = JSON.parse(operation[1].json);
+        const user = extractUser(operation[1]);
+        if (!user) return;
         console.log(`[SC] battle: ${user} → ${data.target}`);
         await sendTransaction(user, 'battle', data.target, blockId, trxId, Date.now());
     }
 
     if (operation[0] === 'custom_json' && operation[1].id === 'terracore_quest_progress') {
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const user = extractUser(operation[1]);
+        if (!user) return;
         console.log(`[SC] quest-progress: ${user}`);
         await sendTransaction(user, 'progress', 'none', blockId, trxId, Date.now());
     }
 
     if (operation[0] === 'custom_json' && operation[1].id === 'terracore_quest_complete') {
-        var user = operation[1].required_auths[0] == undefined
-            ? operation[1].required_posting_auths[0]
-            : operation[1].required_auths[0];
+        const user = extractUser(operation[1]);
+        if (!user) return;
         console.log(`[SC] quest-complete: ${user}`);
-        await sendTransaction(user, 'complete', 'none');
+        await sendTransaction(user, 'complete', 'none', blockId, trxId);
     }
 }
 

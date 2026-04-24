@@ -1,4 +1,5 @@
 const { MongoTopologyClosedError } = require('mongodb');
+var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { bossWebhook, bossWebhook2, marketWebhook } = require('./webhooks');
 
@@ -19,10 +20,11 @@ function getRarityAndDrop(planet, roll, roll2) {
     return { rarity, drop };
 }
 
-async function mintCrate(owner, _planet, droproll, luck) {
+async function mintCrate(owner, _planet, droproll, luck, seed) {
     try {
-        const roll  = Math.floor(Math.random() * 1001);
-        const roll2 = Math.floor(Math.random() * 1001);
+        const rng   = seedrandom(seed + '-crate');
+        const roll  = Math.floor(rng() * 1001);
+        const roll2 = Math.floor(rng() * 1001);
         console.log('Item Roll: ' + roll + ' | Crate Roll: ' + roll2);
 
         const { rarity, drop } = getRarityAndDrop(_planet, roll, roll2);
@@ -50,13 +52,13 @@ async function mintCrate(owner, _planet, droproll, luck) {
             let type;
             if (rarity == 'uncommon') {
                 const types = ['attack', 'claim', 'crit', 'damage', 'dodge'];
-                type = types[Math.floor(Math.random() * types.length)];
+                type = types[Math.floor(rng() * types.length)];
             } else if (rarity == 'rare') {
                 const types = ['rage', 'impenetrable', 'overload', 'rogue', 'battle', 'fury'];
-                type = types[Math.floor(Math.random() * types.length)];
+                type = types[Math.floor(rng() * types.length)];
             } else {
                 const types = ['protection', 'focus'];
-                type = types[Math.floor(Math.random() * types.length)];
+                type = types[Math.floor(rng() * types.length)];
             }
 
             const consumables = ctx.db.collection('consumables');
@@ -107,9 +109,8 @@ async function issue(username, type, amount, rarity, planet) {
     }
 }
 
-async function bossFight(username, _planet) {
+async function bossFight(username, _planet, seed) {
     try {
-        await ctx.db.collection('players').updateOne({ username: username }, { $set: { last_upgrade_time: Date.now() }, $inc: { version: 1, experience: 100 } });
         const collection = ctx.db.collection('players');
         const user = await collection.findOne({ username: username });
 
@@ -140,27 +141,45 @@ async function bossFight(username, _planet) {
             return false;
         }
 
-        if (Date.now() - user.boss_data[index].lastBattle < 14400000) {
+        // Atomically claim the cooldown slot, grant experience, and set lastBattle.
+        // A concurrent or replayed fight will fail because lastBattle will already be now.
+        const now = Date.now();
+        const reserved = await collection.findOneAndUpdate(
+            {
+                username,
+                $or: [
+                    { [`boss_data.${index}.lastBattle`]: { $exists: false } },
+                    { [`boss_data.${index}.lastBattle`]: { $lt: now - 14400000 } }
+                ]
+            },
+            {
+                $set: { [`boss_data.${index}.lastBattle`]: now, last_upgrade_time: now },
+                $inc: { version: 1, experience: 100 }
+            },
+            { returnOriginal: false }
+        );
+
+        if (!reserved.value) {
             console.log('User: ' + username + ' already battled boss in the last 4 hours');
             return false;
         }
 
-        const roll = Math.random() * 100;
+        const rng  = seedrandom(seed + '-boss');
+        const roll = rng() * 100;
 
         if (roll > luck) {
             console.log('------  BOSS MISSED: Roll: ' + roll + ' | Max: ' + luck + ' ------');
-            await collection.updateOne({ username: username }, { $set: { ['boss_data.' + index + '.lastBattle']: Date.now() } });
 
             let luck_mod = luck / 5;
             const minThreshold = 0.1;
-            const roll2 = Math.random() * 100;
+            const roll2 = rng() * 100;
             if (_planet == 'Terracore') luck_mod = luck_mod / 2;
 
             let rarity, amount;
-            if      (roll2 <= 70) { rarity = 'common';    amount = Math.max((Math.random() * 1.25 * luck_mod) + 1, minThreshold); }
-            else if (roll2 <= 90) { rarity = 'uncommon';  amount = Math.max((Math.random() * 1    * luck_mod) + 1, minThreshold); }
-            else if (roll2 <= 98) { rarity = 'rare';      amount = Math.max((Math.random() * 0.75 * luck_mod) + 1, minThreshold); }
-            else if (roll2 <= 99) { rarity = 'epic';      amount = Math.max((Math.random() * 0.5  * luck_mod) + 1, minThreshold); }
+            if      (roll2 <= 70) { rarity = 'common';    amount = Math.max((rng() * 1.25 * luck_mod) + 1, minThreshold); }
+            else if (roll2 <= 90) { rarity = 'uncommon';  amount = Math.max((rng() *  1   * luck_mod) + 1, minThreshold); }
+            else if (roll2 <= 98) { rarity = 'rare';      amount = Math.max((rng() * 0.75 * luck_mod) + 1, minThreshold); }
+            else if (roll2 <= 99) { rarity = 'epic';      amount = Math.max((rng() * 0.5  * luck_mod) + 1, minThreshold); }
             else                  { rarity = 'legendary'; amount = Math.max(0.1 * luck_mod, minThreshold); }
             amount = parseFloat(amount.toFixed(3));
 
@@ -169,8 +188,7 @@ async function bossFight(username, _planet) {
             return false;
         } else {
             console.log('------  ITEM FOUND: Roll: ' + roll + ' | Max: ' + luck + ' ------');
-            await collection.updateOne({ username: username }, { $set: { ['boss_data.' + index + '.lastBattle']: Date.now() } });
-            await mintCrate(username, _planet, roll, luck);
+            await mintCrate(username, _planet, roll, luck, seed);
             return true;
         }
     } catch (err) {
