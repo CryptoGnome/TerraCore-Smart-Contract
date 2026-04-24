@@ -32,7 +32,7 @@ const { sleep }    = require('../shared/retry');
 const { findNode, updateNodesFromBeacon } = require('../shared/he-node');
 
 // L1 node selection
-const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, getCurrentNode: getL1Node } = require('../shared/l1-node');
+const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, getCurrentNode: getL1Node, isNodeDisabled: isL1NodeDisabled } = require('../shared/l1-node');
 
 // Error logging
 const errorLogger = require('../shared/error-logger');
@@ -63,7 +63,9 @@ async function startL1Stream() {
                 }
             }
         } catch (err) {
-            trackL1Error(getL1Node());
+            const currentNode = getL1Node();
+            trackL1Error(currentNode);
+            if (isL1NodeDisabled(currentNode)) changeL1Node();
             logError('SYS_L1_STREAM_STALE', err, { fn: 'startL1Stream', service: 'SYS' });
         }
     });
