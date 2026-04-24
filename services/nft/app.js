@@ -3,6 +3,7 @@ const { Webhook } = require('discord-webhook-node');
 var hive = require('@hiveio/hive-js');
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const chalk = require('chalk');
+const { findNode: findL1Node } = require('../../shared/l1-node');
 
 const ctx = require('./context');
 const { checkTransactions } = require('./lib/queue');
@@ -40,69 +41,10 @@ async function establishConnection() {
 establishConnection();
 ctx.db = client.db('terracore');
 
-const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://anyx.io', 'https://api.openhive.network', 'https://techcoderx.com', 'https://api.c0ff33a.uk', 'https://hiveapi.actifit.io'];
-let lastUsedNode = '';
-
-async function testNodeEndpoints(nodes) {
-    let fastestEndpoint = '';
-    let fastestResponseTime = Infinity;
-    let availableNodes = nodes.filter(node => node !== lastUsedNode);
-
-    if (availableNodes.length === 0) {
-        availableNodes = nodes;
-    }
-
-    const testPromises = availableNodes.map(endpoint => {
-        return new Promise((resolve) => {
-            hive.api.setOptions({ url: endpoint });
-            const startTime = Date.now();
-            hive.api.getState('/', (err, result) => {
-                if (err) {
-                    console.error(`${endpoint} error: ${err.message}`);
-                    resolve(null);
-                } else {
-                    const responseTime = Date.now() - startTime;
-                    console.log(`${endpoint}: ${responseTime}ms`);
-                    resolve({ endpoint, responseTime });
-                }
-            });
-        });
-    });
-
-    const results = await Promise.all(testPromises);
-    const validResults = results.filter(result => result !== null);
-
-    if (validResults.length > 0) {
-        const fastest = validResults.reduce((min, p) => p.responseTime < min.responseTime ? p : min);
-        fastestEndpoint = fastest.endpoint;
-        fastestResponseTime = fastest.responseTime;
-
-        console.log(`Fastest endpoint: ${fastestEndpoint} (${fastestResponseTime}ms)`);
-
-        const json = { "action": "test-tx" };
-        const data = JSON.stringify(json);
-        try {
-            await hive.broadcast.customJsonAsync(ctx.wif, ['terracore.market'], [], 'test-tx', data);
-            console.log(`${fastestEndpoint} transaction successful`);
-            lastUsedNode = fastestEndpoint;
-        } catch (err) {
-            console.error(`${fastestEndpoint} transaction error: ${err.message}`);
-        }
-    } else {
-        console.error('No valid endpoints found');
-    }
-
-    return fastestEndpoint;
-}
-
 async function changeNode() {
-    const newNode = await testNodeEndpoints(nodes);
-    if (newNode) {
-        hive.api.setOptions({ url: newNode });
-        console.log(`Switched to node: ${newNode}`);
-    } else {
-        console.error('Failed to change node');
-    }
+    const newNode = await findL1Node();
+    hive.api.setOptions({ url: newNode });
+    console.log(`L1 switched to: ${newNode}`);
 }
 
 async function listen() {

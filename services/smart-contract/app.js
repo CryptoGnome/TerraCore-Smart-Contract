@@ -1,8 +1,8 @@
 var hive = require('@hiveio/hive-js');
 const { MongoClient } = require('mongodb');
-const fetch = require('node-fetch');
 const { Webhook } = require('discord-webhook-node');
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+const { findNode: findL1Node } = require('../../shared/l1-node');
 
 const ctx = require('./context');
 const { checkTransactions } = require('./lib/queue');
@@ -19,64 +19,9 @@ const client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, u
 ctx.client = client;
 ctx.db = client.db('terracore');
 
-const nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://techcoderx.com', 'https://hive-api.arcange.eu'];
-
-async function getLastUsedEndpoint() {
-    const collection = ctx.db.collection('lastUsedEndpoint');
-    const lastUsed = await collection.findOne({}, { sort: { _id: -1 } });
-    return lastUsed ? lastUsed.endpoint : null;
-}
-
-async function updateLastUsedEndpoint(endpoint) {
-    const collection = ctx.db.collection('lastUsedEndpoint');
-    await collection.insertOne({ endpoint: endpoint, timestamp: new Date() });
-}
-
-async function testNodeEndpoints(nodes) {
-    let fastestEndpoint = '';
-    let fastestResponseTime = Infinity;
-    const lastUsedEndpoint = await getLastUsedEndpoint();
-    let endpointsToTest = nodes.filter(endpoint => endpoint !== lastUsedEndpoint);
-
-    for (const endpoint of endpointsToTest) {
-        const startTime = Date.now();
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_dynamic_global_properties", params: [], id: 1 }),
-                headers: { 'Content-Type': 'application/json' }
-            });
-            await response.json();
-            if (response.ok) {
-                const responseTime = Date.now() - startTime;
-                console.log(`${endpoint}: ${responseTime}ms`);
-                if (responseTime < fastestResponseTime) {
-                    fastestResponseTime = responseTime;
-                    fastestEndpoint = endpoint;
-                }
-            } else {
-                throw new Error(`Response error: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.log(`${endpoint} error: ${error.message}`);
-        }
-    }
-
-    if (fastestEndpoint) {
-        console.log(`Fastest endpoint: ${fastestEndpoint} (${fastestResponseTime}ms)`);
-        await updateLastUsedEndpoint(fastestEndpoint);
-    } else {
-        let remainingEndpoints = nodes.filter(endpoint => endpoint !== lastUsedEndpoint);
-        fastestEndpoint = remainingEndpoints[Math.floor(Math.random() * remainingEndpoints.length)];
-        console.log(`No fastest endpoint found. Randomly selected: ${fastestEndpoint}`);
-        await updateLastUsedEndpoint(fastestEndpoint);
-    }
-
-    hive.api.setOptions({ url: fastestEndpoint });
-}
-
 async function changeNode() {
-    (async () => { await testNodeEndpoints(nodes); })();
+    const selectedNode = await findL1Node();
+    hive.api.setOptions({ url: selectedNode });
 }
 
 // Expose changeNode via context so queue.js can call it when backlogged

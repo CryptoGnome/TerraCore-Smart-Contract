@@ -5,8 +5,6 @@ var hive = require('@hiveio/hive-js');
 const SSC = require('sscjs');
 const { MongoClient } = require('mongodb');
 const { Webhook } = require('discord-webhook-node');
-const fetch = require('node-fetch');
-
 // Per-service contexts
 const scCtx  = require('./smart-contract/context');
 const nftCtx = require('./nft/context');
@@ -33,67 +31,18 @@ const { sleep }    = require('../shared/retry');
 // HE node selection
 const { findNode, updateNodesFromBeacon } = require('../shared/he-node');
 
+// L1 node selection
+const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, getCurrentNode: getL1Node } = require('../shared/l1-node');
+
 // Error logging
 const errorLogger = require('../shared/error-logger');
 const { logError } = require('../shared/error-logger');
 
-// L1 Hive nodes
-const l1Nodes = ['https://api.deathwing.me', 'https://api.hive.blog', 'https://hived.emre.sh', 'https://api.openhive.network', 'https://techcoderx.com', 'https://hive-api.arcange.eu'];
-
-async function getLastUsedL1Endpoint() {
-    const collection = scCtx.db.collection('lastUsedEndpoint');
-    const lastUsed = await collection.findOne({}, { sort: { _id: -1 } });
-    return lastUsed ? lastUsed.endpoint : null;
-}
-
-async function testL1Nodes() {
-    let fastestEndpoint = '';
-    let fastestResponseTime = Infinity;
-    const lastUsed = await getLastUsedL1Endpoint();
-    const toTest = l1Nodes.filter(ep => ep !== lastUsed);
-
-    for (const endpoint of toTest) {
-        const start = Date.now();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_dynamic_global_properties', params: [], id: 1 }),
-                headers: { 'Content-Type': 'application/json' },
-                signal: controller.signal,
-            });
-            await response.json();
-            if (response.ok) {
-                const t = Date.now() - start;
-                console.log(`L1 ${endpoint}: ${t}ms`);
-                if (t < fastestResponseTime) {
-                    fastestResponseTime = t;
-                    fastestEndpoint = endpoint;
-                }
-            }
-        } catch (err) {
-            console.log(`L1 ${endpoint} error: ${err.message}`);
-        } finally {
-            clearTimeout(timeoutId);
-        }
-    }
-
-    if (!fastestEndpoint) {
-        const remaining = l1Nodes.filter(ep => ep !== lastUsed);
-        fastestEndpoint = remaining[Math.floor(Math.random() * remaining.length)];
-        console.log(`No fastest L1 endpoint, randomly selected: ${fastestEndpoint}`);
-    } else {
-        console.log(`Fastest L1 endpoint: ${fastestEndpoint} (${fastestResponseTime}ms)`);
-    }
-
-    const collection = scCtx.db.collection('lastUsedEndpoint');
-    await collection.insertOne({ endpoint: fastestEndpoint, timestamp: new Date() });
-    hive.api.setOptions({ url: fastestEndpoint });
-}
-
 function changeL1Node() {
-    (async () => { await testL1Nodes(); })();
+    (async () => {
+        const selectedNode = await findL1Node();
+        hive.api.setOptions({ url: selectedNode });
+    })();
 }
 
 async function startL1Stream() {
@@ -114,6 +63,7 @@ async function startL1Stream() {
                 }
             }
         } catch (err) {
+            trackL1Error(getL1Node());
             logError('SYS_L1_STREAM_STALE', err, { fn: 'startL1Stream', service: 'SYS' });
         }
     });
@@ -247,4 +197,9 @@ setInterval(function () {
 // Refresh HE node list from beacon every 30 minutes
 setInterval(function () {
     updateNodesFromBeacon().catch(err => logError('SYS_BEACON_UPDATE_FAIL', err, { fn: 'beaconRefresh', service: 'SYS' }));
+}, 1800000);
+
+// Refresh L1 node list from beacon every 30 minutes
+setInterval(function () {
+    updateL1Nodes().catch(err => logError('SYS_L1_BEACON_UPDATE_FAIL', err, { fn: 'l1BeaconRefresh', service: 'SYS' }));
 }, 1800000);
