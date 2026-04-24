@@ -38,16 +38,34 @@ const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: 
 const errorLogger = require('../shared/error-logger');
 const { logError } = require('../shared/error-logger');
 
+let isChangingL1Node = false;
 function changeL1Node() {
+    if (isChangingL1Node) return;
+    isChangingL1Node = true;
     (async () => {
-        const selectedNode = await findL1Node();
-        hive.api.setOptions({ url: selectedNode });
+        try {
+            const selectedNode = await findL1Node();
+            hive.api.setOptions({ url: selectedNode });
+        } finally {
+            isChangingL1Node = false;
+        }
     })();
+}
+
+function handleL1NodeError(err, context) {
+    const currentNode = getL1Node();
+    trackL1Error(currentNode);
+    if (isL1NodeDisabled(currentNode)) changeL1Node();
+    logError('SYS_L1_STREAM_ERR', err, { fn: context, service: 'SYS' });
 }
 
 async function startL1Stream() {
     changeL1Node();
     hive.api.streamBlock(async function (err, result) {
+        if (err) {
+            handleL1NodeError(err, 'startL1Stream:connection');
+            return;
+        }
         try {
             if (!result || !result.transactions || !result.block_id) return;
             globalCtx.lastL1Event = Date.now();
@@ -63,10 +81,7 @@ async function startL1Stream() {
                 }
             }
         } catch (err) {
-            const currentNode = getL1Node();
-            trackL1Error(currentNode);
-            if (isL1NodeDisabled(currentNode)) changeL1Node();
-            logError('SYS_L1_STREAM_STALE', err, { fn: 'startL1Stream', service: 'SYS' });
+            handleL1NodeError(err, 'startL1Stream:processing');
         }
     });
 }
