@@ -4,3 +4,4 @@ ideas.js
 node_modules
 services/nft/images/
 .playwright/
+.claude/
