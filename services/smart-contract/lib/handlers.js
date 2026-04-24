@@ -6,7 +6,7 @@ async function handleOperation(operation, blockId, trxId) {
     ctx.lastevent = Date.now();
     ctx.lastCheck = Date.now();
 
-    if (operation[0] == 'transfer' && operation[1].to === 'terracore') {
+    if (operation[0] === 'transfer' && operation[1].to === 'terracore') {
         try {
             var memo = JSON.parse(operation[1].memo);
             if (memo.hash.includes('terracore_register')) {
@@ -20,10 +20,11 @@ async function handleOperation(operation, blockId, trxId) {
             }
         } catch (err) {
             // memo is not valid JSON — ignore
+            console.warn('[SC] non-JSON memo skipped from', operation[1].from, ':', err.message);
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_claim') {
+    if (operation[0] === 'custom_json' && operation[1].id === 'terracore_claim') {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
@@ -31,7 +32,7 @@ async function handleOperation(operation, blockId, trxId) {
         await sendTransaction(user, 'claim', 'none');
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_battle') {
+    if (operation[0] === 'custom_json' && operation[1].id === 'terracore_battle') {
         var data = JSON.parse(operation[1].json);
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
@@ -40,7 +41,7 @@ async function handleOperation(operation, blockId, trxId) {
         await sendTransaction(user, 'battle', data.target, blockId, trxId, Date.now());
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_progress') {
+    if (operation[0] === 'custom_json' && operation[1].id === 'terracore_quest_progress') {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];
@@ -48,7 +49,7 @@ async function handleOperation(operation, blockId, trxId) {
         await sendTransaction(user, 'progress', 'none', blockId, trxId, Date.now());
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id === 'terracore_quest_complete') {
+    if (operation[0] === 'custom_json' && operation[1].id === 'terracore_quest_complete') {
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
             : operation[1].required_auths[0];

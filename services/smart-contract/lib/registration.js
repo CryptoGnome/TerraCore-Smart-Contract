@@ -15,6 +15,10 @@ async function payReferrer(referrer, username, amount) {
 async function register(username, referrer, amount) {
     try {
         let registration_fee_query = await ctx.db.collection('price_feed').findOne({ date: 'global' });
+        if (!registration_fee_query) {
+            console.error('[SC] price_feed global document missing — cannot register ' + username);
+            return false;
+        }
         let registration_fee = parseFloat(registration_fee_query.registration_fee.split(' ')[0]).toFixed(3);
         let referrer_fee = registration_fee_query.referral_fee;
         amount = parseFloat(amount.split(' ')[0]).toFixed(3);

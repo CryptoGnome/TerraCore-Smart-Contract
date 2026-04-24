@@ -8,6 +8,13 @@ const { logError } = require('../../../shared/error-logger');
 async function sendTransaction(username, type, target, blockId, trxId, hash) {
     try {
         let collection = ctx.db.collection('transactions');
+        if (blockId !== undefined && trxId !== undefined) {
+            const existing = await collection.findOne({ blockId: blockId, trxId: trxId });
+            if (existing) {
+                console.warn(`[SC] duplicate transaction skipped: blockId=${blockId} trxId=${trxId} type=${type} user=${username}`);
+                return;
+            }
+        }
         let result = await collection.insertOne({ username: username, type: type, target: target, blockId: blockId, trxId: trxId, hash: hash, time: Date.now() });
         console.log('Transaction ' + result.insertedId + ' added to queue');
     } catch (err) {

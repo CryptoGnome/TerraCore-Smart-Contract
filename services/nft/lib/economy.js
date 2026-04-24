@@ -66,7 +66,7 @@ async function forgeCrate(owner, type) {
         market.sold = 0;
         crate.market = market;
 
-        collection.insertOne(crate);
+        await collection.insertOne(crate);
         console.log('Minted crate: ' + crate.name + ' with rarity: ' + crate.rarity + ' with owner: ' + crate.owner + ' with item number: ' + crate.item_number);
         await ctx.db.collection('crate-count').updateOne({ supply: 'total' }, { $inc: { count: 1 } });
         await ctx.db.collection('relics').updateOne({ username: owner, type: type }, { $inc: { amount: -100 } });

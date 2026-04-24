@@ -37,7 +37,7 @@ async function mintCrate(owner, _planet, droproll, luck) {
                 equiped: false,
                 market: { listed: false, price: 0, seller: null, created: 0, expires: 0, sold: 0 },
             };
-            ctx.db.collection('crates').insertOne(crate);
+            await ctx.db.collection('crates').insertOne(crate);
             console.log('Minted crate: ' + crate.name + ' for ' + crate.owner + ' #' + crate.item_number);
             bossWebhook('Crate Dropped!', crate.name + ' has dropped for ' + crate.owner + '! Item #' + crate.item_number, crate.rarity, _planet);
             await ctx.db.collection('crate-count').updateOne({ supply: 'total' }, { $inc: { count: 1 } });
@@ -118,6 +118,11 @@ async function bossFight(username, _planet) {
             return false;
         }
 
+        if (!planetConfig[_planet]) {
+            console.error(`[HE] bossFight: invalid planet '${_planet}' for user ${username}`);
+            return false;
+        }
+
         const luck  = user.stats.luck;
         const level = user.level;
         let found = false;
@@ -157,6 +162,7 @@ async function bossFight(username, _planet) {
             else if (roll2 <= 98) { rarity = 'rare';      amount = Math.max((Math.random() * 0.75 * luck_mod) + 1, minThreshold); }
             else if (roll2 <= 99) { rarity = 'epic';      amount = Math.max((Math.random() * 0.5  * luck_mod) + 1, minThreshold); }
             else                  { rarity = 'legendary'; amount = Math.max(0.1 * luck_mod, minThreshold); }
+            amount = parseFloat(amount.toFixed(3));
 
             await issue(username, rarity + '_relics', amount, rarity, _planet);
             await ctx.db.collection('boss-log').insertOne({ username: username, planet: _planet, result: false, roll: roll, luck: luck, drop: rarity + '_relics', amount: amount, time: Date.now() });

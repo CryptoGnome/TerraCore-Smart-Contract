@@ -33,6 +33,7 @@ async function selectQuest(round, user) {
         const base_stats = { damage: 20 * round, defense: 20 * round, engineering: 2 * round, dodge: round, crit: round, luck: round };
         let success_chance = 0.80;
         for (let i = 1; i < round; i++) { success_chance -= 0.01; }
+        success_chance = Math.max(success_chance, 0.01);
         const multiplier = round * 2;
 
         for (const key in user.stats) {

@@ -4,7 +4,7 @@ const { queOpenCrates, queEquip, queCombine, queUse } = require('./queue');
 const { salvageNFT } = require('./items');
 
 async function handleOperation(operation, blockId, trxId, hash) {
-    if (operation[0] == 'transfer' && operation[1].to == 'terracore.market') {
+    if (operation[0] === 'transfer' && operation[1].to == 'terracore.market') {
         try {
             var memo = JSON.parse(operation[1].memo);
             if (memo.action.includes('tm_purchase') && operation[1].to == 'terracore.market') {
@@ -16,7 +16,7 @@ async function handleOperation(operation, blockId, trxId, hash) {
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'tm_create') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'tm_create') {
         if (operation[1].required_auths[0] != undefined) {
             var data = JSON.parse(operation[1].json);
             console.log(`[NFT] list-item: ${operation[1].required_auths[0]}`);
@@ -24,7 +24,7 @@ async function handleOperation(operation, blockId, trxId, hash) {
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'tm_cancel') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'tm_cancel') {
         var data = JSON.parse(operation[1].json);
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
@@ -33,7 +33,7 @@ async function handleOperation(operation, blockId, trxId, hash) {
         await cancelItem(data, user);
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'tm_transfer') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'tm_transfer') {
         if (operation[1].required_auths[0] != undefined) {
             var data = JSON.parse(operation[1].json);
             console.log(`[NFT] transfer-item: ${operation[1].required_auths[0]} → ${data.to}`);
@@ -41,7 +41,7 @@ async function handleOperation(operation, blockId, trxId, hash) {
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'terracore_open_crate') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'terracore_open_crate') {
         var data = JSON.parse(operation[1].json);
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
@@ -50,7 +50,7 @@ async function handleOperation(operation, blockId, trxId, hash) {
 
         if (data.length != undefined) {
             for (let i = 0; i < data.length; i++) {
-                var rarity = data.crate_type;
+                var rarity = data[i].crate_type;
                 let item = await collection.findOne({ owner: user, crate_type: rarity });
                 if (item != null) {
                     console.log(`[NFT] open-crate: ${user} (${rarity})`);
@@ -67,7 +67,7 @@ async function handleOperation(operation, blockId, trxId, hash) {
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'terracore_equip') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'terracore_equip') {
         var data = JSON.parse(operation[1].json);
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
@@ -83,7 +83,7 @@ async function handleOperation(operation, blockId, trxId, hash) {
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'terracore_unequip') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'terracore_unequip') {
         var data = JSON.parse(operation[1].json);
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]
@@ -99,15 +99,15 @@ async function handleOperation(operation, blockId, trxId, hash) {
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'terracore_salvage') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'terracore_salvage') {
         if (operation[1].required_auths[0] != undefined) {
             var data = JSON.parse(operation[1].json);
             console.log(`[NFT] salvage: ${operation[1].required_auths[0]} item #${data.item_number}`);
-            salvageNFT(operation[1].required_auths[0], data.item_number);
+            await salvageNFT(operation[1].required_auths[0], data.item_number);
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'terracore_combine') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'terracore_combine') {
         if (operation[1].required_auths[0] != undefined) {
             var data = JSON.parse(operation[1].json);
             console.log(`[NFT] combine: ${operation[1].required_auths[0]} (${data.type})`);
@@ -115,7 +115,7 @@ async function handleOperation(operation, blockId, trxId, hash) {
         }
     }
 
-    if (operation[0] == 'custom_json' && operation[1].id == 'terracore_use_consumable') {
+    if (operation[0] === 'custom_json' && operation[1].id == 'terracore_use_consumable') {
         var data = JSON.parse(operation[1].json);
         var user = operation[1].required_auths[0] == undefined
             ? operation[1].required_posting_auths[0]

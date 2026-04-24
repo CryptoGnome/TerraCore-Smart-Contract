@@ -61,7 +61,8 @@ async function claim(username) {
         const claimSuccess = await ctx.hive.broadcast.customJsonAsync(ctx.wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
 
         if (!claimSuccess) {
-            await collection.insertOne({ username: username, qty: 'failed', time: Date.now() });
+            console.error('[SC] claim broadcast failed for ' + username);
+            await ctx.db.collection('claims').insertOne({ username: username, qty: 0, status: 'failed', time: Date.now() });
             return true;
         }
 

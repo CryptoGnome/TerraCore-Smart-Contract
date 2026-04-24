@@ -7,7 +7,7 @@ const { logError } = require('../../../shared/error-logger');
 
 function checkDodge(_target) {
     const roll = Math.floor(Math.random() * 100) + 1;
-    return roll < _target.stats.dodge;
+    return roll <= _target.stats.dodge;
 }
 
 function rollAttack(_player, seed) {
@@ -101,20 +101,38 @@ async function battle(username, _target, blockId, trxId, hash) {
             }
 
             try {
-                const newScrap       = user.scrap + scrapToSteal;
-                const newTargetScrap = target.scrap - scrapToSteal;
-                const newAttacks     = user.attacks - 1;
                 let maxAttempts = 3;
                 let delay = 700;
+                let currentUser   = user;
+                let currentTarget = target;
+                let currentSteal  = parseFloat(scrapToSteal.toFixed(3));
+
                 for (let i = 0; i < maxAttempts; i++) {
+                    if (i > 0) {
+                        // Re-read on retry to get fresh scrap values and versions
+                        const fresh = await collection.find({ $or: [{ username: username }, { username: _target }] }).toArray();
+                        currentUser   = fresh.find(e => e.username === username);
+                        currentTarget = fresh.find(e => e.username === _target);
+                        if (!currentUser || !currentTarget) break;
+                        currentSteal = currentTarget.scrap * (roll / 100);
+                        if (currentSteal > currentTarget.scrap) currentSteal = currentTarget.scrap;
+                        if (currentUser.scrap + currentSteal > staked + 1) currentSteal = (staked + 1) - currentUser.scrap;
+                        currentSteal = parseFloat(currentSteal.toFixed(3));
+                        if (currentSteal <= 0) break;
+                    }
+
+                    const newScrap       = parseFloat((currentUser.scrap + currentSteal).toFixed(3));
+                    const newTargetScrap = parseFloat(Math.max(currentTarget.scrap - currentSteal, 0).toFixed(3));
+                    const newAttacks     = currentUser.attacks - 1;
+
                     const bulkOps = [
-                        { updateOne: { filter: { username: _target },  update: { $set: { scrap: newTargetScrap }, $inc: { version: 1 } } } },
-                        { updateOne: { filter: { username: username }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() }, $inc: { version: 1 } } } }
+                        { updateOne: { filter: { username: _target,  version: currentTarget.version }, update: { $set: { scrap: newTargetScrap }, $inc: { version: 1 } } } },
+                        { updateOne: { filter: { username: username, version: currentUser.version   }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: Date.now() }, $inc: { version: 1 } } } }
                     ];
                     const res = await collection.bulkWrite(bulkOps);
-                    if (res.modifiedCount == 2) {
-                        await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: scrapToSteal, seed: seed, roll: roll, timestamp: Date.now() });
-                        webhook('New Battle Log', 'User ' + username + ' stole ' + scrapToSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2) + '% roll', '#f55a42');
+                    if (res.modifiedCount === 2) {
+                        await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: currentSteal, seed: seed, roll: roll, timestamp: Date.now() });
+                        webhook('New Battle Log', 'User ' + username + ' stole ' + currentSteal.toString() + ' scrap from ' + _target + ' with a ' + roll.toFixed(2) + '% roll', '#f55a42');
                         return true;
                     }
                     await new Promise(resolve => setTimeout(resolve, delay));

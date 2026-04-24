@@ -165,6 +165,7 @@ async function salvageNFT(username, item_number) {
             if (mint) {
                 await collection.updateOne({ item_number: item_number }, { $set: { salvaged: true, equiped: false, owner: null, market: { listed: false, price: 0 } } });
                 await ctx.db.collection('salvage-log').insertOne({ username: username, item_number: item_number, value: value, time: Date.now() });
+                console.log(`[NFT] salvage success: ${username} salvaged item #${item_number} (${item.rarity} ${item.type}) for ${value} FLUX`);
                 webhook2("Item #" + item_number + " Salvaged", "User: " + username + " salvaged a " + item.rarity + " " + item.type + " item for " + value + " $FLUX", "#00ff00");
                 return true;
             } else {

@@ -55,9 +55,9 @@ async function handleTransaction(transaction) {
 
                     if (planetQtyMapping[planet] == quantity) {
                         bossFight(from, planet)
-                            .then(result => {
+                            .then(async result => {
                                 console.log(`[HE] boss-fight result: ${from} → ${planet}:`, result);
-                                storeHash(hash, from, quantity);
+                                await storeHash(hash, from, quantity);
                             })
                             .catch(err => logError('HE_BOSS_FIGHT_FAIL', err, { fn: 'bossFight', username: from, service: 'HE' }));
                     }

@@ -90,6 +90,11 @@ async function listItem(_item, seller) {
                 return;
             }
         } else {
+            const VALID_ITEM_COLLECTIONS = ['items'];
+            if (!VALID_ITEM_COLLECTIONS.includes(_item.type)) {
+                console.warn(`[NFT] listItem rejected: invalid type '${_item.type}' from ${seller}`);
+                return;
+            }
             let collection = ctx.db.collection(_item.type);
             let item = await collection.findOne({ item_number: parseInt(_item.item_number) });
             if (item.salvaged == true) {
@@ -159,6 +164,11 @@ async function cancelItem(_item, seller) {
             }
         }
 
+        const VALID_ITEM_COLLECTIONS = ['items'];
+        if (!VALID_ITEM_COLLECTIONS.includes(_item.type)) {
+            console.warn(`[NFT] cancelItem rejected: invalid type '${_item.type}' from ${seller}`);
+            return;
+        }
         let collection = ctx.db.collection(_item.type);
         let item = await collection.findOne({ item_number: parseInt(_item.item_number) });
         if (item && item.market.listed == true && item.owner == seller && item.equiped == false) {
@@ -275,6 +285,12 @@ async function purchaseItem(memo, price, buyer) {
                 await session.endSession();
             }
         } else {
+            const VALID_ITEM_COLLECTIONS = ['items'];
+            if (!VALID_ITEM_COLLECTIONS.includes(memo.type)) {
+                console.warn(`[NFT] purchaseItem rejected: invalid type '${memo.type}' for buyer ${buyer}`);
+                await refundBuyer('Invalid item type');
+                return;
+            }
             let collection = ctx.db.collection(memo.type);
             let check = await collection.findOne({ item_number: parseInt(memo.item_number) });
             if (check) {
@@ -338,6 +354,11 @@ async function purchaseItem(memo, price, buyer) {
 
 async function transferItem(_item, sender) {
     try {
+        const VALID_ITEM_COLLECTIONS = ['items'];
+        if (!VALID_ITEM_COLLECTIONS.includes(_item.type)) {
+            console.warn(`[NFT] transferItem rejected: invalid type '${_item.type}' from ${sender}`);
+            return;
+        }
         let collection = ctx.db.collection(_item.type);
         let item = await collection.findOne({ item_number: parseInt(_item.item_number) });
         if (item.owner == sender && item.equiped == false) {
