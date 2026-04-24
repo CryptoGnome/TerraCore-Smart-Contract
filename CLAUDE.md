@@ -153,3 +153,5 @@ This is a production system handling real token transfers and blockchain broadca
 **Define success before writing code.** Since there is no test suite, write down what correct behavior looks like before editing anything. For a bug fix: describe the exact wrong output and the exact expected output. For a new feature: describe the observable end state. Use that as your acceptance criterion and don't stop until it's met.
 
 **Extra caution on money-touching code.** Any function that mints SCRAP, places DEX orders, distributes FLUX, or broadcasts a Hive transfer gets a second read-through before you consider it done. Confirm amounts, recipients, and conditions are exactly right — there is no rollback on a blockchain transaction.
+
+**Update the changelog.** Every commit that ships a change must have a corresponding entry in `../CHANGELOG.md` — one bullet describing what changed and why. Add it before or immediately after committing.
