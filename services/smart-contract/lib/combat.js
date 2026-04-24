@@ -95,8 +95,6 @@ async function battle(username, _target, blockId, trxId, hash) {
                 return true;
             }
             if (scrapToSteal <= 0) {
-                logError('SC_BATTLE_SCRAP_ZERO', new Error('scrapToSteal <= 0'), { fn: 'battle', username, blockId });
-                webhook('New Error', 'User ' + username + ' attacked ' + _target + ' but scrapToSteal <= 0', '#6385ff');
                 await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
                 return true;
             }
