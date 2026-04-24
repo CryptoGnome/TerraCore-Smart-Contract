@@ -26,7 +26,8 @@
       "Bash(timeout 10 node services/lb-rewards/app.js)",
       "Bash(timeout 8 node services/hive-engine/app.js)",
       "Bash(timeout 8 node services/nft/app.js)",
-      "Bash(grep -n \"^async function\\\\|^function\\\\|^const.*=.*async\\\\|// ===\\\\|//=====\\\\|// ---\\\\|//---\\\\|// MARKET\\\\|// NFT\\\\|// CRATE\\\\|// ITEM\\\\|// PLAYER\\\\|// BATTLE\\\\|// QUEST\\\\|ssc\\\\.\\\\|hive\\\\.\\\\|collection\\\\|Webhook\\\\|discord\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/app.js\")"
+      "Bash(grep -n \"^async function\\\\|^function\\\\|^const.*=.*async\\\\|// ===\\\\|//=====\\\\|// ---\\\\|//---\\\\|// MARKET\\\\|// NFT\\\\|// CRATE\\\\|// ITEM\\\\|// PLAYER\\\\|// BATTLE\\\\|// QUEST\\\\|ssc\\\\.\\\\|hive\\\\.\\\\|collection\\\\|Webhook\\\\|discord\" \"/c/Users/oimap/Desktop/TerraCore Smart Contract/services/nft/app.js\")",
+      "WebFetch(domain:api.github.com)"
     ]
   }
 }
