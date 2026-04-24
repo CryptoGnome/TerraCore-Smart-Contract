@@ -2,6 +2,8 @@
 
 Blockchain game backend running on Hive and Hive Engine. Handles battles, quests, claims, NFTs, and leaderboard rewards in a single unified process.
 
+Play the game at [terracoregame.com](https://www.terracoregame.com/).
+
 ## Setup
 
 ```bash
