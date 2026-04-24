@@ -24,22 +24,46 @@ async function ensureMongoConnection() {
 }
 
 async function distributeRewards(user) {
-    if (!Number.isFinite(user.reward) || user.reward <= 0) {
-        console.warn(`[LB] skipping invalid reward for ${user.username}: ${user.reward}`);
+    if (!Number.isFinite(user.calculatedReward) || user.calculatedReward <= 0) {
+        console.warn(`[LB] skipping invalid reward for ${user.username}: ${user.calculatedReward}`);
         return;
     }
-    var reward = user.reward.toFixed(8);
+    var reward = user.calculatedReward.toFixed(8);
     console.log('Distributing ' + reward + ' to ' + user.username);
     try {
         var data = {
             contractName: 'tokens',
-            contractAction: 'issue',
-            contractPayload: { symbol: 'SCRAP', to: user.username, quantity: reward, memo: 'terracore_reward_mint' },
+            contractAction: 'transfer',
+            contractPayload: { symbol: 'SCRAP', to: user.username, quantity: reward, memo: 'terracore_reward' },
         };
         await ctx.hive.broadcast.customJsonAsync(ctx.wif, ['terracore'], [], 'ssc-mainnet-hive', JSON.stringify(data));
     } catch (err) {
         console.log(err);
     }
+}
+
+async function fetchScrapBalance() {
+    return await retryWithBackoff(async () => {
+        if (!node) node = await findNode();
+        validateNode(node, 'fetchScrapBalance');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        let response;
+        try {
+            response = await fetch(node + '/contracts', {
+                method: 'POST',
+                headers: { 'Content-type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', method: 'find', params: { contract: 'tokens', table: 'balances', query: { account: 'terracore', symbol: 'SCRAP' } }, id: 1 }),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
+        const data = await response.json();
+        if (!data.result) throw new Error('Invalid response from Hive Engine');
+        return data.result.length > 0 ? parseFloat(data.result[0].balance) : 0;
+    }, { maxAttempts: 3, initialDelay: 2000, functionName: 'fetchScrapBalance' });
+    // No .catch() — throws on failure so getRewards() can abort safely
 }
 
 async function getRewards() {
@@ -58,7 +82,40 @@ async function getRewards() {
             return;
         }
 
-        console.log(`Processing rewards for ${json.length} players...`);
+        // Fetch SCRAP balance strictly — abort if all retries fail
+        let scrapBalance;
+        try {
+            scrapBalance = await fetchScrapBalance();
+        } catch (err) {
+            logError('LB_SCRAP_BALANCE_FAIL', err, { fn: 'getRewards', service: 'LB' });
+            console.error('Failed to fetch terracore SCRAP balance — skipping reward distribution');
+            return;
+        }
+
+        // Persist to MongoDB so the API can display accurate expected rewards
+        await db.collection('stats').updateOne(
+            { date: 'global' },
+            { $set: { terracoreScrap: scrapBalance } }
+        );
+
+        // Calculate daily pool (0.01% of balance)
+        const pool = scrapBalance * 0.0001;
+        if (pool <= 0) {
+            console.log('terracore SCRAP balance is 0 — skipping reward distribution');
+            return;
+        }
+
+        // Normalize API rewards to proportional shares of the pool
+        const totalApiRewards = json.reduce((sum, u) => sum + (u.reward || 0), 0);
+        if (totalApiRewards <= 0) {
+            console.log('No reward data from API');
+            return;
+        }
+        for (const user of json) {
+            user.calculatedReward = (user.reward / totalApiRewards) * pool;
+        }
+
+        console.log(`Processing rewards for ${json.length} players... Pool: ${pool.toFixed(8)} SCRAP`);
         let successCount = 0;
         let errorCount = 0;
 
