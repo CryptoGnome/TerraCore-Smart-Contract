@@ -58,15 +58,15 @@ async function handleOperation(operation, blockId, trxId, hash) {
         if (data.length != undefined) {
             for (let i = 0; i < data.length; i++) {
                 var rarity = data[i].crate_type;
-                let item = await collection.findOne({ owner: user, crate_type: rarity });
+                let item = await collection.findOne({ owner: user, rarity: rarity });
                 if (item != null) {
                     console.log(`[NFT] open-crate: ${user} (${rarity})`);
-                    queOpenCrates(user, rarity, blockId, trxId, Date.now());
+                    queOpenCrates(user, rarity, blockId, trxId, hash);
                 }
             }
         } else {
             var rarity = data.crate_type;
-            let item = await collection.findOne({ owner: user, crate_type: rarity });
+            let item = await collection.findOne({ owner: user, rarity: rarity });
             if (item != null) {
                 console.log(`[NFT] open-crate: ${user} (${rarity})`);
                 queOpenCrates(user, rarity, blockId, trxId, hash);
