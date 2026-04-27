@@ -13,6 +13,7 @@ This module is one of three interconnected parts of TerraCore. Changes here are 
 
 **Before renaming or removing a MongoDB field:** grep `../TerraCore API/app.js` for the field name.
 **Before changing token amounts, cooldowns, or game mechanics:** check `../Terracore FE/src/` for hardcoded values or logic that mirrors those rules.
+**Before shipping any cost, burn rate, reward amount, or mechanic change:** bump the API version in `../TerraCore API/package.json` (format `YYYY.MM.patch`), update `released` in the `/version` handler in `../TerraCore API/app.js`, and update the `API version:` line in `../Terracore FE/public/llms.txt`. Bots rely on this signal to know when to re-read pricing and operation docs.
 **Before adding a new custom JSON operation type:** the frontend will need a new signing flow and the API may need a new endpoint to expose its state.
 **Before changing a collection name or schema shape:** both the API and any frontend polling that collection will break.
 
