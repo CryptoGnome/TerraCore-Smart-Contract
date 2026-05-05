@@ -9,7 +9,7 @@ async function sendTransaction(username, type, target, blockId, trxId, hash) {
     try {
         let collection = ctx.db.collection('transactions');
         if (blockId !== undefined && trxId !== undefined) {
-            const existing = await collection.findOne({ blockId: blockId, trxId: trxId });
+            const existing = await collection.findOne({ blockId: blockId, trxId: trxId, username: username, target: target });
             if (existing) {
                 console.warn(`[SC] duplicate transaction skipped: blockId=${blockId} trxId=${trxId} type=${type} user=${username}`);
                 return;
