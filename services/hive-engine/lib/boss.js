@@ -263,7 +263,10 @@ async function buy_crate(owner, quantity) {
     }
 }
 
-function getExpectedFluxCost(planet) {
+async function getExpectedFluxCost(planet) {
+    if (Date.now() - configLastLoaded > CONFIG_TTL) {
+        await refreshPlanetConfig();
+    }
     const cfg = planetConfig[planet];
     return cfg?.flux ?? null;
 }

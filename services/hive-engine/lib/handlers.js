@@ -50,7 +50,7 @@ async function handleTransaction(transaction) {
 
                     const { hash, planet } = payload.memo;
                     const quantity = parseFloat(payload.quantity);
-                    const expectedFlux = getExpectedFluxCost(planet);
+                    const expectedFlux = await getExpectedFluxCost(planet);
                     console.log(`[HE] boss-fight: ${from} → ${planet} (${quantity} FLUX)`);
 
                     if (expectedFlux !== null && expectedFlux == quantity) {
