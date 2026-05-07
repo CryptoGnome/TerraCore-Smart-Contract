@@ -4,12 +4,12 @@ const ctx = require('../context');
 const { bossWebhook, bossWebhook2, marketWebhook } = require('./webhooks');
 
 const FALLBACK_CONFIG = {
-    Terracore:   { rarityThresholds: [950, 985, 995, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [900, 1000], dropValues: ['consumable', 'crate'] },
-    Oceana:      { rarityThresholds: [949, 983, 993, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
-    Celestia:    { rarityThresholds: [948, 982, 992, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
-    Arborealis:  { rarityThresholds: [947.5, 981, 991, 1000],   rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [500, 1000], dropValues: ['consumable', 'crate'] },
-    Neptolith:   { rarityThresholds: [947, 980.5, 990.5, 1000], rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
-    Solisar:     { rarityThresholds: [930, 975, 993, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
+    Terracore:   { flux: 1, rarityThresholds: [950, 985, 995, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [900, 1000], dropValues: ['consumable', 'crate'] },
+    Oceana:      { flux: 2, rarityThresholds: [949, 983, 993, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
+    Celestia:    { flux: 2, rarityThresholds: [948, 982, 992, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
+    Arborealis:  { flux: 2, rarityThresholds: [947.5, 981, 991, 1000],   rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [500, 1000], dropValues: ['consumable', 'crate'] },
+    Neptolith:   { flux: 2, rarityThresholds: [947, 980.5, 990.5, 1000], rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
+    Solisar:     { flux: 2, rarityThresholds: [930, 975, 993, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
 };
 
 let planetConfig = { ...FALLBACK_CONFIG };
@@ -23,6 +23,7 @@ async function refreshPlanetConfig() {
         const fresh = { ...FALLBACK_CONFIG };   // always start from fallback so existing planets stay safe
         for (const doc of docs) {
             fresh[doc.name] = {
+                flux:             doc.flux ?? fresh[doc.name]?.flux ?? null,
                 rarityThresholds: doc.rarityThresholds,
                 rarityValues:     doc.rarityValues,
                 dropThresholds:   doc.dropThresholds,
@@ -262,4 +263,9 @@ async function buy_crate(owner, quantity) {
     }
 }
 
-module.exports = { mintCrate, issue, bossFight, buy_crate };
+function getExpectedFluxCost(planet) {
+    const cfg = planetConfig[planet];
+    return cfg?.flux ?? null;
+}
+
+module.exports = { mintCrate, issue, bossFight, buy_crate, getExpectedFluxCost };

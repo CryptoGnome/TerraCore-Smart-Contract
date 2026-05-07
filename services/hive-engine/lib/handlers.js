@@ -1,6 +1,6 @@
 const { sendTransaction } = require('./queue');
 const { storeHash, storeRejectedHash, checkHash } = require('./hashes');
-const { bossFight } = require('./boss');
+const { bossFight, getExpectedFluxCost } = require('./boss');
 const { startQuest } = require('./quests');
 const { webhook } = require('./webhooks');
 const { logError } = require('../../../shared/error-logger');
@@ -48,12 +48,12 @@ async function handleTransaction(transaction) {
                         return;
                     }
 
-                    const planetQtyMapping = { Terracore: 1, Oceana: 2, Celestia: 2, Arborealis: 2, Neptolith: 2, Solisar: 2 };
                     const { hash, planet } = payload.memo;
                     const quantity = parseFloat(payload.quantity);
+                    const expectedFlux = getExpectedFluxCost(planet);
                     console.log(`[HE] boss-fight: ${from} → ${planet} (${quantity} FLUX)`);
 
-                    if (planetQtyMapping[planet] == quantity) {
+                    if (expectedFlux !== null && expectedFlux == quantity) {
                         if (await checkHash(hash)) {
                             console.warn(`[HE] duplicate boss-fight hash skipped: ${hash} user=${from}`);
                             return;
