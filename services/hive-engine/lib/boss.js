@@ -3,7 +3,7 @@ var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { bossWebhook, bossWebhook2, marketWebhook } = require('./webhooks');
 
-const planetConfig = {
+const FALLBACK_CONFIG = {
     Terracore:   { rarityThresholds: [950, 985, 995, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [900, 1000], dropValues: ['consumable', 'crate'] },
     Oceana:      { rarityThresholds: [949, 983, 993, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
     Celestia:    { rarityThresholds: [948, 982, 992, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
@@ -11,6 +11,31 @@ const planetConfig = {
     Neptolith:   { rarityThresholds: [947, 980.5, 990.5, 1000], rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
     Solisar:     { rarityThresholds: [930, 975, 993, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [750, 1000], dropValues: ['consumable', 'crate'] },
 };
+
+let planetConfig = { ...FALLBACK_CONFIG };
+let configLastLoaded = 0;
+const CONFIG_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function refreshPlanetConfig() {
+    try {
+        const docs = await ctx.db.collection('planet-config').find({}).toArray();
+        if (!docs || docs.length === 0) return; // DB empty — keep fallback
+        const fresh = { ...FALLBACK_CONFIG };   // always start from fallback so existing planets stay safe
+        for (const doc of docs) {
+            fresh[doc.name] = {
+                rarityThresholds: doc.rarityThresholds,
+                rarityValues:     doc.rarityValues,
+                dropThresholds:   doc.dropThresholds,
+                dropValues:       doc.dropValues
+            };
+        }
+        planetConfig = fresh;
+        configLastLoaded = Date.now();
+    } catch (err) {
+        console.error('[boss] Failed to refresh planet config from DB:', err);
+        // keep existing cache — no fight disruption
+    }
+}
 
 function getRarityAndDrop(planet, roll, roll2) {
     const config = planetConfig[planet];
@@ -110,6 +135,9 @@ async function issue(username, type, amount, rarity, planet) {
 }
 
 async function bossFight(username, _planet, seed) {
+    if (Date.now() - configLastLoaded > CONFIG_TTL) {
+        await refreshPlanetConfig();
+    }
     try {
         const collection = ctx.db.collection('players');
         const user = await collection.findOne({ username: username });
