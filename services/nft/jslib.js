@@ -329,7 +329,8 @@ mergeInto(LibraryManager.library, {
 		var hash = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 		var _memo = {
 			hash: "terracore_boss_fight-" + hash,
-			planet : UTF8ToString(planet)
+			planet: UTF8ToString(planet),
+			description: "Terracore Boss Fight - " + UTF8ToString(planet)
 		};
 
 		const json = {
