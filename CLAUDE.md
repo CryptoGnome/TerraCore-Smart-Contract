@@ -29,13 +29,13 @@ TerraCore is a blockchain-based game backend built on the **Hive blockchain** wi
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start the unified process
 pm2 start ecosystem.config.js
 
 # Pull latest and restart
-git pull && npm install && pm2 restart tc-terracore && pm2 logs tc-terracore
+git pull && pnpm install && pm2 restart tc-terracore && pm2 logs tc-terracore
 ```
 
 No test suite is configured.
@@ -139,7 +139,7 @@ Each service has its own `context.js` (db, client, wif, webhooks). The unified `
 
 ## Deployment
 
-A GitHub Actions workflow (`.github/workflows/deploy.yml`) automatically SSHs into the server and runs `git pull && npm install && pm2 restart tc-terracore` when a new release is published on GitHub. Required secrets: `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PATH`.
+A GitHub Actions workflow (`.github/workflows/deploy.yml`) automatically SSHs into the server and runs `git pull && pnpm install --prod --frozen-lockfile && pm2 restart tc-terracore` on every push to `main`. Required secrets: `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PATH`.
 
 ## Development Principles
 

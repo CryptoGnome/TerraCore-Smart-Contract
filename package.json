@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "TerraCore game backend monorepo",
   "main": "services/smart-contract/app.js",
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "start": "pm2 start ecosystem.config.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -17,9 +18,11 @@
     "url": "https://github.com/CryptoGnome/TerraCore-Smart-Contract/issues"
   },
   "homepage": "https://github.com/CryptoGnome/TerraCore-Smart-Contract#readme",
-  "overrides": {
-    "axios": "^1.15.2",
-    "ws": "^8.20.0"
+  "pnpm": {
+    "overrides": {
+      "axios": "^1.15.2",
+      "ws": "^8.20.0"
+    }
   },
   "dependencies": {
     "@hiveio/hive-js": "^2.0.6",

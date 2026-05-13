@@ -17,6 +17,8 @@ jobs:
           script: |
             cd ${{ secrets.SERVER_PATH }}
             git pull
-            npm install --omit=dev
+            corepack enable
+            corepack prepare pnpm@10.33.2 --activate
+            pnpm install --prod --frozen-lockfile
             pm2 restart tc-terracore
             pm2 save
