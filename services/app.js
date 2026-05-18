@@ -32,7 +32,7 @@ const { sleep }    = require('../shared/retry');
 const { findNode, updateNodesFromBeacon } = require('../shared/he-node');
 
 // L1 node selection
-const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, getCurrentNode: getL1Node, isNodeDisabled: isL1NodeDisabled } = require('../shared/l1-node');
+const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, disableNode: disableL1Node, getCurrentNode: getL1Node, isNodeDisabled: isL1NodeDisabled } = require('../shared/l1-node');
 
 // Error logging
 const errorLogger = require('../shared/error-logger');
@@ -54,36 +54,63 @@ function changeL1Node() {
 
 function handleL1NodeError(err, context) {
     const currentNode = getL1Node();
-    trackL1Error(currentNode);
+    // Rate-limit responses won't recover by retrying the same node — disable it now
+    // so the next poll routes through findL1Node to a different endpoint.
+    if (err && /429|too many requests/i.test(err.message || '')) {
+        disableL1Node(currentNode);
+    } else {
+        trackL1Error(currentNode);
+    }
     if (isL1NodeDisabled(currentNode)) changeL1Node();
     logError('SYS_L1_STREAM_ERR', err, { fn: context, service: 'SYS' });
 }
 
+// Self-paced L1 block poller. hive-js's built-in streamBlock polls
+// getDynamicGlobalProperties every 200ms (5 req/s) and tears down the loop on
+// any error — which causes public RPC nodes to 429 us and leaves no recovery
+// path. This poller hits the node ~once per block (3s), survives errors by
+// switching nodes via handleL1NodeError, and keeps lastL1Event fresh on every
+// successful tick so the heartbeat doesn't kill the process during recovery.
 async function startL1Stream() {
     changeL1Node();
-    hive.api.streamBlock(async function (err, result) {
-        if (err) {
-            handleL1NodeError(err, 'startL1Stream:connection');
-            return;
-        }
-        try {
-            if (!result || !result.transactions || !result.block_id) return;
-            globalCtx.lastL1Event = Date.now();
-            const blockId = result.block_id;
+    let lastProcessedBlock = 0;
+    const POLL_INTERVAL_MS = 3000;
 
-            let opHash = -1;
-            for (const transaction of result.transactions) {
-                const trxId = transaction.transaction_id;
-                for (const operation of transaction.operations) {
-                    opHash++;
-                    await scHandleOp(operation, blockId, trxId);
-                    await nftHandleOp(operation, blockId, trxId, opHash);
+    const poll = async () => {
+        try {
+            const props = await hive.api.getDynamicGlobalPropertiesAsync();
+            globalCtx.lastL1Event = Date.now();
+            const head = props.head_block_number;
+
+            if (lastProcessedBlock === 0) {
+                lastProcessedBlock = head - 1;
+            }
+
+            while (lastProcessedBlock < head) {
+                const blockNum = lastProcessedBlock + 1;
+                const block = await hive.api.getBlockAsync(blockNum);
+                if (!block) break;
+                const blockId = block.block_id;
+                let opHash = -1;
+                for (const transaction of block.transactions) {
+                    const trxId = transaction.transaction_id;
+                    for (const operation of transaction.operations) {
+                        opHash++;
+                        await scHandleOp(operation, blockId, trxId);
+                        await nftHandleOp(operation, blockId, trxId, opHash);
+                    }
                 }
+                lastProcessedBlock = blockNum;
+                globalCtx.lastL1Event = Date.now();
             }
         } catch (err) {
-            handleL1NodeError(err, 'startL1Stream:processing');
+            handleL1NodeError(err, 'startL1Stream:poll');
+        } finally {
+            setTimeout(poll, POLL_INTERVAL_MS);
         }
-    });
+    };
+
+    poll();
 }
 
 async function startHEStream(node) {

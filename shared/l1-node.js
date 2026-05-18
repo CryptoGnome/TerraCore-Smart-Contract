@@ -36,6 +36,17 @@ function isNodeDisabled(nodeUrl) {
     return true;
 }
 
+function disableNode(nodeUrl, durationMs = DISABLE_DURATION_MS) {
+    if (!nodeUrl) return;
+    nodeDisabledUntil.set(nodeUrl, Date.now() + durationMs);
+    console.log(`L1: Disabling node immediately: ${nodeUrl}`);
+    const activeNodes = nodes.filter(n => !isNodeDisabled(n));
+    if (activeNodes.length === 0) {
+        console.log('L1: All nodes disabled — re-enabling all');
+        nodeDisabledUntil.clear();
+    }
+}
+
 function trackError(nodeUrl) {
     if (!nodeUrl) return;
     const now = Date.now();
@@ -172,4 +183,4 @@ async function findNode() {
     return node;
 }
 
-module.exports = { fallbackNodes, findNode, updateNodesFromBeacon, trackError, isNodeDisabled, getCurrentNode };
+module.exports = { fallbackNodes, findNode, updateNodesFromBeacon, trackError, disableNode, isNodeDisabled, getCurrentNode };
