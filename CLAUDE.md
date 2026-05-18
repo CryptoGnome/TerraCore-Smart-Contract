@@ -141,18 +141,12 @@ Each service has its own `context.js` (db, client, wif, webhooks). The unified `
 
 A GitHub Actions workflow (`.github/workflows/deploy.yml`) automatically SSHs into the server and runs `git pull && pnpm install --prod --frozen-lockfile && pm2 restart tc-terracore` on every push to `main`. Required secrets: `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PATH`.
 
-**Note:** The GitHub Actions deploy workflow needs its secrets updated to point to the new OVH server (`15.204.248.222`). Until then, deploy manually via SCP or direct SSH.
-
 ## Server Access
 
-Production server: OVH VPS at `15.204.248.222`
-
-SSH: `ssh root@15.204.248.222` (uses `~/.ssh/id_ed25519` — requires SSH agent running)
-
-On Windows, start the agent first if it's not running:
+SSH into the production server using your login key (same key used in Terminus). Start the SSH agent first if needed:
 ```powershell
 Start-Service ssh-agent
-ssh-add C:\Users\oimap\.ssh\id_ed25519
+ssh-add ~\.ssh\id_ed25519
 ```
 
 App paths on server:
@@ -160,8 +154,6 @@ App paths on server:
 - API: `/root/terracore-api/`
 - PM2: `pm2 status` / `pm2 logs tc-terracore` / `pm2 restart all`
 - MongoDB: `mongosh --port 27017 --authenticationDatabase terracore -u terracore -p`
-
-**Note:** Git remotes on the server use HTTPS (not SSH) — OVH blocks outbound port 22. To deploy manually: `scp` files directly or push to GitHub and `git pull` over HTTPS.
 
 ## Development Principles
 
