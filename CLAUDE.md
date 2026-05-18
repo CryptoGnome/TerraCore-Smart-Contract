@@ -170,3 +170,5 @@ This is a production system handling real token transfers and blockchain broadca
 **Extra caution on money-touching code.** Any function that mints SCRAP, places DEX orders, distributes FLUX, or broadcasts a Hive transfer gets a second read-through before you consider it done. Confirm amounts, recipients, and conditions are exactly right — there is no rollback on a blockchain transaction.
 
 **Update the changelog.** Every commit that ships a change must have a corresponding entry in `../CHANGELOG.md` — one bullet describing what changed and why. Add it before or immediately after committing.
+
+**Commit messages:** Do not add `Co-Authored-By` or any Claude attribution lines to commits in this repo.
