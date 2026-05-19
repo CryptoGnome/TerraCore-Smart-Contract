@@ -24,9 +24,11 @@ var isUpdatingNodes = false;
 
 // Error tracking (mirrors hive-interface pattern)
 const nodeErrors = new Map();
+const nodeConsecutiveErrors = new Map();
 const nodeDisabledUntil = new Map();
 const ERROR_WINDOW_MS = 10 * 60 * 1000;  // 10-min sliding window
 const ERROR_THRESHOLD = 10;               // errors before disabling
+const CONSECUTIVE_ERROR_THRESHOLD = 3;    // consecutive errors → disable immediately
 const DISABLE_DURATION_MS = 60 * 60 * 1000; // disabled for 1 hour
 
 // Load persisted disable state on module init so PM2 restarts don't wipe
@@ -95,9 +97,16 @@ function trackError(nodeUrl) {
     }
     nodeErrors.set(nodeUrl, entry);
 
-    if (entry.count >= ERROR_THRESHOLD) {
+    const consecutive = (nodeConsecutiveErrors.get(nodeUrl) || 0) + 1;
+    nodeConsecutiveErrors.set(nodeUrl, consecutive);
+
+    const hitWindow = entry.count >= ERROR_THRESHOLD;
+    const hitConsecutive = consecutive >= CONSECUTIVE_ERROR_THRESHOLD;
+
+    if (hitWindow || hitConsecutive) {
         nodeDisabledUntil.set(nodeUrl, now + DISABLE_DURATION_MS);
-        console.log(`L1: Disabling node due to errors: ${nodeUrl}`);
+        const reason = hitConsecutive ? `${consecutive} consecutive errors` : `${entry.count} errors in window`;
+        console.log(`L1: Disabling node (${reason}): ${nodeUrl}`);
 
         // Panic recovery: if all nodes disabled, re-enable all
         const activeNodes = nodes.filter(n => !isNodeDisabled(n));
@@ -106,6 +115,15 @@ function trackError(nodeUrl) {
             nodeDisabledUntil.clear();
         }
         persistDisabledState();
+    }
+}
+
+// Called by the poller after a successful request — clears the consecutive
+// error counter so transient blips don't accumulate across long uptime.
+function recordSuccess(nodeUrl) {
+    if (!nodeUrl) return;
+    if (nodeConsecutiveErrors.has(nodeUrl)) {
+        nodeConsecutiveErrors.delete(nodeUrl);
     }
 }
 
@@ -219,4 +237,4 @@ async function findNode() {
     return node;
 }
 
-module.exports = { fallbackNodes, findNode, updateNodesFromBeacon, trackError, disableNode, isNodeDisabled, getCurrentNode };
+module.exports = { fallbackNodes, findNode, updateNodesFromBeacon, trackError, recordSuccess, disableNode, isNodeDisabled, getCurrentNode };

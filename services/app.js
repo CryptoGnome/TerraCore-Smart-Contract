@@ -32,7 +32,7 @@ const { sleep }    = require('../shared/retry');
 const { findNode, updateNodesFromBeacon } = require('../shared/he-node');
 
 // L1 node selection
-const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, disableNode: disableL1Node, getCurrentNode: getL1Node, isNodeDisabled: isL1NodeDisabled } = require('../shared/l1-node');
+const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, recordSuccess: recordL1Success, disableNode: disableL1Node, getCurrentNode: getL1Node, isNodeDisabled: isL1NodeDisabled } = require('../shared/l1-node');
 
 // Error logging
 const errorLogger = require('../shared/error-logger');
@@ -79,6 +79,7 @@ async function startL1Stream() {
     const poll = async () => {
         try {
             const props = await hive.api.getDynamicGlobalPropertiesAsync();
+            recordL1Success(getL1Node());
             globalCtx.lastL1Event = Date.now();
             const head = props.head_block_number;
 
