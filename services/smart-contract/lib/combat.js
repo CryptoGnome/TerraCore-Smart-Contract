@@ -28,6 +28,19 @@ async function scrapStaked(username) {
     }
 }
 
+function computeCurrentAttacks(user) {
+    const stored       = user.attacks    || 0;
+    const maxAtks      = user.maxAttacks || 8;
+    const daysSince    = Math.floor((Date.now() - (user.last_upgrade_time || 0)) / (3600000 * 24));
+    const weeksDecay   = Math.floor(daysSince / 5);
+    const effectiveMax = Math.max(1, maxAtks - weeksDecay);
+    const hoursSince   = Math.floor((Date.now() - (user.lastregen || 0)) / 3600000);
+    const regenAmount  = Math.floor(hoursSince / 4);
+    const current      = Math.min(stored + regenAmount, effectiveMax);
+    const newLastregen = regenAmount > 0 ? Date.now() : (user.lastregen || 0);
+    return { current, newLastregen };
+}
+
 async function battle(username, _target, blockId, trxId, hash) {
     try {
         if (username == _target) {
@@ -43,15 +56,17 @@ async function battle(username, _target, blockId, trxId, hash) {
         if (!user)   { console.log('User ' + username + ' does not exist'); return true; }
         if (!target) { console.log('Target ' + _target + ' does not exist'); return true; }
 
+        let { current: currentAttacks, newLastregen } = computeCurrentAttacks(user);
+
         if (target.registrationTime && Date.now() - target.registrationTime < 86400000) {
-            await collection.updateOne({ username: username }, { $inc: { attacks: -1, version: 1 } });
+            await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
             await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
             webhook('New User Protection', 'User ' + username + ' tried to attack ' + _target + ' but they have new user protection', '#ff6eaf');
             return true;
         }
 
         if (target.consumables.protection > 0 && Date.now() - target.consumables.protection_times[0] < 86400000) {
-            await collection.updateOne({ username: username }, { $inc: { attacks: -1, version: 1 } });
+            await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
             await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
             webhook('Protection Potion Active!', 'User ' + username + ' tried to attack ' + _target + ' but they have protection', '#ff6eaf');
             return true;
@@ -63,19 +78,19 @@ async function battle(username, _target, blockId, trxId, hash) {
         }
 
         if (Date.now() - target.lastBattle < 60000) {
-            await collection.updateOne({ username: username }, { $inc: { attacks: -1, version: 1 } });
+            await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
             await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
             return true;
         }
 
-        if ((user.stats.damage > target.stats.defense || user.consumables.focus > 0) && user.attacks > 0) {
+        if ((user.stats.damage > target.stats.defense || user.consumables.focus > 0) && currentAttacks > 0) {
             const staked = await scrapStaked(username);
             const seed   = createSeed(blockId, trxId, hash);
             const roll   = rollAttack(user, seed);
             let scrapToSteal = target.scrap * (roll / 100);
 
             if (checkDodge(target, seed) && user.consumables.focus == 0) {
-                await collection.updateOne({ username: username }, { $inc: { attacks: -1, version: 1 } });
+                await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
                 await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, seed: seed, roll: roll, dodged: true, timestamp: Date.now() });
                 webhook('Attack Dodged', 'User ' + username + ' tried to attack ' + _target + ' but they dodged', '#ff6eaf');
                 return true;
@@ -113,6 +128,7 @@ async function battle(username, _target, blockId, trxId, hash) {
                         currentUser   = fresh.find(e => e.username === username);
                         currentTarget = fresh.find(e => e.username === _target);
                         if (!currentUser || !currentTarget) break;
+                        ({ current: currentAttacks, newLastregen } = computeCurrentAttacks(currentUser));
                         currentSteal = currentTarget.scrap * (roll / 100);
                         if (currentSteal > currentTarget.scrap) currentSteal = currentTarget.scrap;
                         if (currentUser.scrap + currentSteal > staked + 1) currentSteal = (staked + 1) - currentUser.scrap;
@@ -122,12 +138,11 @@ async function battle(username, _target, blockId, trxId, hash) {
 
                     const newScrap       = parseFloat((currentUser.scrap + currentSteal).toFixed(3));
                     const newTargetScrap = parseFloat(Math.max(currentTarget.scrap - currentSteal, 0).toFixed(3));
-                    const newAttacks     = currentUser.attacks - 1;
 
                     const battleNow = Date.now();
                     const bulkOps = [
                         { updateOne: { filter: { username: _target,  version: currentTarget.version }, update: { $set: { scrap: newTargetScrap, lastBattle: battleNow }, $inc: { version: 1 } } } },
-                        { updateOne: { filter: { username: username, version: currentUser.version   }, update: { $set: { scrap: newScrap, attacks: newAttacks, lastBattle: battleNow }, $inc: { version: 1 } } } }
+                        { updateOne: { filter: { username: username, version: currentUser.version   }, update: { $set: { scrap: newScrap, attacks: currentAttacks - 1, lastregen: newLastregen, lastBattle: battleNow }, $inc: { version: 1 } } } }
                     ];
                     const res = await collection.bulkWrite(bulkOps);
                     if (res.modifiedCount === 2) {

@@ -16,19 +16,13 @@ async function storeClaim(username, qty) {
     }
 }
 
-async function performUpdate(collection, username, user) {
-    while (true) {
-        const updateResult = await collection.findOneAndUpdate(
-            { username, claims: { $gt: 0 }, lastPayout: { $lt: Date.now() - 30000 } },
-            {
-                $set: { scrap: 0, claims: user.claims - 1, lastPayout: Date.now() },
-                $inc: { version: 1 }
-            },
-            { returnOriginal: false }
-        );
-        if (updateResult.value) return true;
-        else return false;
-    }
+function computeCurrentClaims(user) {
+    const stored       = user.claims   || 0;
+    const hoursSince   = Math.floor((Date.now() - (user.lastclaim || 0)) / 3600000);
+    const regenAmount  = Math.floor(hoursSince / 4);
+    const current      = Math.min(stored + regenAmount, 5);
+    const newLastclaim = regenAmount > 0 ? Date.now() : (user.lastclaim || 0);
+    return { current, newLastclaim };
 }
 
 async function claim(username) {
@@ -40,7 +34,10 @@ async function claim(username) {
             console.log('User ' + username + ' does not exist');
             return true;
         }
-        if (user.claims === 0) {
+
+        const { current: currentClaims, newLastclaim } = computeCurrentClaims(user);
+
+        if (currentClaims === 0) {
             console.log('User ' + username + ' has no claims left');
             return true;
         }
@@ -54,8 +51,8 @@ async function claim(username) {
         // A concurrent claim will fail this update because lastPayout will already be now.
         const now = Date.now();
         const reserved = await collection.findOneAndUpdate(
-            { username, claims: { $gt: 0 }, lastPayout: { $lt: now - 30000 } },
-            { $set: { scrap: 0, lastPayout: now }, $inc: { claims: -1, version: 1 } },
+            { username, lastPayout: { $lt: now - 30000 } },
+            { $set: { scrap: 0, lastPayout: now, claims: currentClaims - 1, lastclaim: newLastclaim }, $inc: { version: 1 } },
             { returnOriginal: false }
         );
 
@@ -75,8 +72,8 @@ async function claim(username) {
         if (!claimSuccess) {
             // Revert the atomic reserve so the player can retry
             await collection.updateOne({ username }, {
-                $set: { scrap: user.scrap, lastPayout: user.lastPayout || 0 },
-                $inc: { claims: 1, version: 1 }
+                $set: { scrap: user.scrap, lastPayout: user.lastPayout || 0, claims: currentClaims, lastclaim: user.lastclaim || 0 },
+                $inc: { version: 1 }
             });
             console.error('[SC] claim broadcast failed for ' + username);
             await ctx.db.collection('claims').insertOne({ username: username, qty: 0, status: 'failed', time: Date.now() });
@@ -96,4 +93,4 @@ async function claim(username) {
     }
 }
 
-module.exports = { storeClaim, performUpdate, claim };
+module.exports = { storeClaim, claim };
