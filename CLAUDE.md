@@ -149,11 +149,11 @@ Start-Service ssh-agent
 ssh-add ~\.ssh\id_ed25519
 ```
 
-App paths on server:
-- Smart Contract: `/root/terracore-sc/`
-- API: `/root/terracore-api/`
-- PM2: `pm2 status` / `pm2 logs tc-terracore` / `pm2 restart all`
-- MongoDB: `mongosh --port 27017 --authenticationDatabase terracore -u terracore -p`
+App paths on server (OVH VPS `15.204.248.222`):
+- Smart Contract: `/opt/terracore-sc/`
+- API: `/opt/terracore-api/`
+- PM2 runs under `ubuntu` user — prefix all pm2 commands: `sudo -u ubuntu pm2 <cmd>`
+- MongoDB local on port 27017: `mongosh --port 27017 --authenticationDatabase terracore -u terracore -p`
 
 ## Development Principles
 
