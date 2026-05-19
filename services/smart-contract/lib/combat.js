@@ -4,6 +4,7 @@ const ctx = require('../context');
 const { webhook } = require('./webhooks');
 const { createSeed, rollDice, adjustedRoll } = require('../../../shared/rng');
 const { logError } = require('../../../shared/error-logger');
+const { computeCurrentScrap } = require('../../../shared/mining');
 
 function checkDodge(_target, seed) {
     const rng  = seedrandom(seed + '-dodge');
@@ -57,6 +58,8 @@ async function battle(username, _target, blockId, trxId, hash) {
         if (!target) { console.log('Target ' + _target + ' does not exist'); return true; }
 
         let { current: currentAttacks, newLastregen } = computeCurrentAttacks(user);
+        let userCurrentScrap   = computeCurrentScrap(user);
+        let targetCurrentScrap = computeCurrentScrap(target);
 
         if (target.registrationTime && Date.now() - target.registrationTime < 86400000) {
             await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
@@ -87,7 +90,7 @@ async function battle(username, _target, blockId, trxId, hash) {
             const staked = await scrapStaked(username);
             const seed   = createSeed(blockId, trxId, hash);
             const roll   = rollAttack(user, seed);
-            let scrapToSteal = target.scrap * (roll / 100);
+            let scrapToSteal = targetCurrentScrap * (roll / 100);
 
             if (checkDodge(target, seed) && user.consumables.focus == 0) {
                 await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
@@ -100,8 +103,8 @@ async function battle(username, _target, blockId, trxId, hash) {
                 await collection.updateOne({ username: username }, { $inc: { 'consumables.focus': -1, version: 1 } });
             }
 
-            if (scrapToSteal > target.scrap) scrapToSteal = target.scrap;
-            if (user.scrap + scrapToSteal > staked + 1) scrapToSteal = (staked + 1) - user.scrap;
+            if (scrapToSteal > targetCurrentScrap) scrapToSteal = targetCurrentScrap;
+            if (userCurrentScrap + scrapToSteal > staked + 1) scrapToSteal = (staked + 1) - userCurrentScrap;
 
             if (isNaN(scrapToSteal)) {
                 logError('SC_BATTLE_SCRAP_NAN', new Error('scrapToSteal is NaN'), { fn: 'battle', username, blockId });
@@ -129,20 +132,22 @@ async function battle(username, _target, blockId, trxId, hash) {
                         currentTarget = fresh.find(e => e.username === _target);
                         if (!currentUser || !currentTarget) break;
                         ({ current: currentAttacks, newLastregen } = computeCurrentAttacks(currentUser));
-                        currentSteal = currentTarget.scrap * (roll / 100);
-                        if (currentSteal > currentTarget.scrap) currentSteal = currentTarget.scrap;
-                        if (currentUser.scrap + currentSteal > staked + 1) currentSteal = (staked + 1) - currentUser.scrap;
+                        userCurrentScrap   = computeCurrentScrap(currentUser);
+                        targetCurrentScrap = computeCurrentScrap(currentTarget);
+                        currentSteal = targetCurrentScrap * (roll / 100);
+                        if (currentSteal > targetCurrentScrap) currentSteal = targetCurrentScrap;
+                        if (userCurrentScrap + currentSteal > staked + 1) currentSteal = (staked + 1) - userCurrentScrap;
                         currentSteal = parseFloat(currentSteal.toFixed(3));
                         if (currentSteal <= 0) break;
                     }
 
-                    const newScrap       = parseFloat((currentUser.scrap + currentSteal).toFixed(3));
-                    const newTargetScrap = parseFloat(Math.max(currentTarget.scrap - currentSteal, 0).toFixed(3));
+                    const newScrap       = parseFloat((userCurrentScrap + currentSteal).toFixed(3));
+                    const newTargetScrap = parseFloat(Math.max(targetCurrentScrap - currentSteal, 0).toFixed(3));
 
                     const battleNow = Date.now();
                     const bulkOps = [
-                        { updateOne: { filter: { username: _target,  version: currentTarget.version }, update: { $set: { scrap: newTargetScrap, lastBattle: battleNow }, $inc: { version: 1 } } } },
-                        { updateOne: { filter: { username: username, version: currentUser.version   }, update: { $set: { scrap: newScrap, attacks: currentAttacks - 1, lastregen: newLastregen, lastBattle: battleNow }, $inc: { version: 1 } } } }
+                        { updateOne: { filter: { username: _target,  version: currentTarget.version }, update: { $set: { scrap: newTargetScrap, cooldown: battleNow, lastBattle: battleNow }, $inc: { version: 1 } } } },
+                        { updateOne: { filter: { username: username, version: currentUser.version   }, update: { $set: { scrap: newScrap, cooldown: battleNow, attacks: currentAttacks - 1, lastregen: newLastregen, lastBattle: battleNow }, $inc: { version: 1 } } } }
                     ];
                     const res = await collection.bulkWrite(bulkOps);
                     if (res.modifiedCount === 2) {
