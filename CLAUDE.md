@@ -149,7 +149,7 @@ Start-Service ssh-agent
 ssh-add ~\.ssh\id_ed25519
 ```
 
-App paths on server (OVH VPS `15.204.248.222`):
+App paths on server:
 - Smart Contract: `/opt/terracore-sc/`
 - API: `/opt/terracore-api/`
 - PM2 runs under `ubuntu` user — prefix all pm2 commands: `sudo -u ubuntu pm2 <cmd>`
