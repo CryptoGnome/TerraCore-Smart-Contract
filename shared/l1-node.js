@@ -1,4 +1,8 @@
 const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
+
+const STATE_FILE = path.join(__dirname, '..', '.l1-node-state.json');
 
 const fallbackNodes = [
     'https://api.deathwing.me',
@@ -25,11 +29,42 @@ const ERROR_WINDOW_MS = 10 * 60 * 1000;  // 10-min sliding window
 const ERROR_THRESHOLD = 10;               // errors before disabling
 const DISABLE_DURATION_MS = 60 * 60 * 1000; // disabled for 1 hour
 
+// Load persisted disable state on module init so PM2 restarts don't wipe
+// the in-memory disable map and immediately re-pick a rate-limited node.
+(function loadDisabledState() {
+    try {
+        if (!fs.existsSync(STATE_FILE)) return;
+        const raw = fs.readFileSync(STATE_FILE, 'utf8');
+        const data = JSON.parse(raw);
+        const now = Date.now();
+        for (const [nodeUrl, disabledUntil] of Object.entries(data.disabledUntil || {})) {
+            if (typeof disabledUntil === 'number' && disabledUntil > now) {
+                nodeDisabledUntil.set(nodeUrl, disabledUntil);
+            }
+        }
+        if (nodeDisabledUntil.size > 0) {
+            console.log(`L1: Restored ${nodeDisabledUntil.size} disabled node(s) from ${STATE_FILE}`);
+        }
+    } catch (err) {
+        console.log(`L1: Failed to load disable state: ${err.message}`);
+    }
+})();
+
+function persistDisabledState() {
+    try {
+        const data = { disabledUntil: Object.fromEntries(nodeDisabledUntil) };
+        fs.writeFileSync(STATE_FILE, JSON.stringify(data));
+    } catch (err) {
+        console.log(`L1: Failed to persist disable state: ${err.message}`);
+    }
+}
+
 function isNodeDisabled(nodeUrl) {
     const disabledUntil = nodeDisabledUntil.get(nodeUrl);
     if (!disabledUntil) return false;
     if (Date.now() > disabledUntil) {
         nodeDisabledUntil.delete(nodeUrl);
+        persistDisabledState();
         return false;
     }
     return true;
@@ -44,6 +79,7 @@ function disableNode(nodeUrl, durationMs = DISABLE_DURATION_MS) {
         console.log('L1: All nodes disabled — re-enabling all');
         nodeDisabledUntil.clear();
     }
+    persistDisabledState();
 }
 
 function trackError(nodeUrl) {
@@ -69,6 +105,7 @@ function trackError(nodeUrl) {
             console.log('L1: All nodes disabled — re-enabling all');
             nodeDisabledUntil.clear();
         }
+        persistDisabledState();
     }
 }
 

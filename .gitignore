@@ -6,3 +6,4 @@ services/nft/images/
 .playwright/
 .claude/
 ecosystem.config.js
+.l1-node-state.json
