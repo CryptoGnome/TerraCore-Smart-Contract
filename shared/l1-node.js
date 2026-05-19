@@ -26,10 +26,12 @@ var isUpdatingNodes = false;
 const nodeErrors = new Map();
 const nodeConsecutiveErrors = new Map();
 const nodeDisabledUntil = new Map();
+const nodeLast429 = new Map();
 const ERROR_WINDOW_MS = 10 * 60 * 1000;  // 10-min sliding window
 const ERROR_THRESHOLD = 10;               // errors before disabling
 const CONSECUTIVE_ERROR_THRESHOLD = 3;    // consecutive errors → disable immediately
 const DISABLE_DURATION_MS = 60 * 60 * 1000; // disabled for 1 hour
+const RECENT_429_WINDOW_MS = 60 * 60 * 1000; // soft penalty window after 429
 
 // Load persisted disable state on module init so PM2 restarts don't wipe
 // the in-memory disable map and immediately re-pick a rate-limited node.
@@ -44,8 +46,16 @@ const DISABLE_DURATION_MS = 60 * 60 * 1000; // disabled for 1 hour
                 nodeDisabledUntil.set(nodeUrl, disabledUntil);
             }
         }
+        for (const [nodeUrl, ts] of Object.entries(data.last429 || {})) {
+            if (typeof ts === 'number' && now - ts < RECENT_429_WINDOW_MS) {
+                nodeLast429.set(nodeUrl, ts);
+            }
+        }
         if (nodeDisabledUntil.size > 0) {
             console.log(`L1: Restored ${nodeDisabledUntil.size} disabled node(s) from ${STATE_FILE}`);
+        }
+        if (nodeLast429.size > 0) {
+            console.log(`L1: Restored ${nodeLast429.size} recent-429 node(s) from ${STATE_FILE}`);
         }
     } catch (err) {
         console.log(`L1: Failed to load disable state: ${err.message}`);
@@ -54,11 +64,30 @@ const DISABLE_DURATION_MS = 60 * 60 * 1000; // disabled for 1 hour
 
 function persistDisabledState() {
     try {
-        const data = { disabledUntil: Object.fromEntries(nodeDisabledUntil) };
+        const data = {
+            disabledUntil: Object.fromEntries(nodeDisabledUntil),
+            last429: Object.fromEntries(nodeLast429),
+        };
         fs.writeFileSync(STATE_FILE, JSON.stringify(data));
     } catch (err) {
         console.log(`L1: Failed to persist disable state: ${err.message}`);
     }
+}
+
+function hasRecent429(nodeUrl) {
+    const ts = nodeLast429.get(nodeUrl);
+    if (!ts) return false;
+    if (Date.now() - ts > RECENT_429_WINDOW_MS) {
+        nodeLast429.delete(nodeUrl);
+        return false;
+    }
+    return true;
+}
+
+function track429(nodeUrl) {
+    if (!nodeUrl) return;
+    nodeLast429.set(nodeUrl, Date.now());
+    persistDisabledState();
 }
 
 function isNodeDisabled(nodeUrl) {
@@ -196,7 +225,11 @@ async function findNode() {
     updateNodesFromBeacon().catch(() => {});
 
     const activeNodes = nodes.filter(n => !isNodeDisabled(n));
-    const candidates = activeNodes.length > 0 ? activeNodes : nodes;
+    const baseCandidates = activeNodes.length > 0 ? activeNodes : nodes;
+    // Prefer nodes that have NOT 429'd us in the last hour, even if disable
+    // expired. Falls back to all active nodes if every option is flagged.
+    const cleanCandidates = baseCandidates.filter(n => !hasRecent429(n));
+    const candidates = cleanCandidates.length > 0 ? cleanCandidates : baseCandidates;
 
     const firstBatch = candidates.slice(0, 5);
     const results = await Promise.allSettled(firstBatch.map(checkNode));
@@ -237,4 +270,4 @@ async function findNode() {
     return node;
 }
 
-module.exports = { fallbackNodes, findNode, updateNodesFromBeacon, trackError, recordSuccess, disableNode, isNodeDisabled, getCurrentNode };
+module.exports = { fallbackNodes, findNode, updateNodesFromBeacon, trackError, recordSuccess, track429, disableNode, isNodeDisabled, getCurrentNode };

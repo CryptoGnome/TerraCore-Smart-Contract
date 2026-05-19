@@ -32,7 +32,7 @@ const { sleep }    = require('../shared/retry');
 const { findNode, updateNodesFromBeacon } = require('../shared/he-node');
 
 // L1 node selection
-const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, recordSuccess: recordL1Success, disableNode: disableL1Node, getCurrentNode: getL1Node, isNodeDisabled: isL1NodeDisabled } = require('../shared/l1-node');
+const { findNode: findL1Node, updateNodesFromBeacon: updateL1Nodes, trackError: trackL1Error, recordSuccess: recordL1Success, track429: trackL1_429, disableNode: disableL1Node, getCurrentNode: getL1Node, isNodeDisabled: isL1NodeDisabled } = require('../shared/l1-node');
 
 // Error logging
 const errorLogger = require('../shared/error-logger');
@@ -57,6 +57,7 @@ function handleL1NodeError(err, context) {
     // Rate-limit responses won't recover by retrying the same node — disable it now
     // so the next poll routes through findL1Node to a different endpoint.
     if (err && /429|too many requests/i.test(err.message || '')) {
+        trackL1_429(currentNode);
         disableL1Node(currentNode);
     } else {
         trackL1Error(currentNode);
