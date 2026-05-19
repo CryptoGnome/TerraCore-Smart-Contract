@@ -39,10 +39,11 @@ const errorLogger = require('../shared/error-logger');
 const { logError } = require('../shared/error-logger');
 
 let isChangingL1Node = false;
+let l1NodeChangePromise = Promise.resolve();
 function changeL1Node() {
-    if (isChangingL1Node) return;
+    if (isChangingL1Node) return l1NodeChangePromise;
     isChangingL1Node = true;
-    (async () => {
+    l1NodeChangePromise = (async () => {
         try {
             const selectedNode = await findL1Node();
             hive.api.setOptions({ url: selectedNode });
@@ -50,9 +51,10 @@ function changeL1Node() {
             isChangingL1Node = false;
         }
     })();
+    return l1NodeChangePromise;
 }
 
-function handleL1NodeError(err, context) {
+async function handleL1NodeError(err, context) {
     const currentNode = getL1Node();
     // Rate-limit responses won't recover by retrying the same node — disable it now
     // so the next poll routes through findL1Node to a different endpoint.
@@ -62,7 +64,8 @@ function handleL1NodeError(err, context) {
     } else {
         trackL1Error(currentNode);
     }
-    if (isL1NodeDisabled(currentNode)) changeL1Node();
+    // Await rotation so the next poll can't fire against the disabled URL.
+    if (isL1NodeDisabled(currentNode)) await changeL1Node();
     logError('SYS_L1_STREAM_ERR', err, { fn: context, service: 'SYS' });
 }
 
@@ -73,7 +76,7 @@ function handleL1NodeError(err, context) {
 // switching nodes via handleL1NodeError, and keeps lastL1Event fresh on every
 // successful tick so the heartbeat doesn't kill the process during recovery.
 async function startL1Stream() {
-    changeL1Node();
+    await changeL1Node();
     let lastProcessedBlock = 0;
     const POLL_INTERVAL_MS = 3000;
 
@@ -106,7 +109,7 @@ async function startL1Stream() {
                 globalCtx.lastL1Event = Date.now();
             }
         } catch (err) {
-            handleL1NodeError(err, 'startL1Stream:poll');
+            await handleL1NodeError(err, 'startL1Stream:poll');
         } finally {
             setTimeout(poll, POLL_INTERVAL_MS);
         }
