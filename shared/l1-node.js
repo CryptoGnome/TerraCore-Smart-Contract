@@ -4,14 +4,13 @@ const fallbackNodes = [
     'https://api.deathwing.me',
     'https://api.hive.blog',
     'https://api.openhive.network',
-    'https://techcoderx.com',
-    'https://hive-api.arcange.eu',
     'https://anyx.io',
     'https://api.c0ff33a.uk',
     'https://hiveapi.actifit.io',
     'https://rpc.mahdiyari.info',
     'https://api.syncad.com',
-    'https://hapi.ecency.com'
+    'https://hapi.ecency.com',
+    'https://hive.atexoras.com:2096'
 ];
 
 var nodes = [...fallbackNodes];
