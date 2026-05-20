@@ -3,9 +3,9 @@ const ctx = require('../context');
 const { webhook } = require('./webhooks');
 const { computeCurrentScrap } = require('../../../shared/mining');
 
-async function storeClaim(username, qty) {
+async function storeClaim(username, qty, status = 'success') {
     try {
-        await ctx.db.collection('claims').insertOne({ username: username, qty: qty, time: Date.now() });
+        await ctx.db.collection('claims').insertOne({ username: username, qty: qty, status: status, time: Date.now() });
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
@@ -60,6 +60,7 @@ async function claim(username) {
 
         if (!reserved.value) {
             console.log('[SC] claim: conditions not met for ' + username + ' (cooldown or no claims)');
+            await storeClaim(username, 0, 'rejected');
             return true;
         }
 
