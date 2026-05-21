@@ -32,6 +32,17 @@ const AMOUNT_BASE = {
     legendary: { min: 0.08, max: 2.00 },
 };
 
+// Extra draws when the equipped item's primary attribute covers the tier's stat requirement.
+// Rewards specialized items over generic high-level ones.
+function getAffinityBonus(itemAttributeValue, tierStatReq) {
+    if (!itemAttributeValue || itemAttributeValue <= 0 || !tierStatReq) return 0;
+    const coverage = itemAttributeValue / tierStatReq;
+    if (coverage >= 1.5) return 3;
+    if (coverage >= 1.0) return 2;
+    if (coverage >= 0.5) return 1;
+    return 0;
+}
+
 function getLootTable(questType, tier) {
     const base = BASE_LOOT_PROFILES[questType] || BASE_LOOT_PROFILES.combat;
     const shift = (tier - 1) * 2;
@@ -126,6 +137,13 @@ async function collectQuest(username, questId, blockId, trxId) {
         else if (effectiveRoll <  96) { drawCount = baseRolls * 2 + 1; shiftRareUp = true; }
         else if (effectiveRoll < 100) { drawCount = baseRolls * 3; }
         else                          { drawCount = baseRolls * 3 + 1; guaranteedLegendary = true; }
+
+        // Affinity bonus: extra draws for well-matched items
+        const affBonus = getAffinityBonus(quest.item_attribute_value, statReq);
+        if (affBonus > 0) {
+            drawCount += affBonus;
+            console.log(`[SC] quest-collect: ${username} affinity bonus +${affBonus} draws (item attr=${quest.item_attribute_value} req=${statReq})`);
+        }
 
         // ── Loot draws ───────────────────────────────────────
         const lootTable = getLootTable(quest.quest_type, tier);

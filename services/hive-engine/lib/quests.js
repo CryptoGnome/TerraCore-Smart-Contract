@@ -134,6 +134,8 @@ async function startQuest(username, questType, tier, paidAmount) {
         const equippedItem = player.items && player.items[mapping.item];
         const equippedItemRarity = equippedItem ? (equippedItem.rarity || null) : null;
         const equippedItemLevel = equippedItem ? (equippedItem.level || 1) : 1;
+        // Item's specific primary-stat attribute — used for affinity draw bonus at collect time
+        const itemAttributeValue = equippedItem && equippedItem.attributes ? (equippedItem.attributes[mapping.primary] || 0) : 0;
         const secondaryStatValue = mapping.secondary ? (baseStats[mapping.secondary] || 0) : null;
 
         const now = Date.now();
@@ -153,6 +155,7 @@ async function startQuest(username, questType, tier, paidAmount) {
             required_item_type: mapping.item,
             equipped_item_rarity: equippedItemRarity,
             equipped_item_level: equippedItemLevel,
+            item_attribute_value: itemAttributeValue,
             effective_primary_stat: effectivePrimary,
             secondary_stat_value: secondaryStatValue,
             base_rolls: TIER_BASE_ROLLS[tier],
