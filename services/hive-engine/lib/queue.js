@@ -58,7 +58,10 @@ async function sendTransactions() {
                 if (result) await storeHash(tx.hash, tx.username, tx.quantity);
                 await collection.deleteOne({ _id: tx._id });
             } else if (tx.type == 'buy_crate') {
-                const result = await buy_crate(tx.username, tx.quantity);
+                const memoParts = tx.hash.split('-');
+                const VALID_RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+                const rarity = VALID_RARITIES.includes(memoParts[1]) ? memoParts[1] : 'common';
+                const result = await buy_crate(tx.username, tx.quantity, rarity);
                 if (result) await storeHash(tx.hash, tx.username, tx.quantity);
                 await collection.deleteOne({ _id: tx._id });
             } else if (tx.type == 'forge') {

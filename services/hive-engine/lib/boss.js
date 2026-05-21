@@ -231,30 +231,65 @@ async function bossFight(username, _planet, seed) {
     }
 }
 
-async function buy_crate(owner, quantity) {
+const CRATE_USD_DEFAULTS = { common: 5.0, uncommon: 10.0, rare: 20.0, epic: 35.0 };
+const PURCHASABLE_RARITIES = ['common', 'uncommon', 'rare', 'epic'];
+const RARITY_COLORS = { common: '#aaaaaa', uncommon: '#4caf50', rare: '#2196f3', epic: '#9c27b0' };
+
+async function buy_crate(owner, quantity, rarity = 'common') {
     try {
+        if (!PURCHASABLE_RARITIES.includes(rarity)) {
+            console.log(`[HE] buy_crate: forbidden rarity '${rarity}' for ${owner}`);
+            return true;
+        }
+
         const price = await ctx.db.collection('price_feed').findOne({ date: 'global' });
         if (!price) {
             console.error('[HE] buy_crate: price_feed missing, rejecting purchase for ' + owner);
             return false;
         }
-        if (quantity != price.price) return true;
 
-        const rarity = 'common';
+        let expectedCost;
+        if (rarity === 'common') {
+            expectedCost = price.price;
+        } else {
+            if (!price.scrap_usd || price.scrap_usd <= 0) {
+                console.error(`[HE] buy_crate: scrap_usd invalid (${price.scrap_usd}), cannot price ${rarity} crate for ${owner}`);
+                return false;
+            }
+            const usdTarget = price[`${rarity}_crate_usd`] ?? CRATE_USD_DEFAULTS[rarity];
+            expectedCost = Math.ceil(usdTarget / price.scrap_usd);
+        }
+
+        if (parseFloat(quantity) !== expectedCost) {
+            console.log(`[HE] buy_crate: ${owner} paid ${quantity} SCRAP for ${rarity} crate, expected ${expectedCost}`);
+            return true;
+        }
+
         const count = await ctx.db.collection('crate-count').findOne({ supply: 'total' });
+        const crateName = rarity.charAt(0).toUpperCase() + rarity.slice(1) + ' Loot Crate';
         const crate = {
-            name: 'Common Loot Crate', rarity: rarity, owner: owner,
+            name: crateName, rarity: rarity, owner: owner,
             item_number: count.count + 1,
-            image: 'https://terracore.herokuapp.com/images/common_crate.png',
+            image: `https://api.terracoregame.com/images/${rarity}_crate.png`,
             equiped: false,
             market: { listed: false, price: 0, seller: null, created: 0, expires: 0, sold: 0 },
         };
         await ctx.db.collection('crates').insertOne(crate);
-        console.log('Crate Purchased: ' + crate.name + ' for ' + crate.owner + ' #' + crate.item_number);
-        marketWebhook('Crate Purchased', crate.name + ' for ' + crate.owner + ' #' + crate.item_number, '#00ff00');
+        console.log(`Crate Purchased: ${crate.name} for ${crate.owner} #${crate.item_number}`);
+        marketWebhook('Crate Purchased', `${crate.name} for ${crate.owner} #${crate.item_number}`, RARITY_COLORS[rarity] ?? '#aaaaaa');
         await ctx.db.collection('crate-count').updateOne({ supply: 'total' }, { $inc: { count: 1 } });
         await ctx.db.collection('nft-drops').insertOne({ name: crate.name, rarity: crate.rarity, owner: crate.owner, item_number: crate.item_number, purchased: true, time: new Date() });
         await ctx.db.collection('players').updateOne({ username: owner }, { $set: { last_upgrade_time: Date.now() }, $inc: { version: 1 } });
+
+        if (rarity !== 'common') {
+            const today = new Date().toISOString().split('T')[0];
+            await ctx.db.collection('stats').updateOne(
+                { date: today },
+                { $inc: { [`crates_purchased_${rarity}`]: 1 } },
+                { upsert: true }
+            );
+        }
+
         return true;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
