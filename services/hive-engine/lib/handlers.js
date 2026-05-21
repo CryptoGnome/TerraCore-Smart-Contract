@@ -116,6 +116,7 @@ async function handleTransaction(transaction) {
             const hashStore = payload.memo;
             const stakeLogs = JSON.parse(transaction.logs);
             if (stakeLogs.errors && stakeLogs.errors.length > 0) {
+                console.warn(`[HE] stake rejected by HE: ${sender} — ${JSON.stringify(stakeLogs.errors)}`);
                 storeRejectedHash(hashStore, sender);
                 return;
             }
