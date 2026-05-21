@@ -476,8 +476,10 @@ async function updateQuestOracle() {
         const newMultiplier = Math.min(Math.max(rawMultiplier, 1.0), 10.0);
 
         // Circuit breaker: >30% change from previous multiplier
+        // Skip during warm-up (fewer than 2 historical readings = no real baseline yet)
         const prevMultiplier = priceFeed.quest_cost_multiplier || 1.0;
-        if (prevMultiplier > 0 && Math.abs(newMultiplier - prevMultiplier) / prevMultiplier > ORACLE_MAX_CYCLE_CHANGE) {
+        const isWarmup = history.length < 2;
+        if (!isWarmup && prevMultiplier > 0 && Math.abs(newMultiplier - prevMultiplier) / prevMultiplier > ORACLE_MAX_CYCLE_CHANGE) {
             console.warn(`[QuestOracle] Circuit breaker tripped: prev=${prevMultiplier.toFixed(4)} new=${newMultiplier.toFixed(4)} — skipping update`);
             // Fire Discord alert
             try {
