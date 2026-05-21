@@ -19,9 +19,9 @@ async function register(username, referrer, amount) {
             console.error('[SC] price_feed global document missing — cannot register ' + username);
             return false;
         }
-        let registration_fee = parseFloat(registration_fee_query.registration_fee.split(' ')[0]).toFixed(3);
+        let registration_fee = parseFloat(registration_fee_query.registration_fee.split(' ')[0]);
         let referrer_fee = registration_fee_query.referral_fee;
-        amount = parseFloat(amount.split(' ')[0]).toFixed(3);
+        amount = parseFloat(amount.split(' ')[0]);
 
         console.log('Amount: ' + amount + ' Registration Fee: ' + registration_fee);
         if (amount < registration_fee) {

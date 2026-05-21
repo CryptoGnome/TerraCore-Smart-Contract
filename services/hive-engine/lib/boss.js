@@ -234,6 +234,10 @@ async function bossFight(username, _planet, seed) {
 async function buy_crate(owner, quantity) {
     try {
         const price = await ctx.db.collection('price_feed').findOne({ date: 'global' });
+        if (!price) {
+            console.error('[HE] buy_crate: price_feed missing, rejecting purchase for ' + owner);
+            return false;
+        }
         if (quantity != price.price) return true;
 
         const rarity = 'common';
