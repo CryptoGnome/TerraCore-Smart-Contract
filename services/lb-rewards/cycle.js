@@ -473,7 +473,7 @@ async function updateQuestOracle() {
         const twap = history.reduce((a, b) => a + b, 0) / history.length;
         const targetPrice = priceFeed.quest_target_price || QUEST_TARGET_PRICE_DEFAULT;
         const rawMultiplier = targetPrice / twap;
-        const newMultiplier = Math.min(Math.max(rawMultiplier, 1.0), 10.0);
+        const newMultiplier = Math.min(Math.max(rawMultiplier, 1.0), 20.0);
 
         // Circuit breaker: >30% change from previous multiplier
         // Skip during warm-up (fewer than 2 historical readings = no real baseline yet)
