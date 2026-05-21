@@ -11,33 +11,38 @@ const TIER_XP         = { 1: 25,  2: 50,  3: 100, 4: 200, 5: 400 };
 const RARITY_BONUS = { common: 5, uncommon: 10, rare: 20, epic: 35, legendary: 50 };
 const LEVEL_SCALE  = { common: 0.5, uncommon: 0.8, rare: 1.2, epic: 1.8, legendary: 2.5 };
 
-// Per-type loot profiles — weights are relative, not percentages
-// Higher tiers shift +2 weight per tier toward rarer outcomes
+// Rarity weights per quest type. Tier shift applied at runtime.
+// Fortune has only a modest edge on rarity — its advantage is in AMOUNT variance.
 const BASE_LOOT_PROFILES = {
-    combat:  [{ rarity: 'legendary', w: 2 }, { rarity: 'epic', w: 8  }, { rarity: 'rare', w: 20 }, { rarity: 'uncommon', w: 35 }, { rarity: 'common', w: 35 }],
-    salvage: [{ rarity: 'legendary', w: 1 }, { rarity: 'epic', w: 5  }, { rarity: 'rare', w: 14 }, { rarity: 'uncommon', w: 40 }, { rarity: 'common', w: 40 }],
-    stealth: [{ rarity: 'legendary', w: 2 }, { rarity: 'epic', w: 8  }, { rarity: 'rare', w: 20 }, { rarity: 'uncommon', w: 35 }, { rarity: 'common', w: 35 }],
-    fortune: [{ rarity: 'legendary', w: 5 }, { rarity: 'epic', w: 15 }, { rarity: 'rare', w: 25 }, { rarity: 'uncommon', w: 30 }, { rarity: 'common', w: 25 }],
-    defense: [{ rarity: 'legendary', w: 1 }, { rarity: 'epic', w: 6  }, { rarity: 'rare', w: 18 }, { rarity: 'uncommon', w: 38 }, { rarity: 'common', w: 37 }],
+    combat:  [{ r: 'legendary', w: 1  }, { r: 'epic', w: 5  }, { r: 'rare', w: 20 }, { r: 'uncommon', w: 38 }, { r: 'common', w: 36 }],
+    salvage: [{ r: 'legendary', w: 1  }, { r: 'epic', w: 3  }, { r: 'rare', w: 12 }, { r: 'uncommon', w: 43 }, { r: 'common', w: 41 }],
+    stealth: [{ r: 'legendary', w: 1  }, { r: 'epic', w: 5  }, { r: 'rare', w: 18 }, { r: 'uncommon', w: 39 }, { r: 'common', w: 37 }],
+    fortune: [{ r: 'legendary', w: 2  }, { r: 'epic', w: 7  }, { r: 'rare', w: 20 }, { r: 'uncommon', w: 36 }, { r: 'common', w: 35 }],
+    defense: [{ r: 'legendary', w: 1  }, { r: 'epic', w: 4  }, { r: 'rare', w: 15 }, { r: 'uncommon', w: 41 }, { r: 'common', w: 39 }],
+};
+
+// Amount range per relic rarity — fractional, Diablo-style random quantity per draw.
+// Tier scale multiplied on top: T1×0.60, T2×0.95, T3×1.30, T4×1.65, T5×2.00
+// Fortune Hunt also gets a per-draw variance multiplier (0.30×–3.00×) for true gambling feel.
+const AMOUNT_BASE = {
+    common:    { min: 0.40, max: 3.20 },
+    uncommon:  { min: 0.25, max: 2.20 },
+    rare:      { min: 0.12, max: 1.40 },
+    epic:      { min: 0.06, max: 0.85 },
+    legendary: { min: 0.08, max: 2.00 },
 };
 
 function getLootTable(questType, tier) {
     const base = BASE_LOOT_PROFILES[questType] || BASE_LOOT_PROFILES.combat;
-    // Shift weights toward rarer tiers by tier level (tier 1 = no shift, tier 5 = +8 to legendary/epic)
     const shift = (tier - 1) * 2;
-    const rarities = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
-    const shifted = base.map((entry, i) => {
-        let w = entry.w;
-        if (i === 0) w += shift * 2;       // legendary gets biggest boost
-        else if (i === 1) w += shift;       // epic gets moderate boost
-        else if (i >= 3) w = Math.max(1, w - shift); // uncommon/common shed weight
-        return { rarity: entry.rarity, w: Math.max(1, w) };
-    });
-    return shifted;
+    return base.map((entry, i) => ({
+        rarity: entry.r,
+        w: Math.max(1, i === 0 ? entry.w + shift * 2 : i === 1 ? entry.w + shift : i >= 3 ? entry.w - shift : entry.w),
+    }));
 }
 
 function weightedDraw(rng, table) {
-    const total = table.reduce((sum, e) => sum + e.w, 0);
+    const total = table.reduce((s, e) => s + e.w, 0);
     let roll = rng() * total;
     for (const entry of table) {
         roll -= entry.w;
@@ -45,6 +50,18 @@ function weightedDraw(rng, table) {
     }
     return table[table.length - 1].rarity;
 }
+
+// Roll a seeded fractional relic amount for one draw.
+// rng has already advanced once (for the rarity draw), so subsequent calls continue the same seed sequence.
+function drawAmount(rng, rarity, tier, questType) {
+    const scale = 0.60 + (tier - 1) * 0.35;           // T1:0.60 T2:0.95 T3:1.30 T4:1.65 T5:2.00
+    const base  = AMOUNT_BASE[rarity];
+    const raw   = base.min + rng() * (base.max - base.min);
+    const fortuneVariance = questType === 'fortune' ? 0.30 + rng() * 2.70 : 1.0;
+    return Math.round(raw * scale * fortuneVariance * 100) / 100;
+}
+
+function r2(n) { return Math.round(n * 100) / 100; }  // round to 2dp, prevent float drift
 
 async function issue(username, type, amount) {
     try {
@@ -66,81 +83,59 @@ async function collectQuest(username, questId, blockId, trxId) {
     try {
         const db = ctx.db;
 
-        // Fetch the quest
         let objectId;
-        try {
-            objectId = new ObjectId(questId);
-        } catch {
+        try { objectId = new ObjectId(questId); }
+        catch {
             console.log(`[SC] quest-collect: invalid questId '${questId}' for ${username}`);
             return false;
         }
 
         const quest = await db.collection('active-quests').findOne({ _id: objectId, username });
-        if (!quest) {
-            console.log(`[SC] quest-collect: quest ${questId} not found for ${username}`);
-            return false;
-        }
-        if (quest.collected) {
-            console.log(`[SC] quest-collect: quest ${questId} already collected by ${username}`);
-            return false;
-        }
-
-        // Timer check
+        if (!quest) { console.log(`[SC] quest-collect: quest ${questId} not found for ${username}`); return false; }
+        if (quest.collected) { console.log(`[SC] quest-collect: already collected by ${username}`); return false; }
         if (quest.completes_at > Date.now()) {
-            console.log(`[SC] quest-collect: quest ${questId} not ready for ${username} (${Math.ceil((quest.completes_at - Date.now()) / 60000)}m remaining)`);
+            console.log(`[SC] quest-collect: ${username} not ready (${Math.ceil((quest.completes_at - Date.now()) / 60000)}m remaining)`);
             return false;
         }
 
-        const tier = quest.tier;
+        const tier    = quest.tier;
         const statReq = TIER_STAT_REQ[tier] || 10;
 
-        // Compute effective roll
-        const seed = createSeed(blockId, trxId, username);
-        const baseRoll = rollDice(100, seed); // 0–100
-
-        const statModifier = Math.min((quest.effective_primary_stat - statReq) / statReq, 1.0);
-        const secondaryBonus = quest.secondary_stat_value != null
-            ? Math.min((quest.secondary_stat_value / statReq) * 10, 10)
-            : 0;
-        const itemBonus = quest.equipped_item_rarity
+        // ── Effective roll ────────────────────────────────────
+        const seed        = createSeed(blockId, trxId, username);
+        const baseRoll    = rollDice(100, seed);
+        const statMod     = Math.min((quest.effective_primary_stat - statReq) / statReq, 1.0);
+        const secBonus    = quest.secondary_stat_value != null
+            ? Math.min((quest.secondary_stat_value / statReq) * 10, 10) : 0;
+        const itemBonus   = quest.equipped_item_rarity
             ? (RARITY_BONUS[quest.equipped_item_rarity] || 0) + (quest.equipped_item_level * (LEVEL_SCALE[quest.equipped_item_rarity] || 0))
             : 0;
-        const effectiveRoll = baseRoll * (1 + statModifier) + secondaryBonus + itemBonus;
+        const effectiveRoll = baseRoll * (1 + statMod) + secBonus + itemBonus;
 
-        // Map effective roll to draw count
+        // ── Draw count (split plateau for smoother progression) ──
         const baseRolls = quest.base_rolls || 2;
         let drawCount;
         let guaranteedLegendary = false;
         let shiftRareUp = false;
 
-        if (effectiveRoll < 40) {
-            drawCount = Math.max(1, Math.floor(baseRolls * 0.5));
-        } else if (effectiveRoll < 65) {
-            drawCount = baseRolls;
-        } else if (effectiveRoll < 80) {
-            drawCount = Math.ceil(baseRolls * 1.5);
-        } else if (effectiveRoll < 91) {
-            drawCount = baseRolls * 2;
-        } else if (effectiveRoll < 96) {
-            drawCount = baseRolls * 2 + 1;
-            shiftRareUp = true;
-        } else if (effectiveRoll < 100) {
-            drawCount = baseRolls * 3;
-        } else {
-            drawCount = baseRolls * 3 + 1;
-            guaranteedLegendary = true;
-        }
+        if      (effectiveRoll <  30) { drawCount = Math.max(1, Math.floor(baseRolls * 0.50)); }
+        else if (effectiveRoll <  50) { drawCount = Math.max(1, Math.floor(baseRolls * 0.75)); }
+        else if (effectiveRoll <  65) { drawCount = baseRolls; }
+        else if (effectiveRoll <  80) { drawCount = Math.ceil(baseRolls * 1.50); }
+        else if (effectiveRoll <  91) { drawCount = baseRolls * 2; }
+        else if (effectiveRoll <  96) { drawCount = baseRolls * 2 + 1; shiftRareUp = true; }
+        else if (effectiveRoll < 100) { drawCount = baseRolls * 3; }
+        else                          { drawCount = baseRolls * 3 + 1; guaranteedLegendary = true; }
 
-        // Execute loot draws
+        // ── Loot draws ───────────────────────────────────────
         const lootTable = getLootTable(quest.quest_type, tier);
-        const relics = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 };
+        const relics    = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 };
 
         for (let i = 0; i < drawCount; i++) {
             const drawSeed = createSeed(blockId, trxId, username + '_drop_' + i);
-            const rng = seedrandom(drawSeed);
+            const rng      = seedrandom(drawSeed);
 
             let table = lootTable;
-            // For the rare-shifted draw (effectiveRoll 91-95), boost rare+
             if (shiftRareUp && i === drawCount - 1) {
                 table = lootTable.map(e => ({
                     rarity: e.rarity,
@@ -148,36 +143,30 @@ async function collectQuest(username, questId, blockId, trxId) {
                 }));
             }
 
-            const rarity = weightedDraw(rng, table);
-            relics[rarity] = (relics[rarity] || 0) + 1;
+            const rarity = weightedDraw(rng, table);  // consumes rng() once
+            const amount = drawAmount(rng, rarity, tier, quest.quest_type);  // consumes rng() once or twice (fortune)
+            relics[rarity] = r2((relics[rarity] || 0) + amount);
         }
 
-        // Guaranteed legendary draw on 100+ roll
+        // Guaranteed legendary draw at 100+ effective roll (also fractional)
         if (guaranteedLegendary) {
-            relics.legendary = (relics.legendary || 0) + 1;
+            const legSeed = createSeed(blockId, trxId, username + '_leg_bonus');
+            const legRng  = seedrandom(legSeed);
+            const legAmt  = drawAmount(legRng, 'legendary', tier, quest.quest_type);
+            relics.legendary = r2((relics.legendary || 0) + legAmt);
         }
 
-        // Issue relics
-        for (const [rarity, count] of Object.entries(relics)) {
-            if (count > 0) {
-                await issue(username, rarity + '_relics', count);
-            }
+        // ── Issue relics ──────────────────────────────────────
+        for (const [rarity, amount] of Object.entries(relics)) {
+            if (amount > 0) await issue(username, rarity + '_relics', amount);
         }
 
-        // Award XP
+        // ── XP + mark collected ───────────────────────────────
         const xpGain = TIER_XP[tier] || 25;
-        await db.collection('players').updateOne(
-            { username },
-            { $inc: { experience: xpGain, version: 1 } }
-        );
+        await db.collection('players').updateOne({ username }, { $inc: { experience: xpGain, version: 1 } });
+        await db.collection('active-quests').updateOne({ _id: objectId }, { $set: { collected: true, collected_at: Date.now() } });
 
-        // Mark quest collected
-        await db.collection('active-quests').updateOne(
-            { _id: objectId },
-            { $set: { collected: true, collected_at: Date.now() } }
-        );
-
-        // Log
+        // ── Quest log ─────────────────────────────────────────
         await db.collection('quest-log').insertOne({
             username,
             action: 'complete',
@@ -194,29 +183,21 @@ async function collectQuest(username, questId, blockId, trxId) {
             time: new Date(),
         });
 
-        // Daily stats
+        // ── Daily stats ───────────────────────────────────────
         const statDate = new Date().toISOString().slice(0, 10);
-        await db.collection('stats').updateOne(
-            { date: statDate },
-            { $inc: { quests_collected: 1 } },
-            { upsert: true }
-        );
+        await db.collection('stats').updateOne({ date: statDate }, { $inc: { quests_collected: 1 } }, { upsert: true });
 
-        // Discord notification
+        // ── Discord ───────────────────────────────────────────
         const relicSummary = Object.entries(relics)
             .filter(([, c]) => c > 0)
-            .map(([r, c]) => `${c}× ${r}`)
+            .map(([r, c]) => `${c} ${r}`)
             .join(', ');
         webhook3(
-            `${username} collected quest "${quest.name}" (T${tier} ${quest.quest_type})`,
-            relics.common.toString(),
-            relics.uncommon.toString(),
-            relics.rare.toString(),
-            relics.epic.toString(),
-            relics.legendary.toString()
+            `${username} completed "${quest.name}" (T${tier} ${quest.quest_type}) — roll ${effectiveRoll.toFixed(1)}, ${drawCount} draws`,
+            String(relics.common), String(relics.uncommon), String(relics.rare), String(relics.epic), String(relics.legendary)
         );
 
-        console.log(`[SC] quest-collect: ${username} completed "${quest.name}" T${tier} — roll=${effectiveRoll.toFixed(1)} draws=${drawCount} relics: ${relicSummary}`);
+        console.log(`[SC] quest-collect: ${username} "${quest.name}" T${tier} — roll=${effectiveRoll.toFixed(1)} draws=${drawCount} relics: ${relicSummary}`);
         return true;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
