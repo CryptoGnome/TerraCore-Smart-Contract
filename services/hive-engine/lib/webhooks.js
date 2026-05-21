@@ -29,41 +29,23 @@ async function marketWebhook(title, message, color) {
     }
 }
 
-async function bossWebhook(title, message, rarity, planet) {
-    let color;
-    let id;
+const RARITY_COLOR = { common: '#bbc0c7', uncommon: '#538a62', rare: '#2a2cbd', epic: '#7c04cc', legendary: '#d98b16' };
+const RARITY_EMOJI = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟠' };
+const IMG = 'https://api.terracoregame.com/images/';
 
-    switch (rarity) {
-        case 'common':
-            color = '#bbc0c7';
-            id = 'common_crate';
-            break;
-        case 'uncommon':
-            color = '#538a62';
-            id = 'uncommon_crate';
-            break;
-        case 'rare':
-            color = '#2a2cbd';
-            id = 'rare_crate';
-            break;
-        case 'epic':
-            color = '#7c04cc';
-            id = 'epic_crate';
-            break;
-        case 'legendary':
-            color = '#d98b16';
-            id = 'legendary_crate';
-            break;
-    }
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
+async function crateDropWebhook(owner, name, itemNumber, rarity, planet) {
     const embed = new MessageBuilder()
-        .setTitle(title)
-        .addField('Message: ', message, true)
-        .addField('Planet: ', planet, true)
-        .setColor(color)
-        .setThumbnail(`https://terracore.herokuapp.com/images/${id}.png`)
+        .setTitle(`${RARITY_EMOJI[rarity] ?? '🎁'} Crate Dropped!`)
+        .addField('Player', owner, true)
+        .addField('Crate', name, true)
+        .addField('Item #', String(itemNumber), true)
+        .addField('Planet', planet, true)
+        .addField('Rarity', capitalize(rarity), true)
+        .setColor(RARITY_COLOR[rarity] ?? '#ffffff')
+        .setThumbnail(`${IMG}${rarity}_crate.png`)
         .setTimestamp();
-
     try {
         await ctx.boss_hook.send(embed);
         console.log('Sent webhook successfully!');
@@ -72,41 +54,35 @@ async function bossWebhook(title, message, rarity, planet) {
     }
 }
 
-async function bossWebhook2(title, message, rarity, planet, type) {
-    let color;
-    let id;
-
-    switch (rarity) {
-        case 'common':
-            color = '#bbc0c7';
-            id = 'common_crate';
-            break;
-        case 'uncommon':
-            color = '#538a62';
-            id = 'uncommon_crate';
-            break;
-        case 'rare':
-            color = '#2a2cbd';
-            id = 'rare_crate';
-            break;
-        case 'epic':
-            color = '#7c04cc';
-            id = 'epic_crate';
-            break;
-        case 'legendary':
-            color = '#d98b16';
-            id = 'legendary_crate';
-            break;
-    }
-
+async function consumableDropWebhook(owner, type, rarity, planet) {
     const embed = new MessageBuilder()
-        .setTitle(title)
-        .addField('Message: ', message, true)
-        .addField('Planet: ', planet, true)
-        .setColor(color)
-        .setThumbnail(`https://terracore.herokuapp.com/images/${type}.png`)
+        .setTitle('🧪 Consumable Dropped!')
+        .addField('Player', owner, true)
+        .addField('Type', capitalize(type) + ' Consumable', true)
+        .addField('Rarity', capitalize(rarity), true)
+        .addField('Planet', planet, true)
+        .setColor(RARITY_COLOR[rarity] ?? '#ffffff')
+        .setThumbnail(`${IMG}${type}_consumable.png`)
         .setTimestamp();
+    try {
+        await ctx.boss_hook.send(embed);
+        console.log('Sent webhook successfully!');
+    } catch (err) {
+        console.log('Discord Webhook Error:', err.message);
+    }
+}
 
+async function relicDropWebhook(owner, relicType, amount, rarity, planet) {
+    const label = relicType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const embed = new MessageBuilder()
+        .setTitle('✨ Relic Dropped!')
+        .addField('Player', owner, true)
+        .addField('Amount', String(amount), true)
+        .addField('Type', label, true)
+        .addField('Planet', planet, true)
+        .setColor(RARITY_COLOR[rarity] ?? '#ffffff')
+        .setThumbnail(`${IMG}${rarity}_relic.png`)
+        .setTimestamp();
     try {
         await ctx.boss_hook.send(embed);
         console.log('Sent webhook successfully!');
@@ -129,4 +105,4 @@ async function forgeWebhook(title, message) {
     }
 }
 
-module.exports = { webhook, marketWebhook, bossWebhook, bossWebhook2, forgeWebhook };
+module.exports = { webhook, marketWebhook, crateDropWebhook, consumableDropWebhook, relicDropWebhook, forgeWebhook };

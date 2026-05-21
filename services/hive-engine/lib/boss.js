@@ -1,7 +1,7 @@
 const { MongoTopologyClosedError } = require('mongodb');
 var seedrandom = require('seedrandom');
 const ctx = require('../context');
-const { bossWebhook, bossWebhook2, marketWebhook } = require('./webhooks');
+const { crateDropWebhook, consumableDropWebhook, relicDropWebhook, marketWebhook } = require('./webhooks');
 
 const FALLBACK_CONFIG = {
     Terracore:   { flux: 1, rarityThresholds: [950, 985, 995, 1000],     rarityValues: ['uncommon', 'rare', 'epic', 'legendary'], dropThresholds: [900, 1000], dropValues: ['consumable', 'crate'] },
@@ -67,7 +67,7 @@ async function mintCrate(owner, _planet, droproll, luck, seed) {
             };
             await ctx.db.collection('crates').insertOne(crate);
             console.log('Minted crate: ' + crate.name + ' for ' + crate.owner + ' #' + crate.item_number);
-            bossWebhook('Crate Dropped!', crate.name + ' has dropped for ' + crate.owner + '! Item #' + crate.item_number, crate.rarity, _planet);
+            crateDropWebhook(crate.owner, crate.name, crate.item_number, crate.rarity, _planet);
             await ctx.db.collection('crate-count').updateOne({ supply: 'total' }, { $inc: { count: 1 } });
             await ctx.db.collection('boss-log').insertOne({ username: crate.owner, planet: _planet, result: true, roll: droproll, luck: luck, rarity: crate.rarity, drop: 'crate', time: Date.now() });
             await ctx.db.collection('nft-drops').insertOne({ name: crate.name, rarity: crate.rarity, owner: crate.owner, item_number: crate.item_number, purchased: false, time: new Date() });
@@ -96,7 +96,7 @@ async function mintCrate(owner, _planet, droproll, luck, seed) {
             } else {
                 await consumables.updateOne({ username: owner, type: type + '_consumable' }, { $inc: { amount: 1 } });
             }
-            bossWebhook2('Consumable Dropped!', 'A ' + rarity + ' ' + type + ' consumable dropped for ' + owner + '!', rarity, _planet, type + '_consumable');
+            consumableDropWebhook(owner, type, rarity, _planet);
             await ctx.db.collection('nft-drops').insertOne({ name: type + '_consumable', rarity: rarity, owner: owner, item_number: null, purchased: false, time: new Date() });
             return drop;
         }
@@ -121,7 +121,7 @@ async function issue(username, type, amount, rarity, planet) {
             await collection.updateOne({ username: username, type: type }, { $inc: { amount: amount } });
         }
         await ctx.db.collection('nft-drops').insertOne({ name: type, rarity: rarity, owner: username, amount: amount, item_number: null, purchased: false, time: new Date() });
-        bossWebhook2('Relic Dropped!', `${amount} ${type} have dropped for ${username}!`, rarity, planet, type);
+        relicDropWebhook(username, type, amount, rarity, planet);
         return true;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
