@@ -2,7 +2,7 @@ const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
 const { claim } = require('./claims');
 const { battle } = require('./combat');
-const { progressQuest, completeQuest } = require('./quests');
+const { collectQuest } = require('./quests');
 const { logError } = require('../../../shared/error-logger');
 
 async function sendTransaction(username, type, target, blockId, trxId, hash) {
@@ -79,11 +79,8 @@ async function sendTransactions() {
                     }
                     break;
                 }
-            } else if (tx.type == 'progress') {
-                await progressQuest(tx.username, tx.blockId, tx.trxId);
-                await collection.deleteOne({ _id: tx._id });
-            } else if (tx.type == 'complete') {
-                await completeQuest(tx.username);
+            } else if (tx.type == 'collect') {
+                await collectQuest(tx.username, tx.target, tx.blockId, tx.trxId);
                 await collection.deleteOne({ _id: tx._id });
             }
         }

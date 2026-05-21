@@ -30,6 +30,21 @@ async function handleTransaction(transaction) {
             else if (event == 'tm_buy_crate') {
                 console.log(`[HE] buy-crate: ${from} (${quantity} SCRAP)`);
                 sendTransaction(from, quantity, 'buy_crate', hashStore);
+            } else if (event == 'terracore_quest_start') {
+                const memoParts = hashStore.split('-');
+                const questType = memoParts[1];
+                const tier = parseInt(memoParts[2], 10);
+                if (await checkHash(hashStore)) {
+                    console.warn(`[HE] duplicate quest-start skipped: hash=${hashStore} user=${from}`);
+                    return;
+                }
+                await storeHash(hashStore, from, quantity);
+                console.log(`[HE] quest-start: ${from} type=${questType} tier=${tier} (${quantity} SCRAP)`);
+                startQuest(from, questType, tier, quantity)
+                    .then(result => {
+                        if (!result) console.warn(`[HE] quest-start failed for ${from}`);
+                    })
+                    .catch(err => logError('HE_QUEST_START_FAIL', err, { fn: 'startQuest', username: from, service: 'HE' }));
             } else {
                 console.log('Unknown SCRAP burn event: ' + event);
             }
@@ -65,24 +80,6 @@ async function handleTransaction(transaction) {
                                 console.log(`[HE] boss-fight result: ${from} → ${planet}:`, result);
                             })
                             .catch(err => logError('HE_BOSS_FIGHT_FAIL', err, { fn: 'bossFight', username: from, service: 'HE' }));
-                    }
-                } else if (memoHash == 'terracore_quest_start') {
-                    const from = transaction['sender'];
-                    if (transaction.logs.includes('errors')) {
-                        storeRejectedHash(payload.memo, from);
-                        return;
-                    }
-                    if (payload.quantity === '2') {
-                        const questHash = payload.memo.hash;
-                        if (questHash && await checkHash(questHash)) {
-                            console.warn(`[HE] duplicate quest-start hash skipped: ${questHash} user=${from}`);
-                            return;
-                        }
-                        if (questHash) await storeHash(questHash, from, payload.quantity);
-                        console.log(`[HE] quest-start: ${from}`);
-                        startQuest(from, questHash);
-                    } else {
-                        console.log(`[HE] quest-start rejected: ${from} (insufficient FLUX)`);
                     }
                 }
             } catch (err) {

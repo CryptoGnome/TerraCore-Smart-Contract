@@ -45,18 +45,19 @@ async function handleOperation(operation, blockId, trxId) {
         await sendTransaction(user, 'battle', data.target, blockId, trxId, Date.now());
     }
 
-    if (operation[0] === 'custom_json' && operation[1].id === 'terracore_quest_progress') {
+    if (operation[0] === 'custom_json' && operation[1].id === 'terracore_quest_collect') {
         const user = extractUser(operation[1]);
         if (!user) return;
-        console.log(`[SC] quest-progress: ${user}`);
-        await sendTransaction(user, 'progress', 'none', blockId, trxId, Date.now());
-    }
-
-    if (operation[0] === 'custom_json' && operation[1].id === 'terracore_quest_complete') {
-        const user = extractUser(operation[1]);
-        if (!user) return;
-        console.log(`[SC] quest-complete: ${user}`);
-        await sendTransaction(user, 'complete', 'none', blockId, trxId);
+        let data;
+        try {
+            data = JSON.parse(operation[1].json);
+        } catch {
+            console.warn(`[SC] quest-collect: invalid JSON from ${user}`);
+            return;
+        }
+        if (!data.quest_id) return;
+        console.log(`[SC] quest-collect: ${user} quest=${data.quest_id}`);
+        await sendTransaction(user, 'collect', data.quest_id, blockId, trxId);
     }
 }
 

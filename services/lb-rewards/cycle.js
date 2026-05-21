@@ -3,8 +3,20 @@ const ctx = require('./context');
 const { findNode, validateNode, fetchWithTimeout } = require('../../shared/he-node');
 const { sleep, retryWithBackoff } = require('../../shared/retry');
 const { logError } = require('../../shared/error-logger');
+var seedrandom = require('seedrandom');
 
 var node;
+
+const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200,  4: 500,  5: 2000 };
+const TIER_DURATION   = { 1: 1,   2: 4,   3: 12,   4: 24,   5: 48   };
+const TIER_BASE_ROLLS = { 1: 2,   2: 3,   3: 4,    4: 5,    5: 7    };
+const QUEST_TARGET_PRICE_DEFAULT = 0.0002;
+const ORACLE_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+const ORACLE_MAX_CYCLE_CHANGE = 0.30;
+const QUEST_TYPES = ['combat', 'salvage', 'stealth', 'fortune', 'defense'];
+
+// Weighted tier draw for random slots (Tier 1:10%, 2:20%, 3:30%, 4:25%, 5:15%)
+const WEIGHTED_TIER_POOL = [1,1,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,5,5,5];
 
 async function ensureMongoConnection() {
     try {
@@ -63,7 +75,6 @@ async function fetchScrapBalance() {
         if (!data.result) throw new Error('Invalid response from Hive Engine');
         return data.result.length > 0 ? parseFloat(data.result[0].balance) : 0;
     }, { maxAttempts: 3, initialDelay: 2000, functionName: 'fetchScrapBalance' });
-    // No .catch() — throws on failure so getRewards() can abort safely
 }
 
 async function getRewards() {
@@ -82,7 +93,6 @@ async function getRewards() {
             return;
         }
 
-        // Fetch SCRAP balance strictly — abort if all retries fail
         let scrapBalance;
         try {
             scrapBalance = await fetchScrapBalance();
@@ -92,20 +102,17 @@ async function getRewards() {
             return;
         }
 
-        // Persist to MongoDB so the API can display accurate expected rewards
         await db.collection('stats').updateOne(
             { date: 'global' },
             { $set: { terracoreScrap: scrapBalance } }
         );
 
-        // Calculate daily pool (0.01% of balance)
         const pool = scrapBalance * 0.0001;
         if (pool <= 0) {
             console.log('terracore SCRAP balance is 0 — skipping reward distribution');
             return;
         }
 
-        // Normalize API rewards to proportional shares of the pool
         const totalApiRewards = json.reduce((sum, u) => sum + (u.reward || 0), 0);
         if (totalApiRewards <= 0) {
             console.log('No reward data from API');
@@ -427,21 +434,241 @@ async function manageFlux() {
     });
 }
 
+// ─── Quest Oracle ─────────────────────────────────────────────────────────────
+
+async function updateQuestOracle() {
+    try {
+        const db = ctx.client.db('terracore');
+        const priceFeed = await db.collection('price_feed').findOne({ date: 'global' });
+        if (!priceFeed) {
+            console.log('[QuestOracle] price_feed not found, skipping');
+            return;
+        }
+
+        const now = Date.now();
+        const lastUpdated = priceFeed.quest_oracle_updated_at || 0;
+        if (now - lastUpdated < ORACLE_INTERVAL_MS) {
+            console.log('[QuestOracle] < 4h since last update, skipping');
+            return;
+        }
+
+        // Fetch current SCRAP spot price
+        let spotPrice;
+        try {
+            const prices = await fetch_prices('SCRAP');
+            spotPrice = parseFloat(prices.bid);
+            if (!spotPrice || spotPrice <= 0) throw new Error('invalid spot price');
+        } catch (err) {
+            logError('LB_QUEST_ORACLE_PRICE', err, { fn: 'updateQuestOracle', service: 'LB' });
+            console.error('[QuestOracle] Failed to fetch SCRAP price, skipping update');
+            return;
+        }
+
+        // Maintain rolling 6-element history (oldest → newest)
+        const history = Array.isArray(priceFeed.scrap_price_history) ? [...priceFeed.scrap_price_history] : [];
+        history.push(spotPrice);
+        if (history.length > 6) history.shift();
+
+        // Compute TWAP from however many readings exist (handles warmup)
+        const twap = history.reduce((a, b) => a + b, 0) / history.length;
+        const targetPrice = priceFeed.quest_target_price || QUEST_TARGET_PRICE_DEFAULT;
+        const rawMultiplier = targetPrice / twap;
+        const newMultiplier = Math.min(Math.max(rawMultiplier, 1.0), 10.0);
+
+        // Circuit breaker: >30% change from previous multiplier
+        const prevMultiplier = priceFeed.quest_cost_multiplier || 1.0;
+        if (prevMultiplier > 0 && Math.abs(newMultiplier - prevMultiplier) / prevMultiplier > ORACLE_MAX_CYCLE_CHANGE) {
+            console.warn(`[QuestOracle] Circuit breaker tripped: prev=${prevMultiplier.toFixed(4)} new=${newMultiplier.toFixed(4)} — skipping update`);
+            // Fire Discord alert
+            try {
+                const { Webhook } = require('discord-webhook-node');
+                if (process.env.SC_DISCORD_WEBHOOK) {
+                    const hook = new Webhook(process.env.SC_DISCORD_WEBHOOK);
+                    await hook.send(`⚠️ Quest oracle circuit breaker tripped: prev=${prevMultiplier.toFixed(4)} → raw=${newMultiplier.toFixed(4)} (SCRAP bid=${spotPrice}). Multiplier unchanged.`);
+                }
+            } catch (webhookErr) {
+                console.error('[QuestOracle] Discord alert failed:', webhookErr.message);
+            }
+            return;
+        }
+
+        await db.collection('price_feed').updateOne(
+            { date: 'global' },
+            {
+                $set: {
+                    quest_cost_multiplier: newMultiplier,
+                    scrap_price_history: history,
+                    quest_oracle_updated_at: now,
+                    quest_target_price: targetPrice,
+                },
+            },
+            { upsert: false }
+        );
+
+        console.log(`[QuestOracle] Updated: SCRAP bid=${spotPrice} TWAP=${twap.toFixed(8)} multiplier=${newMultiplier.toFixed(4)} (prev=${prevMultiplier.toFixed(4)})`);
+    } catch (err) {
+        logError('LB_QUEST_ORACLE_FAIL', err, { fn: 'updateQuestOracle', service: 'LB' });
+    }
+}
+
+// ─── Quest Board Generation ───────────────────────────────────────────────────
+
+function weightedTierPick(rng, allowedTiers) {
+    const pool = WEIGHTED_TIER_POOL.filter(t => allowedTiers.includes(t));
+    if (pool.length === 0) return allowedTiers[Math.floor(rng() * allowedTiers.length)];
+    return pool[Math.floor(rng() * pool.length)];
+}
+
+function pickTemplate(rng, templates, usedIds) {
+    const available = templates.filter(t => !usedIds.has(String(t._id)));
+    if (available.length === 0) return null;
+    return available[Math.floor(rng() * available.length)];
+}
+
+async function generateQuestBoard() {
+    try {
+        const db = ctx.client.db('terracore');
+        const todayDate = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+        const existing = await db.collection('quest-board').findOne({});
+        if (existing && existing.date === todayDate) {
+            console.log('[QuestBoard] Board is current for ' + todayDate + ', skipping generation');
+            return;
+        }
+
+        // Fetch all active templates
+        const allTemplates = await db.collection('quest-templates').find({ active: true }).toArray();
+        if (allTemplates.length === 0) {
+            console.warn('[QuestBoard] No active quest templates found — board not generated');
+            return;
+        }
+
+        const rng = seedrandom(todayDate);
+        const usedIds = new Set();
+        const slots = [];
+
+        // Shuffle the 5 quest types
+        const types = [...QUEST_TYPES];
+        for (let i = types.length - 1; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            [types[i], types[j]] = [types[j], types[i]];
+        }
+
+        // Tier assignments: slot 0 = T1/T2, slot 1 = T2/T3, slot 2 = T3+, slots 3-4 = weighted random
+        const tierRules = [
+            [1, 2],
+            [2, 3],
+            [3, 4, 5],
+            null, // weighted random
+            null,
+        ];
+
+        for (let i = 0; i < 5; i++) {
+            const questType = types[i];
+            let tier;
+            if (tierRules[i]) {
+                tier = tierRules[i][Math.floor(rng() * tierRules[i].length)];
+            } else {
+                tier = weightedTierPick(rng, [1, 2, 3, 4, 5]);
+            }
+
+            // Find templates matching this type + tier (excluding already used)
+            const candidates = allTemplates.filter(t => t.quest_type === questType && t.tier === tier && !usedIds.has(String(t._id)));
+            // If no templates for this exact type+tier, try other tiers for this type
+            let template = candidates.length > 0
+                ? candidates[Math.floor(rng() * candidates.length)]
+                : pickTemplate(rng, allTemplates.filter(t => t.quest_type === questType), usedIds);
+
+            if (!template) {
+                console.warn(`[QuestBoard] No template found for type=${questType} tier=${tier}, skipping slot`);
+                continue;
+            }
+
+            usedIds.add(String(template._id));
+            slots.push({
+                template_id: template._id,
+                quest_type: template.quest_type,
+                tier: template.tier,
+                name: template.name,
+                duration_hours: TIER_DURATION[template.tier],
+                base_rolls: TIER_BASE_ROLLS[template.tier],
+            });
+        }
+
+        // Bonus 6th slot: 10% legendary, 90% weighted random
+        const legendaryRoll = rng();
+        let bonusTemplate = null;
+        if (legendaryRoll < 0.10) {
+            const legendaries = allTemplates.filter(t => t.legendary === true && !usedIds.has(String(t._id)));
+            if (legendaries.length > 0) {
+                bonusTemplate = legendaries[Math.floor(rng() * legendaries.length)];
+            }
+        }
+        if (!bonusTemplate) {
+            bonusTemplate = pickTemplate(rng, allTemplates, usedIds);
+        }
+        if (bonusTemplate) {
+            usedIds.add(String(bonusTemplate._id));
+            slots.push({
+                template_id: bonusTemplate._id,
+                quest_type: bonusTemplate.quest_type,
+                tier: bonusTemplate.tier,
+                name: bonusTemplate.name,
+                duration_hours: TIER_DURATION[bonusTemplate.tier],
+                base_rolls: TIER_BASE_ROLLS[bonusTemplate.tier],
+            });
+        }
+
+        await db.collection('quest-board').replaceOne(
+            {},
+            { date: todayDate, slots, generated_at: Date.now() },
+            { upsert: true }
+        );
+
+        console.log(`[QuestBoard] Generated board for ${todayDate} with ${slots.length} slots`);
+    } catch (err) {
+        logError('LB_QUEST_BOARD_FAIL', err, { fn: 'generateQuestBoard', service: 'LB' });
+    }
+}
+
+// ─── Quest Expiry Cleanup ─────────────────────────────────────────────────────
+
+async function cleanupExpiredQuests() {
+    try {
+        const db = ctx.client.db('terracore');
+        const result = await db.collection('active-quests').deleteMany({ expires_at: { $lt: Date.now() } });
+        if (result.deletedCount > 0) {
+            console.log(`[QuestCleanup] Deleted ${result.deletedCount} expired quest(s)`);
+        }
+    } catch (err) {
+        logError('LB_QUEST_CLEANUP_FAIL', err, { fn: 'cleanupExpiredQuests', service: 'LB' });
+    }
+}
+
+// ─── Main Cycle ───────────────────────────────────────────────────────────────
+
 async function runCycle() {
-    console.log('\n[1/5] Finding fastest node...');
+    console.log('\n[1/7] Finding fastest node...');
     node = await findNode();
 
-    console.log('\n[2/5] Managing FLUX...');
+    console.log('\n[2/7] Managing FLUX...');
     await manageFlux();
 
-    console.log('\n[3/5] Processing SWAP.HIVE...');
+    console.log('\n[3/7] Processing SWAP.HIVE...');
     await withdrawSwapHive();
 
-    console.log('\n[4/5] Distributing rewards...');
+    console.log('\n[4/7] Distributing rewards...');
     await getRewards();
 
-    console.log('\n[5/5] Distributing revenue...');
+    console.log('\n[5/7] Distributing revenue...');
     await distributeRevenue();
+
+    console.log('\n[6/7] Updating quest oracle...');
+    await updateQuestOracle();
+
+    console.log('\n[7/7] Generating quest board + cleanup...');
+    await generateQuestBoard();
+    await cleanupExpiredQuests();
 }
 
 module.exports = { runCycle };
