@@ -114,8 +114,10 @@ async function handleTransaction(transaction) {
             const sender    = transaction['sender'];
             const qty       = payload.quantity;
             const hashStore = payload.memo;
-            if (transaction.logs.includes('errors')) {
+            const stakeLogs = JSON.parse(transaction.logs);
+            if (stakeLogs.errors && stakeLogs.errors.length > 0) {
                 storeRejectedHash(hashStore, sender);
+                return;
             }
             console.log(`[HE] stake: ${sender} (${qty} SCRAP)`);
             webhook('New Stake', sender + ' has staked ' + qty + ' SCRAP', '#FFA500');
