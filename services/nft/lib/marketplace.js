@@ -236,28 +236,24 @@ async function purchaseItem(memo, price, buyer) {
                 return;
             }
 
-            const session = ctx.client.startSession();
             try {
-                await session.withTransaction(async () => {
-                    await ctx.db.collection(collectionName).updateOne(
-                        { username: memo.seller, type: memo.type },
-                        {
-                            $inc: { amount: -memo.amount },
-                            $set: memo.amount < item.market.amount
-                                ? { 'market.amount': item.market.amount - memo.amount }
-                                : { 'market.listed': false, 'market.amount': 0, 'market.price': 0, 'market.seller': null, 'market.created': 0 }
-                        },
-                        { session }
-                    );
+                await ctx.db.collection(collectionName).updateOne(
+                    { username: memo.seller, type: memo.type },
+                    {
+                        $inc: { amount: -memo.amount },
+                        $set: memo.amount < item.market.amount
+                            ? { 'market.amount': item.market.amount - memo.amount }
+                            : { 'market.listed': false, 'market.amount': 0, 'market.price': 0, 'market.seller': null, 'market.created': 0 }
+                    }
+                );
 
-                    await ctx.db.collection(collectionName).updateOne(
-                        { username: memo.buyer, type: memo.type },
-                        { $inc: { amount: memo.amount } },
-                        { upsert: true, session }
-                    );
+                await ctx.db.collection(collectionName).updateOne(
+                    { username: memo.buyer, type: memo.type },
+                    { $inc: { amount: memo.amount } },
+                    { upsert: true }
+                );
 
-                    await marketplaceLog('purchase', item.type, item.type, buyer, memo.seller, item_price, memo.marketplace, item.rarity, memo.amount);
-                });
+                await marketplaceLog('purchase', item.type, item.type, buyer, memo.seller, item_price, memo.marketplace, item.rarity, memo.amount);
 
                 refundNeeded = false;
 
@@ -278,11 +274,8 @@ async function purchaseItem(memo, price, buyer) {
                 webhook4(`${collectionName.charAt(0).toUpperCase() + collectionName.slice(1)} Purchased`, item.type, memo.amount.toString(), item_price.toString(), buyer, memo.seller);
 
             } catch (error) {
-                console.error('Transaction failed:', error);
+                console.error('Purchase failed:', error);
                 refundReason = 'Transaction failed';
-                await refundBuyer(refundReason);
-            } finally {
-                await session.endSession();
             }
         } else {
             const VALID_ITEM_COLLECTIONS = ['items'];
@@ -294,19 +287,15 @@ async function purchaseItem(memo, price, buyer) {
             let collection = ctx.db.collection(memo.type);
             let check = await collection.findOne({ item_number: parseInt(memo.item_number) });
             if (check) {
-                if (check.market.listed && check.market.price == price && check.market.seller == memo.seller && check.owner == memo.seller && !check.equiped) {
-                    const session = ctx.client.startSession();
+                if (check.market.listed && parseFloat(check.market.price) === parseFloat(price) && check.market.seller == memo.seller && check.owner == memo.seller && !check.equiped) {
                     try {
-                        await session.withTransaction(async () => {
-                            const updateResult = await collection.updateOne(
-                                { item_number: check.item_number, 'market.listed': true, owner: memo.seller },
-                                { $set: { owner: buyer, market: { listed: false, seller: null, price: 0, sold: Date.now() } } },
-                                { session }
-                            );
-                            if (updateResult.modifiedCount === 0) {
-                                throw new Error('Item no longer available — concurrent purchase');
-                            }
-
+                        const updateResult = await collection.updateOne(
+                            { item_number: check.item_number, 'market.listed': true, owner: memo.seller },
+                            { $set: { owner: buyer, market: { listed: false, seller: null, price: 0, sold: Date.now() } } }
+                        );
+                        if (updateResult.modifiedCount === 0) {
+                            refundReason = 'Item no longer available — concurrent purchase';
+                        } else {
                             let amount = parseFloat(price.split(' ')[0]);
                             let seller_amount = amount * 0.95;
                             let marketplace_amount = amount * 0.025;
@@ -322,17 +311,16 @@ async function purchaseItem(memo, price, buyer) {
                                 var total = marketplace_amount + terracore_amount;
                                 await sendTransaction('crypt0gnome', total.toFixed(3) + ' HIVE', `Terracore Marketplace Fee for Sale of ${check.name} #${check.item_number} to ${buyer}`);
                             }
-                        });
 
-                        refundNeeded = false;
-                        webhook('Item Purchased', `Item # ${check.item_number}  ${check.name} was purchased by ${buyer} for ${price}`, check.rarity, check.attributes, '#81fc8d', check.id);
+                            refundNeeded = false;
+                            webhook('Item Purchased', `Item # ${check.item_number}  ${check.name} was purchased by ${buyer} for ${price}`, check.rarity, check.attributes, '#81fc8d', check.id);
+                        }
                     } catch (error) {
-                        console.error('Transaction failed:', error);
+                        console.error('Purchase failed:', error);
                         refundReason = 'Transaction failed';
-                    } finally {
-                        await session.endSession();
                     }
                 } else {
+                    console.log(`[NFT] purchaseItem reject #${memo.item_number}: listed=${check.market.listed} priceMatch=${parseFloat(check.market.price) === parseFloat(price)}(stored="${check.market.price}" sent="${price}") sellerMatch=${check.market.seller == memo.seller} ownerMatch=${check.owner == memo.seller} equipped=${check.equiped}`);
                     refundReason = 'Item is no longer available for purchase';
                 }
             } else {
