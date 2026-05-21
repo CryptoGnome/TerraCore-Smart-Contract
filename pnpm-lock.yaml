@@ -6,7 +6,7 @@ settings:
 
 overrides:
   axios: ^1.15.2
-  ws: ^8.20.0
+  ws: ^8.20.1
 
 importers:
 
@@ -643,8 +643,8 @@ packages:
     resolution: {integrity: sha512-HxJdYWq1MTIQbJ3nw0cqssHoTNU267KlrDuGZ1WYlxDStUtKUhOaJmh112/TZmHxxUfuJqPXSOm7tDyas0OSIQ==}
     hasBin: true
 
-  ws@8.20.0:
-    resolution: {integrity: sha512-sAt8BhgNbzCtgGbt2OxmpuryO63ZoDk/sqaB/znQm94T4fCEsy/yV+7CdC1kJhOU9lboAEU7R3kquuycDoibVA==}
+  ws@8.20.1:
+    resolution: {integrity: sha512-It4dO0K5v//JtTXuPkfEOaI3uUN87iYPnqo/ZzqCoG3g8uhA66QUMs/SrM0YK7/NAu+r4LMh/9dq2A7k+rHs+w==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -683,7 +683,7 @@ snapshots:
       retry: 0.12.0
       ripemd160: 2.0.3
       secure-random: 1.1.2
-      ws: 8.20.0
+      ws: 8.20.1
     transitivePeerDependencies:
       - bufferutil
       - encoding
@@ -1282,4 +1282,4 @@ snapshots:
     dependencies:
       isexe: 2.0.0
 
-  ws@8.20.0: {}
+  ws@8.20.1: {}
