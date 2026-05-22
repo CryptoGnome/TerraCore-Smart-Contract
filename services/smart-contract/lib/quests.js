@@ -32,14 +32,12 @@ const AMOUNT_BASE = {
     legendary: { min: 0.08, max: 2.00 },
 };
 
-// Extra draws when the equipped item's primary attribute is strong in the relevant stat.
-// Item attributes are fractional (0–1+ range); thresholds are calibrated to that scale.
-function getAffinityBonus(itemAttributeValue, tierStatReq) {
+// Fractional affinity: attribute × 4 = expected extra draws (0–4 for attr 0–1.0).
+// e.g. attr 0.51 → 2.04 raw → 2 guaranteed draws + 4% chance of a third.
+// Caller must split into floor (guaranteed) + fractional (probabilistic) parts.
+function getAffinityBonus(itemAttributeValue) {
     if (!itemAttributeValue || itemAttributeValue <= 0) return 0;
-    if (itemAttributeValue >= 0.75) return 3;
-    if (itemAttributeValue >= 0.50) return 2;
-    if (itemAttributeValue >= 0.25) return 1;
-    return 0;
+    return itemAttributeValue * 4;
 }
 
 function getLootTable(questType, tier) {
@@ -137,11 +135,15 @@ async function collectQuest(username, questId, blockId, trxId) {
         else if (effectiveRoll < 100) { drawCount = baseRolls * 3; }
         else                          { drawCount = baseRolls * 3 + 1; guaranteedLegendary = true; }
 
-        // Affinity bonus: extra draws for well-matched items
-        const affBonus = getAffinityBonus(quest.item_attribute_value, statReq);
-        if (affBonus > 0) {
-            drawCount += affBonus;
-            console.log(`[SC] quest-collect: ${username} affinity bonus +${affBonus} draws (item attr=${quest.item_attribute_value} req=${statReq})`);
+        // Affinity bonus: fractional extra draws — floor guaranteed, remainder is a probability roll
+        const rawAff     = getAffinityBonus(quest.item_attribute_value);
+        const affGuar    = Math.floor(rawAff);
+        const affFrac    = rawAff - affGuar;
+        const affRng     = seedrandom(createSeed(blockId, trxId, username + '_aff'));
+        const bonusDraws = affGuar + (affFrac > 0 && affRng() < affFrac ? 1 : 0);
+        if (bonusDraws > 0) {
+            drawCount += bonusDraws;
+            console.log(`[SC] quest-collect: ${username} affinity +${bonusDraws} draws (attr=${quest.item_attribute_value?.toFixed(3)} raw=${rawAff.toFixed(2)})`);
         }
 
         // ── Loot draws ───────────────────────────────────────
