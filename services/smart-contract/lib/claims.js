@@ -22,7 +22,9 @@ function computeCurrentClaims(user) {
     const hoursSince   = Math.floor((Date.now() - (user.lastclaim || 0)) / 3600000);
     const regenAmount  = Math.floor(hoursSince / 4);
     const current      = Math.min(stored + regenAmount, 5);
-    const newLastclaim = regenAmount > 0 ? Date.now() : (user.lastclaim || 0);
+    const newLastclaim = regenAmount > 0
+        ? (user.lastclaim || 0) + regenAmount * 4 * 3600000
+        : (user.lastclaim || 0);
     return { current, newLastclaim };
 }
 

@@ -38,7 +38,9 @@ function computeCurrentAttacks(user) {
     const hoursSince   = Math.floor((Date.now() - (user.lastregen || 0)) / 3600000);
     const regenAmount  = Math.floor(hoursSince / 4);
     const current      = Math.min(stored + regenAmount, effectiveMax);
-    const newLastregen = regenAmount > 0 ? Date.now() : (user.lastregen || 0);
+    const newLastregen = regenAmount > 0
+        ? (user.lastregen || 0) + regenAmount * 4 * 3600000
+        : (user.lastregen || 0);
     return { current, newLastregen };
 }
 
