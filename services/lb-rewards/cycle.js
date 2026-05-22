@@ -12,7 +12,7 @@ const TIER_DURATION   = { 1: 1,   2: 4,   3: 12,   4: 24,   5: 48   };
 const TIER_BASE_ROLLS = { 1: 2,   2: 3,   3: 4,    4: 5,    5: 7    };
 const QUEST_TARGET_PRICE_DEFAULT = 0.0003;
 const ORACLE_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
-const ORACLE_MAX_CYCLE_CHANGE = 0.30;
+const ORACLE_MAX_CYCLE_CHANGE = 0.50;
 const QUEST_TYPES = ['combat', 'salvage', 'stealth', 'fortune', 'defense'];
 
 // Weighted tier draw for random slots (Tier 1:10%, 2:20%, 3:30%, 4:25%, 5:15%)
@@ -475,13 +475,16 @@ async function updateQuestOracle() {
         const rawMultiplier = targetPrice / twap;
         const newMultiplier = Math.min(Math.max(rawMultiplier, 1.0), 20.0);
 
-        // Circuit breaker: >30% change from previous multiplier
-        // Skip during warm-up (fewer than 2 historical readings = no real baseline yet)
+        // Circuit breaker: >50% change from previous multiplier blocks the multiplier write,
+        // but history + timestamp always update so TWAP keeps converging.
+        // Skip during warm-up (fewer than 2 historical readings = no real baseline yet).
         const prevMultiplier = priceFeed.quest_cost_multiplier || 1.0;
         const isWarmup = history.length < 2;
-        if (!isWarmup && prevMultiplier > 0 && Math.abs(newMultiplier - prevMultiplier) / prevMultiplier > ORACLE_MAX_CYCLE_CHANGE) {
-            console.warn(`[QuestOracle] Circuit breaker tripped: prev=${prevMultiplier.toFixed(4)} new=${newMultiplier.toFixed(4)} — skipping update`);
-            // Fire Discord alert
+        const swing = prevMultiplier > 0 ? Math.abs(newMultiplier - prevMultiplier) / prevMultiplier : 0;
+        const breakerTripped = !isWarmup && swing > ORACLE_MAX_CYCLE_CHANGE;
+
+        if (breakerTripped) {
+            console.warn(`[QuestOracle] Circuit breaker tripped: prev=${prevMultiplier.toFixed(4)} raw=${newMultiplier.toFixed(4)} swing=${(swing * 100).toFixed(1)}% — multiplier held, TWAP still tracking`);
             try {
                 const { Webhook } = require('discord-webhook-node');
                 if (process.env.SC_DISCORD_WEBHOOK) {
@@ -491,23 +494,26 @@ async function updateQuestOracle() {
             } catch (webhookErr) {
                 console.error('[QuestOracle] Discord alert failed:', webhookErr.message);
             }
-            return;
         }
+
+        const updateFields = {
+            scrap_price_history: history,
+            quest_oracle_updated_at: now,
+            quest_target_price: targetPrice,
+        };
+        if (!breakerTripped) updateFields.quest_cost_multiplier = newMultiplier;
 
         await db.collection('price_feed').updateOne(
             { date: 'global' },
-            {
-                $set: {
-                    quest_cost_multiplier: newMultiplier,
-                    scrap_price_history: history,
-                    quest_oracle_updated_at: now,
-                    quest_target_price: targetPrice,
-                },
-            },
+            { $set: updateFields },
             { upsert: false }
         );
 
-        console.log(`[QuestOracle] Updated: SCRAP bid=${spotPrice} TWAP=${twap.toFixed(8)} multiplier=${newMultiplier.toFixed(4)} (prev=${prevMultiplier.toFixed(4)})`);
+        if (!breakerTripped) {
+            console.log(`[QuestOracle] Updated: SCRAP bid=${spotPrice} TWAP=${twap.toFixed(8)} multiplier=${newMultiplier.toFixed(4)} (prev=${prevMultiplier.toFixed(4)})`);
+        } else {
+            console.log(`[QuestOracle] History updated: SCRAP bid=${spotPrice} TWAP=${twap.toFixed(8)} (multiplier held at ${prevMultiplier.toFixed(4)} until swing stabilises)`);
+        }
     } catch (err) {
         logError('LB_QUEST_ORACLE_FAIL', err, { fn: 'updateQuestOracle', service: 'LB' });
     }
