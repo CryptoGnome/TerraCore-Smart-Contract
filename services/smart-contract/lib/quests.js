@@ -32,14 +32,13 @@ const AMOUNT_BASE = {
     legendary: { min: 0.08, max: 2.00 },
 };
 
-// Extra draws when the equipped item's primary attribute covers the tier's stat requirement.
-// Rewards specialized items over generic high-level ones.
+// Extra draws when the equipped item's primary attribute is strong in the relevant stat.
+// Item attributes are fractional (0–1+ range); thresholds are calibrated to that scale.
 function getAffinityBonus(itemAttributeValue, tierStatReq) {
-    if (!itemAttributeValue || itemAttributeValue <= 0 || !tierStatReq) return 0;
-    const coverage = itemAttributeValue / tierStatReq;
-    if (coverage >= 1.5) return 3;
-    if (coverage >= 1.0) return 2;
-    if (coverage >= 0.5) return 1;
+    if (!itemAttributeValue || itemAttributeValue <= 0) return 0;
+    if (itemAttributeValue >= 0.75) return 3;
+    if (itemAttributeValue >= 0.50) return 2;
+    if (itemAttributeValue >= 0.25) return 1;
     return 0;
 }
 
