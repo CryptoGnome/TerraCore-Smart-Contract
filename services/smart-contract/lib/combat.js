@@ -65,14 +65,14 @@ async function battle(username, _target, blockId, trxId, hash) {
 
         if (target.registrationTime && Date.now() - target.registrationTime < 86400000) {
             await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
-            await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
+            await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, reason: 'new_user_protection', timestamp: Date.now() });
             webhook('New User Protection', 'User ' + username + ' tried to attack ' + _target + ' but they have new user protection', '#ff6eaf');
             return true;
         }
 
         if (target.consumables.protection > 0 && Date.now() - target.consumables.protection_times[0] < 86400000) {
             await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
-            await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
+            await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, reason: 'protection_potion', timestamp: Date.now() });
             webhook('Protection Potion Active!', 'User ' + username + ' tried to attack ' + _target + ' but they have protection', '#ff6eaf');
             return true;
         }
@@ -84,7 +84,7 @@ async function battle(username, _target, blockId, trxId, hash) {
 
         if (Date.now() - target.lastBattle < 60000) {
             await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
-            await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
+            await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, reason: 'cooldown', timestamp: Date.now() });
             return true;
         }
 
@@ -96,7 +96,7 @@ async function battle(username, _target, blockId, trxId, hash) {
 
             if (checkDodge(target, seed) && user.consumables.focus == 0) {
                 await collection.updateOne({ username: username }, { $set: { attacks: currentAttacks - 1, lastregen: newLastregen }, $inc: { version: 1 } });
-                await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, seed: seed, roll: roll, dodged: true, timestamp: Date.now() });
+                await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, seed: seed, roll: roll, dodged: true, reason: 'dodge', timestamp: Date.now() });
                 webhook('Attack Dodged', 'User ' + username + ' tried to attack ' + _target + ' but they dodged', '#ff6eaf');
                 return true;
             }
@@ -111,11 +111,11 @@ async function battle(username, _target, blockId, trxId, hash) {
             if (isNaN(scrapToSteal)) {
                 logError('SC_BATTLE_SCRAP_NAN', new Error('scrapToSteal is NaN'), { fn: 'battle', username, blockId });
                 webhook('New Error', 'User ' + username + ' attacked ' + _target + ' but scrapToSteal is NaN', '#6385ff');
-                await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
+                await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, reason: 'error', timestamp: Date.now() });
                 return true;
             }
             if (scrapToSteal <= 0) {
-                await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, timestamp: Date.now() });
+                await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, reason: 'stash_full', timestamp: Date.now() });
                 return true;
             }
 
@@ -125,6 +125,11 @@ async function battle(username, _target, blockId, trxId, hash) {
                 let currentUser   = user;
                 let currentTarget = target;
                 let currentSteal  = parseFloat(scrapToSteal.toFixed(3));
+
+                if (currentSteal <= 0) {
+                    await ctx.db.collection('battle_logs').insertOne({ username: username, attacked: _target, scrap: 0, dodged: false, reason: 'stash_full', timestamp: Date.now() });
+                    return true;
+                }
 
                 for (let i = 0; i < maxAttempts; i++) {
                     if (i > 0) {
