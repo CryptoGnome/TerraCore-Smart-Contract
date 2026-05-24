@@ -31,7 +31,7 @@ async function scrapStaked(username) {
 
 function computeCurrentAttacks(user) {
     const stored       = user.attacks    || 0;
-    const maxAtks      = user.maxAttacks || 8;
+    const maxAtks      = 8;
     const daysSince    = Math.floor((Date.now() - (user.last_upgrade_time || 0)) / (3600000 * 24));
     const weeksDecay   = Math.floor(daysSince / 5);
     const effectiveMax = Math.max(1, maxAtks - weeksDecay);
