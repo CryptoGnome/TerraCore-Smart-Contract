@@ -5,8 +5,12 @@ const { createSeed, rollDice } = require('../../../shared/rng');
 const { webhook3 } = require('./webhooks');
 const { logError } = require('../../../shared/error-logger');
 
-const TIER_STAT_REQ   = { 1: 10,  2: 50,  3: 100, 4: 200, 5: 500 };
-const TIER_XP         = { 1: 25,  2: 50,  3: 100, 4: 200, 5: 400 };
+const TIER_STAT_REQ      = { 1: 10,  2: 50,  3: 100, 4: 200, 5: 500 };
+const TIER_STAT_REQ_ITEM = { 1: 3,   2: 10,  3: 22,  4: 40,  5: 70  }; // luck/dodge — item-only stats
+const TIER_XP            = { 1: 25,  2: 50,  3: 100, 4: 200, 5: 400 };
+
+const PRIMARY_STAT   = { combat:'damage', salvage:'engineering', stealth:'dodge', fortune:'luck', defense:'defense' };
+const ITEM_ONLY_STATS = new Set(['luck', 'dodge']);
 
 const RARITY_BONUS = { common: 5, uncommon: 10, rare: 20, epic: 35, legendary: 50 };
 const LEVEL_SCALE  = { common: 0.5, uncommon: 0.8, rare: 1.2, epic: 1.8, legendary: 2.5 };
@@ -24,12 +28,13 @@ const BASE_LOOT_PROFILES = {
 // Amount range per relic rarity — fractional, Diablo-style random quantity per draw.
 // Tier scale multiplied on top: T1×0.60, T2×0.95, T3×1.30, T4×1.65, T5×2.00
 // Fortune Hunt also gets a per-draw variance multiplier (0.30×–3.00×) for true gambling feel.
+// Amounts tuned so T1 (59 SCRAP, 1h) yields ~1-3 total relic units on a good run.
 const AMOUNT_BASE = {
-    common:    { min: 0.40, max: 3.20 },
-    uncommon:  { min: 0.25, max: 2.20 },
-    rare:      { min: 0.12, max: 1.40 },
-    epic:      { min: 0.06, max: 0.85 },
-    legendary: { min: 0.08, max: 2.00 },
+    common:    { min: 0.20, max: 1.30 },
+    uncommon:  { min: 0.12, max: 0.90 },
+    rare:      { min: 0.06, max: 0.55 },
+    epic:      { min: 0.03, max: 0.35 },
+    legendary: { min: 0.04, max: 0.50 },
 };
 
 // Fractional affinity: attribute × 4 = expected extra draws (0–4 for attr 0–1.0).
@@ -106,34 +111,51 @@ async function collectQuest(username, questId, blockId, trxId) {
             return false;
         }
 
-        const tier    = quest.tier;
-        const statReq = TIER_STAT_REQ[tier] || 10;
+        const tier       = quest.tier;
+        const primaryStat = PRIMARY_STAT[quest.quest_type] || 'damage';
+        const statReq    = ITEM_ONLY_STATS.has(primaryStat)
+            ? (TIER_STAT_REQ_ITEM[tier] || 3)
+            : (TIER_STAT_REQ[tier] || 10);
 
-        // ── Effective roll ────────────────────────────────────
-        const seed        = createSeed(blockId, trxId, username);
-        const baseRoll    = rollDice(100, seed);
-        const statMod     = Math.min((quest.effective_primary_stat - statReq) / statReq, 1.0);
-        const secBonus    = quest.secondary_stat_value != null
-            ? Math.min((quest.secondary_stat_value / statReq) * 10, 10) : 0;
-        const itemBonus   = quest.equipped_item_rarity
-            ? (RARITY_BONUS[quest.equipped_item_rarity] || 0) + (quest.equipped_item_level * (LEVEL_SCALE[quest.equipped_item_rarity] || 0))
+        // ── Effective roll ─────────────────────────────────────────────────────
+        // statMod: wider denominator (4×req) + lower cap (0.75) so maxing requires
+        // significantly more than the bare minimum stat.
+        // Item rarity/level now drives direct draw bonuses, not roll inflation.
+        const seed      = createSeed(blockId, trxId, username);
+        const baseRoll  = rollDice(100, seed);
+        const statMod   = Math.max(0, Math.min(
+            (quest.effective_primary_stat - statReq) / (statReq * 4), 0.75
+        ));
+        const secBonus  = quest.secondary_stat_value != null
+            ? Math.min((quest.secondary_stat_value / Math.max(statReq, 1)) * 8, 8) : 0;
+        // effectiveRoll: stat skill only (item gives draw count bonus separately below)
+        const effectiveRoll = baseRoll * (1 + statMod) + secBonus;
+
+        // itemBonus retained for draw-count bonus calculation (not added to roll)
+        const itemBonus = quest.equipped_item_rarity
+            ? (RARITY_BONUS[quest.equipped_item_rarity] || 0)
+              + ((quest.equipped_item_level || 1) * (LEVEL_SCALE[quest.equipped_item_rarity] || 0))
             : 0;
-        const effectiveRoll = baseRoll * (1 + statMod) + secBonus + itemBonus;
 
-        // ── Draw count (split plateau for smoother progression) ──
+        // ── Draw count ──────────────────────────────────────────────────────────
+        // effectiveRoll range: 0–183 (100 × 1.75 + 8). Brackets tuned accordingly.
         const baseRolls = quest.base_rolls || 2;
         let drawCount;
         let guaranteedLegendary = false;
         let shiftRareUp = false;
 
-        if      (effectiveRoll <  30) { drawCount = Math.max(1, Math.floor(baseRolls * 0.50)); }
-        else if (effectiveRoll <  50) { drawCount = Math.max(1, Math.floor(baseRolls * 0.75)); }
+        if      (effectiveRoll <  35) { drawCount = Math.max(1, Math.floor(baseRolls * 0.50)); }
         else if (effectiveRoll <  65) { drawCount = baseRolls; }
-        else if (effectiveRoll <  80) { drawCount = Math.ceil(baseRolls * 1.50); }
-        else if (effectiveRoll <  91) { drawCount = baseRolls * 2; }
-        else if (effectiveRoll <  96) { drawCount = baseRolls * 2 + 1; shiftRareUp = true; }
-        else if (effectiveRoll < 100) { drawCount = baseRolls * 3; }
-        else                          { drawCount = baseRolls * 3 + 1; guaranteedLegendary = true; }
+        else if (effectiveRoll < 100) { drawCount = Math.ceil(baseRolls * 1.50); }
+        else if (effectiveRoll < 130) { drawCount = baseRolls * 2; }
+        else if (effectiveRoll < 155) { drawCount = Math.ceil(baseRolls * 2.5); shiftRareUp = true; }
+        else if (effectiveRoll < 175) { drawCount = baseRolls * 3; }
+        else                          { drawCount = baseRolls * 3; guaranteedLegendary = true; }
+
+        // Item draw bonus: epic+ items add 1–2 extra draws (replaces roll inflation).
+        // Every 30 itemBonus points = +1 draw, capped at 2.
+        const itemDrawBonus = Math.min(Math.floor(itemBonus / 30), 2);
+        if (itemDrawBonus > 0) drawCount += itemDrawBonus;
 
         // Affinity bonus: fractional extra draws — floor guaranteed, remainder is a probability roll
         const rawAff     = getAffinityBonus(quest.item_attribute_value);
@@ -211,10 +233,7 @@ async function collectQuest(username, questId, blockId, trxId) {
             .filter(([, c]) => c > 0)
             .map(([r, c]) => `${c} ${r}`)
             .join(', ');
-        webhook3(
-            `${username} completed "${quest.name}" (T${tier} ${quest.quest_type}) — roll ${effectiveRoll.toFixed(1)}, ${drawCount} draws`,
-            String(relics.common), String(relics.uncommon), String(relics.rare), String(relics.epic), String(relics.legendary)
-        );
+        webhook3(quest, username, effectiveRoll, drawCount, relics, quest.scrap_paid);
 
         console.log(`[SC] quest-collect: ${username} "${quest.name}" T${tier} — roll=${effectiveRoll.toFixed(1)} draws=${drawCount} relics: ${relicSummary}`);
         return true;

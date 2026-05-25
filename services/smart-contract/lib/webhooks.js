@@ -38,19 +38,30 @@ async function webhook2(title, message, color) {
     }
 }
 
-async function webhook3(title, common, uncommon, rare, epic, legendary) {
+async function webhook3(quest, player, effectiveRoll, drawCount, relics, scrapPaid) {
+    const EMOJI   = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
+    const COLORS  = { legendary: '#FFD700', epic: '#9B59B6', rare: '#3498DB', uncommon: '#2ECC71', common: '#95A5A6' };
+    const TIER_LABEL = { 1: 'T1', 2: 'T2', 3: 'T3', 4: 'T4', 5: 'T5' };
+
+    const topRarity = ['legendary','epic','rare','uncommon','common'].find(r => (relics[r] || 0) > 0) || 'common';
+
+    const relicParts = ['legendary','epic','rare','uncommon','common']
+        .filter(r => (relics[r] || 0) > 0)
+        .map(r => `${EMOJI[r]} **${relics[r]}** ${r}`);
+
+    const relicLine = relicParts.length ? relicParts.join('  ·  ') : '_No relics_';
+    const questLabel = `${TIER_LABEL[quest.tier] || `T${quest.tier}`} ${quest.quest_type}`;
+
     const embed = new MessageBuilder()
-        .setTitle(title)
-        .addField('Common Relics: ', common, true)
-        .addField('Uncommon Relics: ', uncommon, false)
-        .addField('Rare Relics: ', rare, false)
-        .addField('Epic Relics: ', epic, false)
-        .addField('Legendary Relics: ', legendary, false)
-        .setColor('#00ff00')
+        .setTitle(`${player} completed "${quest.name}"`)
+        .setDescription(relicLine)
+        .addField('Mission', questLabel, true)
+        .addField('SCRAP', `${scrapPaid || '?'}`, true)
+        .addField('Roll', `${effectiveRoll.toFixed(1)}  ·  ${drawCount} draws`, true)
+        .setColor(COLORS[topRarity])
         .setTimestamp();
     try {
-        ctx.hook3.send(embed).then(() => console.log('Sent webhook successfully!'))
-            .catch(err => console.log(err.message));
+        ctx.hook3.send(embed).catch(err => console.log(err.message));
     } catch (err) {
         console.log("Discord Webhook Error:", err.message);
     }
