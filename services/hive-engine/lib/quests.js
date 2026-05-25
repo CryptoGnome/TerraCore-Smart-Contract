@@ -1,6 +1,7 @@
 const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
 const { logError } = require('../../../shared/error-logger');
+const { questStartWebhook } = require('./webhooks');
 
 const TIER_LEVEL_REQ  = { 1: 1,   2: 10,  3: 25,  4: 50,  5: 100 };
 // Upgradeable stats (damage, defense, engineering) — linear SCRAP progression
@@ -222,6 +223,7 @@ async function startQuest(username, questType, tier, paidAmount) {
         );
 
         console.log(`[HE] quest-start: ${username} started ${questType} tier ${tier} "${template.name}" (${durationHours}h, paid ${paid} SCRAP)`);
+        questStartWebhook(username, template.name, tier, questType, durationHours, paid);
         return true;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {

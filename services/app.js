@@ -201,6 +201,7 @@ async function main() {
     heCtx.market_hook = new Webhook(process.env.HE_MARKET_WEBHOOK);
     heCtx.boss_hook   = new Webhook(process.env.HE_BOSS_WEBHOOK);
     heCtx.forge_hook  = new Webhook(process.env.HE_FORGE_WEBHOOK);
+    heCtx.quest_hook  = new Webhook(process.env.SC_DISCORD_WEBHOOK_3); // same channel as quest completions
 
     // Wire lb-rewards context
     lbCtx.client = client;
