@@ -3,7 +3,13 @@ const ctx = require('../context');
 const { logError } = require('../../../shared/error-logger');
 
 const TIER_LEVEL_REQ  = { 1: 1,   2: 10,  3: 25,  4: 50,  5: 100 };
-const TIER_STAT_REQ   = { 1: 10,  2: 50,  3: 100, 4: 200, 5: 500 };
+// Upgradeable stats (damage, defense, engineering) — linear SCRAP progression
+const TIER_STAT_REQ      = { 1: 10, 2: 50,  3: 100, 4: 200, 5: 500 };
+// Item-only stats (luck, dodge) — can only be raised via NFT items + FLUX forging.
+// Thresholds tuned to item drop rates and forge costs across the player population.
+const TIER_STAT_REQ_ITEM = { 1: 3,  2: 10,  3: 22,  4: 40,  5: 70  };
+const ITEM_ONLY_STATS    = new Set(['luck', 'dodge']);
+
 const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200, 4: 500, 5: 2000 };
 const TIER_DURATION   = { 1: 1,   2: 4,   3: 12,  4: 24,  5: 48  };
 const TIER_BASE_ROLLS = { 1: 2,   2: 3,   3: 4,   4: 5,   5: 7   };
@@ -17,14 +23,28 @@ const QUEST_TYPE_MAP = {
     defense: { primary: 'defense',     secondary: null,    item: 'ship'    },
 };
 
+// For luck/dodge we sum across ALL equipped item slots — these stats can't be
+// upgraded directly so the full loadout should count, not just the quest item.
 function getItemAttributeBonus(player, questType) {
     const mapping = QUEST_TYPE_MAP[questType];
     if (!mapping) return 0;
-    const itemSlot = mapping.item;
     const primaryStat = mapping.primary;
-    const item = player.items && player.items[itemSlot];
+    if (ITEM_ONLY_STATS.has(primaryStat)) {
+        let total = 0;
+        if (player.items) {
+            for (const slot of Object.values(player.items)) {
+                if (slot && slot.attributes) total += slot.attributes[primaryStat] || 0;
+            }
+        }
+        return total;
+    }
+    const item = player.items && player.items[mapping.item];
     if (!item || !item.attributes) return 0;
     return item.attributes[primaryStat] || 0;
+}
+
+function tierStatReq(tier, primaryStat) {
+    return ITEM_ONLY_STATS.has(primaryStat) ? TIER_STAT_REQ_ITEM[tier] : TIER_STAT_REQ[tier];
 }
 
 async function startQuest(username, questType, tier, paidAmount) {
@@ -89,13 +109,13 @@ async function startQuest(username, questType, tier, paidAmount) {
             return false;
         }
 
-        // Effective primary stat check
+        // Effective primary stat check (luck/dodge use item-specific thresholds + all-slot sum)
         const baseStats = player.stats || {};
         const itemBonus = getItemAttributeBonus(player, questType);
         const effectivePrimary = (baseStats[mapping.primary] || 0) + itemBonus;
-        const statReq = TIER_STAT_REQ[tier];
+        const statReq = tierStatReq(tier, mapping.primary);
         if (effectivePrimary < statReq) {
-            console.log(`[HE] quest-start: ${username} effective ${mapping.primary}=${effectivePrimary} < required ${statReq} for tier ${tier}`);
+            console.log(`[HE] quest-start: ${username} effective ${mapping.primary}=${effectivePrimary.toFixed(2)} < required ${statReq} for tier ${tier}`);
             return false;
         }
 
