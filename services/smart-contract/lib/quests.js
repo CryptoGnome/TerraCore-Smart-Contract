@@ -68,8 +68,12 @@ function weightedDraw(rng, table) {
 // Roll a seeded fractional relic amount for one draw.
 // rng has already advanced once (for the rarity draw), so subsequent calls continue the same seed sequence.
 function drawAmount(rng, rarity, tier, questType) {
-    const TIER_SCALE = { 1: 0.60, 2: 0.85, 3: 1.10, 4: 1.35, 5: 1.60 };
-    const scale = TIER_SCALE[tier] || 0.60;            // tapered: slower growth at high tiers
+    // Inverse scale: higher tiers give FEWER relics per draw but FAR better rarity.
+    // T1=0.70 (most relics/draw, all common/uncommon) → T5=0.32 (fewest/draw, 15.7% legendary).
+    // This keeps ALL quest tiers below the boss-miss ceiling (3.28 avg relics).
+    // T5/T1 legendary ratio ≈ 20× — quality, not quantity, is the T5 incentive.
+    const TIER_SCALE = { 1: 0.70, 2: 0.58, 3: 0.48, 4: 0.40, 5: 0.32 };
+    const scale = TIER_SCALE[tier] || 0.70;
     const base  = AMOUNT_BASE[rarity];
     const raw   = base.min + rng() * (base.max - base.min);
     const fortuneVariance = questType === 'fortune' ? 0.20 + rng() * 1.60 : 1.0; // avg=1.0, range 0.20–1.80
@@ -156,7 +160,7 @@ async function collectQuest(username, questId, blockId, trxId) {
 
         // Item draw bonus: epic+ items add 1–2 extra draws (replaces roll inflation).
         // Every 30 itemBonus points = +1 draw, capped at 2.
-        const itemDrawBonus = Math.min(Math.floor(itemBonus / 30), 2);
+        const itemDrawBonus = Math.min(Math.floor(itemBonus / 30), 1); // cap at 1 — epic/legendary each add 1 draw, not 2
         if (itemDrawBonus > 0) drawCount += itemDrawBonus;
 
         // Affinity bonus: fractional extra draws — floor guaranteed, remainder is a probability roll
