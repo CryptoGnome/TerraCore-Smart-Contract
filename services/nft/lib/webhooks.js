@@ -10,7 +10,7 @@ async function webhook(title, message, rarity, stats, color, id) {
             .addField('Message: ', message, true)
             .addField('Rarity: ', rarity.toString(), false)
             .setColor(color)
-            .setThumbnail(`https://terracore.herokuapp.com/images/${rarity + "_crate"}.png`)
+            .setThumbnail(`https://api.terracoregame.com/images/${rarity + "_crate"}.png`)
             .setTimestamp();
     } else {
         switch (rarity) {
@@ -39,7 +39,7 @@ async function webhook(title, message, rarity, stats, color, id) {
             .addField('Luck: ', stats.luck.toString(), true)
             .addField('Engineering: ', stats.engineering.toString(), true)
             .setColor(color)
-            .setThumbnail(`https://terracore.herokuapp.com/images/${id}.png`)
+            .setThumbnail(`https://api.terracoregame.com/images/${id}.png`)
             .setTimestamp();
     }
 
@@ -80,7 +80,7 @@ async function webhook3(title, message, rarity, stats, color, id) {
             .addField('Message: ', message, true)
             .addField('Rarity: ', rarity.toString(), false)
             .setColor(color)
-            .setThumbnail(`https://terracore.herokuapp.com/images/${rarity + "_crate"}.png`)
+            .setThumbnail(`https://api.terracoregame.com/images/${rarity + "_crate"}.png`)
             .setTimestamp();
     } else {
         switch (rarity) {
@@ -109,7 +109,7 @@ async function webhook3(title, message, rarity, stats, color, id) {
             .addField('Luck: ', stats.luck.toString(), true)
             .addField('Engineering: ', stats.engineering.toString(), true)
             .setColor(color)
-            .setThumbnail(`https://terracore.herokuapp.com/images/${id}.png`)
+            .setThumbnail(`https://api.terracoregame.com/images/${id}.png`)
             .setTimestamp();
     }
 
@@ -133,7 +133,7 @@ async function webhook4(title, rarity, quantity, price, buyer, seller) {
         .addField('Buyer: ', buyer, true)
         .addField('Seller: ', seller, true)
         .setColor(color)
-        .setThumbnail(`https://terracore.herokuapp.com/images/${image}.png`)
+        .setThumbnail(`https://api.terracoregame.com/images/${image}.png`)
         .setTimestamp();
 
     try {

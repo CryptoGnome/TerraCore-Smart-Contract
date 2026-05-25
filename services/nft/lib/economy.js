@@ -1,6 +1,6 @@
 const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
-const { questHook } = require('./webhooks');
+const { webhook3 } = require('./webhooks');
 
 async function mintFLUX(username, value) {
     try {
@@ -54,7 +54,7 @@ async function forgeCrate(owner, type) {
         crate.rarity = rarity;
         crate.owner = owner;
         crate.item_number = count.count + 1;
-        crate.image = "https://terracore.herokuapp.com/images/" + rarity + '_crate.png';
+        crate.image = "https://api.terracoregame.com/images/" + rarity + '_crate.png';
         crate.equiped = false;
 
         let market = new Object();
@@ -81,7 +81,7 @@ async function forgeCrate(owner, type) {
             case 'legendary': color = '#d98b16'; break;
         }
 
-        questHook("New Crate Forged", owner + " forged a " + crate.rarity + " crate", color, crate.image);
+        webhook3("New Crate Forged", owner + " forged a " + crate.rarity + " crate", crate.rarity, null, color, null);
         return crate;
 
     } catch (err) {
