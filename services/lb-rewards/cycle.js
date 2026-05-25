@@ -598,6 +598,8 @@ async function generateQuestBoard() {
                 quest_type: template.quest_type,
                 tier: template.tier,
                 name: template.name,
+                flavor: template.flavor || '',
+                image_url: template.image_url || '',
                 duration_hours: TIER_DURATION[template.tier],
                 base_rolls: TIER_BASE_ROLLS[template.tier],
             });
@@ -622,6 +624,8 @@ async function generateQuestBoard() {
                 quest_type: bonusTemplate.quest_type,
                 tier: bonusTemplate.tier,
                 name: bonusTemplate.name,
+                flavor: bonusTemplate.flavor || '',
+                image_url: bonusTemplate.image_url || '',
                 duration_hours: TIER_DURATION[bonusTemplate.tier],
                 base_rolls: TIER_BASE_ROLLS[bonusTemplate.tier],
             });
