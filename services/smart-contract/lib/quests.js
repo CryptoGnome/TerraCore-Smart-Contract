@@ -6,7 +6,7 @@ const { webhook3 } = require('./webhooks');
 const { logError } = require('../../../shared/error-logger');
 
 const TIER_STAT_REQ      = { 1: 10,  2: 50,  3: 100, 4: 200, 5: 500 };
-const TIER_STAT_REQ_ITEM = { 1: 3,   2: 10,  3: 22,  4: 40,  5: 70  }; // luck/dodge — item-only stats
+const TIER_STAT_REQ_ITEM = { 1: 3,   2: 10,  3: 22,  4: 40,  5: 55  }; // luck/dodge — item-only stats
 const TIER_XP            = { 1: 25,  2: 50,  3: 100, 4: 200, 5: 400 };
 
 const PRIMARY_STAT   = { combat:'damage', salvage:'engineering', stealth:'dodge', fortune:'luck', defense:'defense' };
@@ -26,9 +26,10 @@ const BASE_LOOT_PROFILES = {
 };
 
 // Amount range per relic rarity — fractional, Diablo-style random quantity per draw.
-// Tier scale multiplied on top: T1×0.60, T2×0.95, T3×1.30, T4×1.65, T5×2.00
-// Fortune Hunt also gets a per-draw variance multiplier (0.30×–3.00×) for true gambling feel.
-// Amounts tuned so T1 (59 SCRAP, 1h) yields ~1-3 total relic units on a good run.
+// Tier scale (tapered): T1×0.60, T2×0.85, T3×1.10, T4×1.35, T5×1.60
+// Fortune Hunt gets a per-draw variance multiplier centered at 1.0× for gambling feel:
+//   0.20×–1.80× (avg=1.00). Previously 0.30×–3.00× (avg=1.65) made fortune 65% over-efficient.
+// Amounts tuned so T1 (59 SCRAP, 1h) yields ~1-2 total relic units on a good run.
 const AMOUNT_BASE = {
     common:    { min: 0.20, max: 1.30 },
     uncommon:  { min: 0.12, max: 0.90 },
@@ -67,10 +68,11 @@ function weightedDraw(rng, table) {
 // Roll a seeded fractional relic amount for one draw.
 // rng has already advanced once (for the rarity draw), so subsequent calls continue the same seed sequence.
 function drawAmount(rng, rarity, tier, questType) {
-    const scale = 0.60 + (tier - 1) * 0.35;           // T1:0.60 T2:0.95 T3:1.30 T4:1.65 T5:2.00
+    const TIER_SCALE = { 1: 0.60, 2: 0.85, 3: 1.10, 4: 1.35, 5: 1.60 };
+    const scale = TIER_SCALE[tier] || 0.60;            // tapered: slower growth at high tiers
     const base  = AMOUNT_BASE[rarity];
     const raw   = base.min + rng() * (base.max - base.min);
-    const fortuneVariance = questType === 'fortune' ? 0.30 + rng() * 2.70 : 1.0;
+    const fortuneVariance = questType === 'fortune' ? 0.20 + rng() * 1.60 : 1.0; // avg=1.0, range 0.20–1.80
     return Math.round(raw * scale * fortuneVariance * 100) / 100;
 }
 

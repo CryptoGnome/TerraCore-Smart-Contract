@@ -7,7 +7,9 @@ const TIER_LEVEL_REQ  = { 1: 1,   2: 10,  3: 25,  4: 50,  5: 100 };
 const TIER_STAT_REQ      = { 1: 10, 2: 50,  3: 100, 4: 200, 5: 500 };
 // Item-only stats (luck, dodge) — can only be raised via NFT items + FLUX forging.
 // Thresholds tuned to item drop rates and forge costs across the player population.
-const TIER_STAT_REQ_ITEM = { 1: 3,  2: 10,  3: 22,  4: 40,  5: 70  };
+// T5 lowered 70→55: mirafun (best luck player, 47.13) still can't reach it today,
+// but a dedicated Lv150+ all-legendary heavily-forged luck loadout can hit ~55.
+const TIER_STAT_REQ_ITEM = { 1: 3,  2: 10,  3: 22,  4: 40,  5: 55  };
 const ITEM_ONLY_STATS    = new Set(['luck', 'dodge']);
 
 const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200, 4: 500, 5: 2000 };
