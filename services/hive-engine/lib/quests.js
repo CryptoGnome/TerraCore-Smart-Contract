@@ -122,9 +122,11 @@ async function startQuest(username, questType, tier, paidAmount) {
         }
 
         // Item requirement (Tier 3+)
+        // Player items are stored as { item_number, item_equipped, rarity, attributes, ... }
+        // Check item_number (truthy = something is in that slot) not the legacy 'equipped' flag.
         if (tier >= 3) {
             const equippedItem = player.items && player.items[mapping.item];
-            if (!equippedItem || equippedItem.equipped !== true) {
+            if (!equippedItem || !equippedItem.item_number) {
                 console.log(`[HE] quest-start: ${username} missing equipped ${mapping.item} for tier ${tier}`);
                 return false;
             }
