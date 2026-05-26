@@ -53,8 +53,9 @@ async function webhook3(quest, player, effectiveRoll, drawCount, relics, scrapPa
     const questLabel = `${TIER_LABEL[quest.tier] || `T${quest.tier}`} ${quest.quest_type}`;
 
     const embed = new MessageBuilder()
-        .setTitle(`${player} completed "${quest.name}"`)
+        .setTitle(`✅ "${quest.name}"`)
         .setDescription(relicLine)
+        .addField('Player', player, true)
         .addField('Mission', questLabel, true)
         .addField('SCRAP', `${scrapPaid || '?'}`, true)
         .addField('Roll', `${effectiveRoll.toFixed(1)}  ·  ${drawCount} draws`, true)
