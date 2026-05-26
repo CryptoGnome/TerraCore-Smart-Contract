@@ -492,13 +492,15 @@ async function updateQuestOracle() {
         const targetFlux  = priceFeed.quest_flux_target  || QUEST_FLUX_TARGET_DEFAULT;
 
         // Combined oracle formula:
-        //   scrapFactor = targetScrap / scrapTwap   — keeps USD quest cost stable as SCRAP moves
-        //   fluxFactor  = √(fluxTwap / targetFlux)  — dampened adjustment for FLUX value changes
-        //                                              √ prevents extreme swings from FLUX pumps
-        // Combined: when FLUX is expensive → costs rise. When FLUX is cheap → costs fall.
-        // Both factors respond in the same direction when FLUX/SCRAP ratio diverges.
+        //   scrapFactor = targetScrap / scrapTwap  — keeps USD quest cost stable as SCRAP moves
+        //   fluxFactor  = max(1, √(fluxTwap/targetFlux))  — ONE-WAY: only raises costs, never lowers
+        //
+        // Why one-way? When FLUX is cheap, making quests cheaper in SCRAP would push MORE items
+        // onto the market into an already depressed FLUX price — procyclical and harmful.
+        // The SCRAP oracle already handles accessibility (SCRAP rising → fewer SCRAP needed).
+        // The FLUX factor only activates above target to protect FLUX when farming is most profitable.
         const scrapFactor = targetScrap / scrapTwap;
-        const fluxFactor  = Math.sqrt(fluxTwap / targetFlux);
+        const fluxFactor  = Math.max(1.0, Math.sqrt(fluxTwap / targetFlux));
         const rawMultiplier = scrapFactor * fluxFactor;
         const newMultiplier = Math.min(Math.max(rawMultiplier, 1.0), ORACLE_MAX_MULTIPLIER);
 
