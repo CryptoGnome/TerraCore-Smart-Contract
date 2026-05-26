@@ -529,7 +529,8 @@ async function updateQuestOracle() {
             quest_oracle_updated_at: now,
             quest_target_price: targetScrap,
             quest_flux_target:  targetFlux,
-            scrap_usd: scrapSpot,
+            // scrap_usd is NOT written here — it's the USD price maintained by fetch_cost() in the API.
+            // scrapSpot is the HIVE price; overwriting scrap_usd with it would corrupt the USD display.
         };
         if (!breakerTripped) updateFields.quest_cost_multiplier = newMultiplier;
 
