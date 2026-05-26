@@ -142,12 +142,6 @@ async function collectQuest(username, questId, blockId, trxId) {
         // effectiveRoll: stat skill only (item gives draw count bonus separately below)
         const effectiveRoll = baseRoll * (1 + statMod) + secBonus;
 
-        // itemBonus retained for draw-count bonus calculation (not added to roll)
-        const itemBonus = quest.equipped_item_rarity
-            ? (RARITY_BONUS[quest.equipped_item_rarity] || 0)
-              + ((quest.equipped_item_level || 1) * (LEVEL_SCALE[quest.equipped_item_rarity] || 0))
-            : 0;
-
         // ── Draw count ──────────────────────────────────────────────────────────
         // effectiveRoll range: 0–183 (100 × 1.75 + 8). Brackets tuned accordingly.
         const baseRolls = quest.base_rolls || 2;
@@ -163,10 +157,17 @@ async function collectQuest(username, questId, blockId, trxId) {
         else if (effectiveRoll < 175) { drawCount = baseRolls * 3; }
         else                          { drawCount = baseRolls * 3; guaranteedLegendary = true; }
 
-        // Item draw bonus: epic+ items add 1–2 extra draws (replaces roll inflation).
-        // Every 30 itemBonus points = +1 draw, capped at 2.
-        const itemDrawBonus = Math.min(Math.floor(itemBonus / 30), 1); // cap at 1 — epic/legendary each add 1 draw, not 2
-        if (itemDrawBonus > 0) drawCount += itemDrawBonus;
+        // Item draw bonus: two independent components.
+        // 1. Rarity base: rare/epic/legendary grant +1 guaranteed draw.
+        // 2. Level bonus: every forge level above 1 adds 5% chance of one more draw (capped at 100%).
+        //    This makes every forge meaningful regardless of rarity.
+        const itemRarity  = quest.equipped_item_rarity;
+        const itemLevel   = quest.equipped_item_level || 1;
+        const rarityBase  = ['rare', 'epic', 'legendary'].includes(itemRarity) ? 1 : 0;
+        const levelChance = itemRarity ? Math.min((itemLevel - 1) * 0.05, 1.0) : 0;
+        drawCount += rarityBase;
+        const lvlRng = seedrandom(createSeed(blockId, trxId, username + '_lvl'));
+        if (levelChance > 0 && lvlRng() < levelChance) drawCount += 1;
 
         // Affinity bonus: fractional extra draws — floor guaranteed, remainder is a probability roll
         const rawAff     = getAffinityBonus(quest.item_attribute_value);
