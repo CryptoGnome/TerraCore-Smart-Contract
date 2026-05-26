@@ -38,12 +38,17 @@ const AMOUNT_BASE = {
     legendary: { min: 0.04, max: 0.50 },
 };
 
-// Fractional affinity: attribute × 4 = expected extra draws (0–4 for attr 0–1.0).
-// e.g. attr 0.51 → 2.04 raw → 2 guaranteed draws + 4% chance of a third.
-// Caller must split into floor (guaranteed) + fractional (probabilistic) parts.
+// Affinity bonus: item's primary stat attribute contributes 0–1 extra draw.
+// Raw = attribute × 4, capped at 1.0. Split into floor (guaranteed) + fractional (probabilistic).
+// Cap is critical — damage/defense attrs are stored at 10× scale (range 6–60), luck/dodge
+// are 1× scale (range 0.6–6). Without the cap, a weapon with damage_attr=9.6 would give
+// 38 bonus draws, completely breaking rewards.
+// Examples: luck 0.1 → raw 0.4 → 0 draws + 40% chance of 1
+//           luck 0.5 → raw 2.0 → capped at 1 guaranteed draw
+//           damage 9.6 → raw 38.4 → capped at 1 guaranteed draw
 function getAffinityBonus(itemAttributeValue) {
     if (!itemAttributeValue || itemAttributeValue <= 0) return 0;
-    return itemAttributeValue * 4;
+    return Math.min(itemAttributeValue * 4, 1.0);
 }
 
 function getLootTable(questType, tier) {
