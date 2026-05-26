@@ -112,7 +112,8 @@ const QT_EMOJI    = { combat: '⚔️', stealth: '👁', fortune: '🎲', salvag
 async function questStartWebhook(username, questName, tier, questType, durationHours, scrapPaid, imageUrl) {
     const label = `${TIER_LABEL[tier] || `T${tier}`} ${questType}`;
     const embed = new MessageBuilder()
-        .setTitle(`${QT_EMOJI[questType] || '🎯'} ${username} started "${questName}"`)
+        .setTitle(`${QT_EMOJI[questType] || '🎯'} "${questName}"`)
+        .addField('Player', username, true)
         .addField('Mission', label, true)
         .addField('Duration', `${durationHours}h`, true)
         .addField('SCRAP', `${Math.round(scrapPaid)}`, true)
