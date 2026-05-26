@@ -6,7 +6,7 @@ const { webhook3 } = require('./webhooks');
 const { logError } = require('../../../shared/error-logger');
 
 const TIER_STAT_REQ      = { 1: 10,  2: 50,  3: 100, 4: 200, 5: 500 };
-const TIER_STAT_REQ_ITEM = { 1: 3,   2: 10,  3: 22,  4: 40,  5: 55  }; // luck/dodge — item-only stats
+const TIER_STAT_REQ_ITEM = { 1: 2,   2: 5,   3: 12,  4: 20,  5: 40  }; // luck/dodge — item-only stats
 const TIER_XP            = { 1: 25,  2: 50,  3: 100, 4: 200, 5: 400 };
 
 const PRIMARY_STAT   = { combat:'damage', salvage:'engineering', stealth:'dodge', fortune:'luck', defense:'defense' };

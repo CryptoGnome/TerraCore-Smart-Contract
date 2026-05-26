@@ -7,10 +7,11 @@ const TIER_LEVEL_REQ  = { 1: 1,   2: 10,  3: 25,  4: 50,  5: 100 };
 // Upgradeable stats (damage, defense, engineering) — linear SCRAP progression
 const TIER_STAT_REQ      = { 1: 10, 2: 50,  3: 100, 4: 200, 5: 500 };
 // Item-only stats (luck, dodge) — can only be raised via NFT items + FLUX forging.
-// Thresholds tuned to item drop rates and forge costs across the player population.
-// T5 lowered 70→55: mirafun (best luck player, 47.13) still can't reach it today,
-// but a dedicated Lv150+ all-legendary heavily-forged luck loadout can hit ~55.
-const TIER_STAT_REQ_ITEM = { 1: 3,  2: 10,  3: 22,  4: 40,  5: 55  };
+// Thresholds recalibrated after fixing double-count bug (API was writing itemLuck into
+// player.stats, causing SC to count it twice). Values now match single-counted item totals.
+// mirafun (best luck/dodge player, 47.13/43.94) is the only player who currently qualifies
+// for T5 fortune/stealth, which is the intended endgame gate for dedicated luck/dodge builds.
+const TIER_STAT_REQ_ITEM = { 1: 2,  2: 5,   3: 12,  4: 20,  5: 40  };
 const ITEM_ONLY_STATS    = new Set(['luck', 'dodge']);
 
 const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200, 4: 500, 5: 2000 };
@@ -113,9 +114,12 @@ async function startQuest(username, questType, tier, paidAmount) {
         }
 
         // Effective primary stat check (luck/dodge use item-specific thresholds + all-slot sum)
+        // For item-only stats the base is always 0 — the API writes item luck/dodge into
+        // player.stats which would double-count if we added itemBonus on top.
         const baseStats = player.stats || {};
         const itemBonus = getItemAttributeBonus(player, questType);
-        const effectivePrimary = (baseStats[mapping.primary] || 0) + itemBonus;
+        const basePrimary = ITEM_ONLY_STATS.has(mapping.primary) ? 0 : (baseStats[mapping.primary] || 0);
+        const effectivePrimary = basePrimary + itemBonus;
         const statReq = tierStatReq(tier, mapping.primary);
         if (effectivePrimary < statReq) {
             console.log(`[HE] quest-start: ${username} effective ${mapping.primary}=${effectivePrimary.toFixed(2)} < required ${statReq} for tier ${tier}`);
