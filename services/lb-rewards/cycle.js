@@ -10,9 +10,11 @@ var node;
 const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200,  4: 500,  5: 2000 };
 const TIER_DURATION   = { 1: 1,   2: 4,   3: 12,   4: 24,   5: 48   };
 const TIER_BASE_ROLLS = { 1: 2,   2: 3,   3: 4,    4: 5,    5: 7    };
-const QUEST_TARGET_PRICE_DEFAULT = 0.0003;
-const ORACLE_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+const QUEST_TARGET_PRICE_DEFAULT = 0.0003;       // target SCRAP price in HIVE
+const QUEST_FLUX_TARGET_DEFAULT  = 3.0;           // target FLUX price in HIVE (~$0.185 at current HIVE)
+const ORACLE_INTERVAL_MS = 4 * 60 * 60 * 1000;   // 4 hours
 const ORACLE_MAX_CYCLE_CHANGE = 0.50;
+const ORACLE_MAX_MULTIPLIER = 50.0;               // raised from 20 to allow flux-adjusted range
 const QUEST_TYPES = ['combat', 'salvage', 'stealth', 'fortune', 'defense'];
 
 // Weighted tier draw for random slots (Tier 1:10%, 2:20%, 3:30%, 4:25%, 5:15%)
@@ -452,44 +454,67 @@ async function updateQuestOracle() {
             return;
         }
 
-        // Fetch current SCRAP spot price
-        let spotPrice;
+        // Fetch SCRAP and FLUX spot prices (both priced in HIVE on Hive Engine)
+        let scrapSpot, fluxSpot;
         try {
-            const prices = await fetch_prices('SCRAP');
-            spotPrice = parseFloat(prices.bid);
-            if (!spotPrice || spotPrice <= 0) throw new Error('invalid spot price');
+            const scrapPrices = await fetch_prices('SCRAP');
+            scrapSpot = parseFloat(scrapPrices.bid);
+            if (!scrapSpot || scrapSpot <= 0) throw new Error('invalid SCRAP spot price');
         } catch (err) {
-            logError('LB_QUEST_ORACLE_PRICE', err, { fn: 'updateQuestOracle', service: 'LB' });
+            logError('LB_QUEST_ORACLE_SCRAP', err, { fn: 'updateQuestOracle', service: 'LB' });
             console.error('[QuestOracle] Failed to fetch SCRAP price, skipping update');
             return;
         }
+        try {
+            const fluxPrices = await fetch_prices('FLUX');
+            fluxSpot = parseFloat(fluxPrices.bid);
+            if (!fluxSpot || fluxSpot <= 0) throw new Error('invalid FLUX spot price');
+        } catch (err) {
+            // FLUX price failure is non-fatal — fall back to target price (flux factor = 1.0)
+            logError('LB_QUEST_ORACLE_FLUX', err, { fn: 'updateQuestOracle', service: 'LB' });
+            console.warn('[QuestOracle] Failed to fetch FLUX price, using target as fallback');
+            fluxSpot = priceFeed.quest_flux_target || QUEST_FLUX_TARGET_DEFAULT;
+        }
 
-        // Maintain rolling 6-element history (oldest → newest)
-        const history = Array.isArray(priceFeed.scrap_price_history) ? [...priceFeed.scrap_price_history] : [];
-        history.push(spotPrice);
-        if (history.length > 6) history.shift();
+        // Maintain rolling 6-element TWAP histories for both tokens
+        const scrapHistory = Array.isArray(priceFeed.scrap_price_history) ? [...priceFeed.scrap_price_history] : [];
+        scrapHistory.push(scrapSpot);
+        if (scrapHistory.length > 6) scrapHistory.shift();
 
-        // Compute TWAP from however many readings exist (handles warmup)
-        const twap = history.reduce((a, b) => a + b, 0) / history.length;
-        const targetPrice = priceFeed.quest_target_price || QUEST_TARGET_PRICE_DEFAULT;
-        const rawMultiplier = targetPrice / twap;
-        const newMultiplier = Math.min(Math.max(rawMultiplier, 1.0), 20.0);
+        const fluxHistory = Array.isArray(priceFeed.flux_price_history) ? [...priceFeed.flux_price_history] : [];
+        fluxHistory.push(fluxSpot);
+        if (fluxHistory.length > 6) fluxHistory.shift();
 
-        // Circuit breaker: >50% change from previous multiplier blocks the multiplier write,
-        // but history + timestamp always update so TWAP keeps converging.
-        // Skip during warm-up (fewer than 2 historical readings = no real baseline yet).
+        const scrapTwap = scrapHistory.reduce((a, b) => a + b, 0) / scrapHistory.length;
+        const fluxTwap  = fluxHistory.reduce((a, b) => a + b, 0) / fluxHistory.length;
+
+        const targetScrap = priceFeed.quest_target_price || QUEST_TARGET_PRICE_DEFAULT;
+        const targetFlux  = priceFeed.quest_flux_target  || QUEST_FLUX_TARGET_DEFAULT;
+
+        // Combined oracle formula:
+        //   scrapFactor = targetScrap / scrapTwap   — keeps USD quest cost stable as SCRAP moves
+        //   fluxFactor  = √(fluxTwap / targetFlux)  — dampened adjustment for FLUX value changes
+        //                                              √ prevents extreme swings from FLUX pumps
+        // Combined: when FLUX is expensive → costs rise. When FLUX is cheap → costs fall.
+        // Both factors respond in the same direction when FLUX/SCRAP ratio diverges.
+        const scrapFactor = targetScrap / scrapTwap;
+        const fluxFactor  = Math.sqrt(fluxTwap / targetFlux);
+        const rawMultiplier = scrapFactor * fluxFactor;
+        const newMultiplier = Math.min(Math.max(rawMultiplier, 1.0), ORACLE_MAX_MULTIPLIER);
+
+        // Circuit breaker: >50% swing blocks the multiplier write, TWAP still advances
         const prevMultiplier = priceFeed.quest_cost_multiplier || 1.0;
-        const isWarmup = history.length < 2;
+        const isWarmup = scrapHistory.length < 2 || fluxHistory.length < 2;
         const swing = prevMultiplier > 0 ? Math.abs(newMultiplier - prevMultiplier) / prevMultiplier : 0;
         const breakerTripped = !isWarmup && swing > ORACLE_MAX_CYCLE_CHANGE;
 
         if (breakerTripped) {
-            console.warn(`[QuestOracle] Circuit breaker tripped: prev=${prevMultiplier.toFixed(4)} raw=${newMultiplier.toFixed(4)} swing=${(swing * 100).toFixed(1)}% — multiplier held, TWAP still tracking`);
+            console.warn(`[QuestOracle] Circuit breaker: prev=${prevMultiplier.toFixed(4)} raw=${newMultiplier.toFixed(4)} swing=${(swing*100).toFixed(1)}% — multiplier held`);
             try {
                 const { Webhook } = require('discord-webhook-node');
                 if (process.env.SC_DISCORD_WEBHOOK) {
                     const hook = new Webhook(process.env.SC_DISCORD_WEBHOOK);
-                    await hook.send(`⚠️ Quest oracle circuit breaker tripped: prev=${prevMultiplier.toFixed(4)} → raw=${newMultiplier.toFixed(4)} (SCRAP bid=${spotPrice}). Multiplier unchanged.`);
+                    await hook.send(`⚠️ Quest oracle circuit breaker: prev=${prevMultiplier.toFixed(4)} → raw=${newMultiplier.toFixed(4)} (SCRAP=${scrapSpot}, FLUX=${fluxSpot}). Multiplier unchanged.`);
                 }
             } catch (webhookErr) {
                 console.error('[QuestOracle] Discord alert failed:', webhookErr.message);
@@ -497,9 +522,12 @@ async function updateQuestOracle() {
         }
 
         const updateFields = {
-            scrap_price_history: history,
+            scrap_price_history: scrapHistory,
+            flux_price_history:  fluxHistory,
             quest_oracle_updated_at: now,
-            quest_target_price: targetPrice,
+            quest_target_price: targetScrap,
+            quest_flux_target:  targetFlux,
+            scrap_usd: scrapSpot,
         };
         if (!breakerTripped) updateFields.quest_cost_multiplier = newMultiplier;
 
@@ -510,9 +538,9 @@ async function updateQuestOracle() {
         );
 
         if (!breakerTripped) {
-            console.log(`[QuestOracle] Updated: SCRAP bid=${spotPrice} TWAP=${twap.toFixed(8)} multiplier=${newMultiplier.toFixed(4)} (prev=${prevMultiplier.toFixed(4)})`);
+            console.log(`[QuestOracle] Updated: SCRAP=${scrapSpot.toFixed(8)} FLUX=${fluxSpot.toFixed(4)} scrapFactor=${scrapFactor.toFixed(3)} fluxFactor=${fluxFactor.toFixed(3)} multiplier=${newMultiplier.toFixed(4)} (prev=${prevMultiplier.toFixed(4)})`);
         } else {
-            console.log(`[QuestOracle] History updated: SCRAP bid=${spotPrice} TWAP=${twap.toFixed(8)} (multiplier held at ${prevMultiplier.toFixed(4)} until swing stabilises)`);
+            console.log(`[QuestOracle] TWAP updated, multiplier held at ${prevMultiplier.toFixed(4)}: SCRAP=${scrapSpot.toFixed(8)} FLUX=${fluxSpot.toFixed(4)}`);
         }
     } catch (err) {
         logError('LB_QUEST_ORACLE_FAIL', err, { fn: 'updateQuestOracle', service: 'LB' });
