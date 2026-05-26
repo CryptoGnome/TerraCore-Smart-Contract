@@ -109,7 +109,7 @@ const TIER_COLORS = { 1: '#95A5A6', 2: '#2ECC71', 3: '#3498DB', 4: '#F1C40F', 5:
 const TIER_LABEL  = { 1: 'T1', 2: 'T2', 3: 'T3', 4: 'T4', 5: 'T5' };
 const QT_EMOJI    = { combat: '⚔️', stealth: '👁', fortune: '🎲', salvage: '🔧', defense: '🛡' };
 
-async function questStartWebhook(username, questName, tier, questType, durationHours, scrapPaid) {
+async function questStartWebhook(username, questName, tier, questType, durationHours, scrapPaid, imageUrl) {
     const label = `${TIER_LABEL[tier] || `T${tier}`} ${questType}`;
     const embed = new MessageBuilder()
         .setTitle(`${QT_EMOJI[questType] || '🎯'} ${username} started "${questName}"`)
@@ -118,6 +118,7 @@ async function questStartWebhook(username, questName, tier, questType, durationH
         .addField('SCRAP', `${Math.round(scrapPaid)}`, true)
         .setColor(TIER_COLORS[tier] || '#95A5A6')
         .setTimestamp();
+    if (imageUrl) embed.setThumbnail(imageUrl);
     try {
         ctx.quest_hook.send(embed).catch(err => console.log(err.message));
     } catch (err) {

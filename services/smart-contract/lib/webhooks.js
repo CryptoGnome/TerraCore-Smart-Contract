@@ -60,6 +60,7 @@ async function webhook3(quest, player, effectiveRoll, drawCount, relics, scrapPa
         .addField('Roll', `${effectiveRoll.toFixed(1)}  ·  ${drawCount} draws`, true)
         .setColor(COLORS[topRarity])
         .setTimestamp();
+    if (quest.image_url) embed.setThumbnail(quest.image_url);
     try {
         ctx.hook3.send(embed).catch(err => console.log(err.message));
     } catch (err) {

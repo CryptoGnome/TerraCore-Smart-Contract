@@ -175,6 +175,7 @@ async function startQuest(username, questType, tier, paidAmount) {
             quest_type: questType,
             tier,
             name: template.name,
+            image_url: template.image_url || '',
             primary_stat: mapping.primary,
             secondary_stat: mapping.secondary,
             required_item_type: mapping.item,
@@ -223,7 +224,7 @@ async function startQuest(username, questType, tier, paidAmount) {
         );
 
         console.log(`[HE] quest-start: ${username} started ${questType} tier ${tier} "${template.name}" (${durationHours}h, paid ${paid} SCRAP)`);
-        questStartWebhook(username, template.name, tier, questType, durationHours, paid);
+        questStartWebhook(username, template.name, tier, questType, durationHours, paid, template.image_url || '');
         return true;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
