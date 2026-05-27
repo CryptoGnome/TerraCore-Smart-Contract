@@ -27,16 +27,19 @@ const BASE_LOOT_PROFILES = {
 
 // Amount range per relic rarity — fractional, Diablo-style random quantity per draw.
 // Tier scale (tapered): T1×0.60, T2×0.85, T3×1.10, T4×1.35, T5×1.60
-// Fortune Hunt gets a per-draw variance multiplier centered at 1.0× for gambling feel:
-//   0.20×–1.80× (avg=1.00). Previously 0.30×–3.00× (avg=1.65) made fortune 65% over-efficient.
-// Amounts tuned so T1 (59 SCRAP, 1h) yields ~1-2 total relic units on a good run.
+// Per-draw variance: 0.20–1.80× (avg=1.0) applied to ALL quest types (was fortune-only).
+// Wider AMOUNT_BASE ranges preserve identical averages while creating Diablo-style loot swings.
 const AMOUNT_BASE = {
-    common:    { min: 0.20, max: 1.30 },
-    uncommon:  { min: 0.12, max: 0.90 },
-    rare:      { min: 0.06, max: 0.55 },
-    epic:      { min: 0.03, max: 0.35 },
-    legendary: { min: 0.04, max: 0.50 },
+    common:    { min: 0.01, max: 1.49 },  // avg 0.75 — unchanged
+    uncommon:  { min: 0.01, max: 1.01 },  // avg 0.51 — unchanged
+    rare:      { min: 0.01, max: 0.60 },  // avg 0.305 — unchanged
+    epic:      { min: 0.01, max: 0.37 },  // avg 0.19 — unchanged
+    legendary: { min: 0.01, max: 0.53 },  // avg 0.27 — unchanged
 };
+
+// 2% per-draw jackpot: bumps rarity one tier + 3× amount. Pure RNG, uses a separate seed.
+const JACKPOT_CHANCE = 0.02;
+const RARITY_BUMP = { common: 'uncommon', uncommon: 'rare', rare: 'epic', epic: 'legendary', legendary: 'legendary' };
 
 // Affinity bonus: item's primary stat attribute contributes 0–1 extra draw.
 // Raw = attribute × 4, capped at 1.0. Split into floor (guaranteed) + fractional (probabilistic).
@@ -81,7 +84,7 @@ function drawAmount(rng, rarity, tier, questType) {
     const scale = TIER_SCALE[tier] || 0.70;
     const base  = AMOUNT_BASE[rarity];
     const raw   = base.min + rng() * (base.max - base.min);
-    const fortuneVariance = questType === 'fortune' ? 0.20 + rng() * 1.60 : 1.0; // avg=1.0, range 0.20–1.80
+    const fortuneVariance = 0.20 + rng() * 1.60; // all quest types, avg=1.0, range 0.20–1.80
     return Math.round(raw * scale * fortuneVariance * 100) / 100;
 }
 
@@ -196,9 +199,14 @@ async function collectQuest(username, questId, blockId, trxId) {
                 }));
             }
 
-            const rarity = weightedDraw(rng, table);  // consumes rng() once
-            const amount = drawAmount(rng, rarity, tier, quest.quest_type);  // consumes rng() once or twice (fortune)
-            relics[rarity] = r2((relics[rarity] || 0) + amount);
+            let rarity = weightedDraw(rng, table);  // consumes rng() once
+            // Jackpot: separate seed so it never shifts the main draw rng stream
+            const jpRng   = seedrandom(createSeed(blockId, trxId, username + '_jp_' + i));
+            const jackpot = jpRng() < JACKPOT_CHANCE;
+            if (jackpot) rarity = RARITY_BUMP[rarity] || rarity;
+            const amount      = drawAmount(rng, rarity, tier, quest.quest_type);  // consumes rng() once or twice
+            const finalAmount = jackpot ? r2(amount * 3) : amount;
+            relics[rarity] = r2((relics[rarity] || 0) + finalAmount);
         }
 
         // Guaranteed legendary draw at 100+ effective roll (also fractional)
