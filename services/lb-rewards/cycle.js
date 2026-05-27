@@ -7,7 +7,7 @@ var seedrandom = require('seedrandom');
 
 var node;
 
-const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200,  4: 500,  5: 2000 };
+const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200,  4: 500,  5: 7500 };
 const TIER_DURATION   = { 1: 1,   2: 4,   3: 12,   4: 24,   5: 48   };
 const TIER_BASE_ROLLS = { 1: 2,   2: 3,   3: 4,    4: 5,    5: 7    };
 const QUEST_TARGET_PRICE_DEFAULT = 0.0003;       // target SCRAP price in HIVE

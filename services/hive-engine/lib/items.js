@@ -86,6 +86,8 @@ async function upgradeItem(username, item_number, quantity) {
         });
         await ctx.db.collection('forge-log').insertOne({ username: username, item: item, flux: quantity, time: new Date() });
         await ctx.db.collection('stats').updateOne({ date: new Date().toISOString().split('T')[0] }, { $inc: { flux_burned_forge: parseFloat(quantity) } });
+        // Forge is a FLUX sink — reset mine rate decay timer (same as quest/boss/upgrade)
+        await ctx.db.collection('players').updateOne({ username }, { $set: { last_upgrade_time: Date.now() }, $inc: { version: 1 } });
         forgeWebhook('Item Upgraded', 'Item #' + item_number + ' upgraded to level ' + (item.level + 1) + ' by ' + username + ' using ' + quantity + ' FLUX');
         await applyItemStats(username);
         return true;

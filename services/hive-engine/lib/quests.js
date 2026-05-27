@@ -14,7 +14,7 @@ const TIER_STAT_REQ      = { 1: 10, 2: 50,  3: 100, 4: 200, 5: 500 };
 const TIER_STAT_REQ_ITEM = { 1: 2,  2: 5,   3: 12,  4: 20,  5: 40  };
 const ITEM_ONLY_STATS    = new Set(['luck', 'dodge']);
 
-const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200, 4: 500, 5: 2000 };
+const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 200, 4: 500, 5: 7500 };
 const TIER_DURATION   = { 1: 1,   2: 4,   3: 12,  4: 24,  5: 48  };
 const TIER_BASE_ROLLS = { 1: 2,   2: 3,   3: 4,   4: 5,   5: 7   };
 
