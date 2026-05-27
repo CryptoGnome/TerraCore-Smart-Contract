@@ -88,6 +88,7 @@ Each service has its own `context.js` (db, client, wif, webhooks). The unified `
 | File | Purpose |
 |------|---------|
 | `shared/rng.js` | `createSeed`, `rollDice`, `adjustedRoll`, `generateRandomNumber` — used by SC, HE, and NFT |
+| `shared/mining.js` | `computeMineRate(eng, lastUpgradeTime?)`, `computeCurrentScrap(user)`, `computeDecayMultiplier(ts)` — engineering softcap at 333 (50% slope) + gentle decay (14-day grace, 10%/week, 25% floor). **Must stay in sync with `../TerraCore API/shared/mining.js`** — both copies must be identical. |
 | `shared/he-node.js` | Beacon API node discovery + fallback list for Hive Engine |
 | `shared/retry.js` | `retryWithBackoff()` — used by lb-rewards |
 
@@ -109,7 +110,7 @@ Each service has its own `context.js` (db, client, wif, webhooks). The unified `
 |-----------|---------|
 | `players` | Player stats (scrap, damage, defense, engineering, cooldowns) |
 | `active-quests` | In-progress quests |
-| `quest-template` | Quest definitions |
+| `quest-templates` | Quest template pool (hand-authored missions drawn daily) |
 | `quest-log` | Quest action audit log |
 | `battle_logs` | Combat records including seeds, rolls, stolen scrap |
 | `registrations` | Player registration records |
