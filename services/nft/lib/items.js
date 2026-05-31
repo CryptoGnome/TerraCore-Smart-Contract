@@ -58,6 +58,7 @@ async function equipItem(username, item_number) {
                     item_id: item.id,
                     item_equipped: true,
                     rarity: item.rarity,
+                    level: item.level || 1,
                     attributes: item.attributes
                 };
 

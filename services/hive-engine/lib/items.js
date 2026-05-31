@@ -32,6 +32,10 @@ async function applyItemStats(username) {
         if (!deepEqual(item.attributes, originalItem.attributes)) {
             result.items[itemName].attributes = deepClone(originalItem.attributes);
         }
+        const correctLevel = originalItem.level || 1;
+        if ((item.level || 1) !== correctLevel) {
+            result.items[itemName].level = correctLevel;
+        }
     }
     await ctx.db.collection('players').updateOne({ username: username }, { $set: { items: result.items } });
 }
