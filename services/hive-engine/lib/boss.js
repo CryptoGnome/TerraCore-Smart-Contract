@@ -278,7 +278,7 @@ async function buy_crate(owner, quantity, rarity = 'common') {
         console.log(`Crate Purchased: ${crate.name} for ${crate.owner} #${crate.item_number}`);
         marketWebhook('Crate Purchased', `${crate.name} for ${crate.owner} #${crate.item_number}`, RARITY_COLORS[rarity] ?? '#aaaaaa');
         await ctx.db.collection('crate-count').updateOne({ supply: 'total' }, { $inc: { count: 1 } });
-        await ctx.db.collection('nft-drops').insertOne({ name: crate.name, rarity: crate.rarity, owner: crate.owner, item_number: crate.item_number, purchased: true, time: new Date() });
+        await ctx.db.collection('nft-drops').insertOne({ name: crate.name, rarity: crate.rarity, owner: crate.owner, item_number: crate.item_number, purchased: true, cost: expectedCost, time: new Date() });
         await ctx.db.collection('players').updateOne({ username: owner }, { $set: { last_upgrade_time: Date.now() }, $inc: { version: 1 } });
 
         if (rarity !== 'common') {
