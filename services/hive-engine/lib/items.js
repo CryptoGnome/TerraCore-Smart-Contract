@@ -26,9 +26,12 @@ function deepEqual(a, b) {
 
 async function applyItemStats(username) {
     const result = await ctx.db.collection('players').findOne({ username: username });
+    if (!result?.items) return;
     for (const itemName in result.items) {
         const item = result.items[itemName];
+        if (!item.item_number) continue;
         const originalItem = await ctx.db.collection('items').findOne({ item_number: item.item_number });
+        if (!originalItem) continue;
         if (!deepEqual(item.attributes, originalItem.attributes)) {
             result.items[itemName].attributes = deepClone(originalItem.attributes);
         }
