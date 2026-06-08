@@ -35,6 +35,11 @@ async function storeRejectedHash(hash, username) {
 
 async function checkHash(trxId) {
     try {
+        // Defense-in-depth: never query with a falsy key. A missing trxId would serialize to
+        // { trxId: null } and match the legacy (pre-trxId) docs, falsely flagging a paid op as a
+        // duplicate. Callers already pass `trxId || memo`, but guard here so checkHash is safe for
+        // any caller. Fail open (treat as not-seen) — dropping a paid op is the worse outcome.
+        if (!trxId) return false;
         const collection = ctx.db.collection('hashes');
         const existing = await collection.findOne({ trxId: trxId });
         return !!existing;

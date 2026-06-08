@@ -170,13 +170,14 @@ async function main() {
 
     // Ensure the HE replay-dedup lookup (hashes.trxId) is indexed. checkHash() runs on every
     // Hive Engine op; without an index it full-scans the large, ever-growing hashes collection.
-    // Idempotent and non-fatal — an existing or slow index build must not block startup.
-    try {
-        await db.collection('hashes').createIndex({ trxId: 1 }, { background: true });
-        console.log('✓ hashes.trxId index ensured');
-    } catch (err) {
-        console.warn('hashes.trxId index build skipped:', err.message);
-    }
+    // Fire-and-forget (NOT awaited): a slow build over ~1.5M docs must not delay stream startup,
+    // or the 30s heartbeat below would process.exit before the streams begin. checkHash falls back
+    // to a collection scan until the build finishes — same as before this change. The partial
+    // filter keeps the index to docs that actually carry trxId (legacy docs predate the field).
+    db.collection('hashes')
+        .createIndex({ trxId: 1 }, { partialFilterExpression: { trxId: { $exists: true } } })
+        .then(() => console.log('✓ hashes.trxId index ensured'))
+        .catch((err) => console.warn('hashes.trxId index build skipped:', err.message));
 
     console.log('-------------------------------------------------------');
     console.log('TerraCore unified process starting...');
