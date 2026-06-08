@@ -8,6 +8,13 @@ const { logError } = require('../../../shared/error-logger');
 async function handleTransaction(transaction) {
     if (transaction['contract'] != 'tokens') return;
 
+    // Replay-dedup keys on the Hive Engine transaction id (server-observed, globally unique) —
+    // not the client-supplied memo. The memo is still used for ROUTING (action type, item_number,
+    // rarity, tier, etc.); only the idempotency key is trxId. This mirrors the L1 smart-contract
+    // queue, which already dedups on transaction_id, and removes the silent-FLUX-loss class of bug
+    // where a stale client reuses a deterministic memo that collides with a prior on-chain action.
+    const trxId = transaction.transactionId;
+
     if (transaction['action'] == 'transfer') {
         const payload = JSON.parse(transaction['payload']);
 
@@ -23,22 +30,23 @@ async function handleTransaction(transaction) {
                 return;
             }
 
-            if      (event == 'terracore_engineering') { console.log(`[HE] engineering: ${from} (${quantity} SCRAP)`); sendTransaction(from, quantity, 'engineering', hashStore); }
-            else if (event == 'terracore_damage')      { console.log(`[HE] damage: ${from} (${quantity} SCRAP)`);      sendTransaction(from, quantity, 'damage',      hashStore); }
-            else if (event == 'terracore_defense')     { console.log(`[HE] defense: ${from} (${quantity} SCRAP)`);     sendTransaction(from, quantity, 'defense',     hashStore); }
-            else if (event == 'terracore_contribute')  { console.log(`[HE] contribute: ${from} (${quantity} SCRAP)`);  sendTransaction(from, quantity, 'contribute',  hashStore); }
+            if      (event == 'terracore_engineering') { console.log(`[HE] engineering: ${from} (${quantity} SCRAP)`); sendTransaction(from, quantity, 'engineering', hashStore, trxId); }
+            else if (event == 'terracore_damage')      { console.log(`[HE] damage: ${from} (${quantity} SCRAP)`);      sendTransaction(from, quantity, 'damage',      hashStore, trxId); }
+            else if (event == 'terracore_defense')     { console.log(`[HE] defense: ${from} (${quantity} SCRAP)`);     sendTransaction(from, quantity, 'defense',     hashStore, trxId); }
+            else if (event == 'terracore_contribute')  { console.log(`[HE] contribute: ${from} (${quantity} SCRAP)`);  sendTransaction(from, quantity, 'contribute',  hashStore, trxId); }
             else if (event == 'tm_buy_crate') {
                 console.log(`[HE] buy-crate: ${from} (${quantity} SCRAP)`);
-                sendTransaction(from, quantity, 'buy_crate', hashStore);
+                sendTransaction(from, quantity, 'buy_crate', hashStore, trxId);
             } else if (event == 'terracore_quest_start') {
                 const memoParts = hashStore.split('-');
                 const questType = memoParts[1];
                 const tier = parseInt(memoParts[2], 10);
-                if (await checkHash(hashStore)) {
-                    console.warn(`[HE] duplicate quest-start skipped: hash=${hashStore} user=${from}`);
+                const dedupKey = trxId || hashStore;
+                if (await checkHash(dedupKey)) {
+                    console.warn(`[HE] duplicate quest-start skipped: trxId=${dedupKey} user=${from}`);
                     return;
                 }
-                await storeHash(hashStore, from, quantity);
+                await storeHash(hashStore, from, quantity, dedupKey);
                 console.log(`[HE] quest-start: ${from} type=${questType} tier=${tier} (${quantity} SCRAP)`);
                 startQuest(from, questType, tier, quantity)
                     .then(result => {
@@ -69,12 +77,13 @@ async function handleTransaction(transaction) {
                     console.log(`[HE] boss-fight: ${from} → ${planet} (${quantity} FLUX)`);
 
                     if (expectedFlux !== null && expectedFlux == quantity) {
-                        if (await checkHash(hash)) {
-                            console.warn(`[HE] duplicate boss-fight hash skipped: ${hash} user=${from}`);
+                        const dedupKey = trxId || hash;
+                        if (await checkHash(dedupKey)) {
+                            console.warn(`[HE] duplicate boss-fight skipped: trxId=${dedupKey} user=${from}`);
                             return;
                         }
-                        // Store hash before fight to prevent replay
-                        await storeHash(hash, from, quantity);
+                        // Store key before fight to prevent replay
+                        await storeHash(hash, from, quantity, dedupKey);
                         bossFight(from, planet, hash)
                             .then(result => {
                                 console.log(`[HE] boss-fight result: ${from} → ${planet}:`, result);
@@ -98,7 +107,7 @@ async function handleTransaction(transaction) {
                     storeRejectedHash(hashStore, from);
                     return;
                 }
-                sendTransaction(from, payload.quantity, 'forge', hashStore);
+                sendTransaction(from, payload.quantity, 'forge', hashStore, trxId);
             }
             return;
         }
@@ -119,7 +128,7 @@ async function handleTransaction(transaction) {
             }
             console.log(`[HE] stake: ${sender} (${qty} SCRAP)`);
             webhook('New Stake', sender + ' has staked ' + qty + ' SCRAP', '#FFA500');
-            storeHash(hashStore, sender, qty);
+            storeHash(hashStore, sender, qty, trxId);
         }
     }
 }

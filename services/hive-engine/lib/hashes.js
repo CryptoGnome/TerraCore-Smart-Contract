@@ -1,11 +1,13 @@
 const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
 
-async function storeHash(hash, username, amount) {
+async function storeHash(memo, username, amount, trxId) {
     try {
         let collection = ctx.db.collection('hashes');
-        await collection.insertOne({ hash: hash, username: username, amount: parseFloat(amount), time: Date.now() });
-        console.log('Hash ' + hash + ' stored');
+        // `hash` keeps the human-readable memo (consumed by the API's daily favor/skills/staked
+        // stats and useful for audit). `trxId` is the replay-dedup key (Hive Engine transaction id).
+        await collection.insertOne({ hash: memo, username: username, amount: parseFloat(amount), time: Date.now(), trxId: trxId });
+        console.log('Hash stored (trxId=' + trxId + ', memo=' + memo + ')');
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {
             console.log('MongoDB connection closed');
@@ -31,10 +33,10 @@ async function storeRejectedHash(hash, username) {
     }
 }
 
-async function checkHash(hash) {
+async function checkHash(trxId) {
     try {
         const collection = ctx.db.collection('hashes');
-        const existing = await collection.findOne({ hash: hash });
+        const existing = await collection.findOne({ trxId: trxId });
         return !!existing;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {

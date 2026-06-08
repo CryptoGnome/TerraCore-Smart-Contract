@@ -168,6 +168,16 @@ async function main() {
     }
     errorLogger.setErrorDb(db);
 
+    // Ensure the HE replay-dedup lookup (hashes.trxId) is indexed. checkHash() runs on every
+    // Hive Engine op; without an index it full-scans the large, ever-growing hashes collection.
+    // Idempotent and non-fatal — an existing or slow index build must not block startup.
+    try {
+        await db.collection('hashes').createIndex({ trxId: 1 }, { background: true });
+        console.log('✓ hashes.trxId index ensured');
+    } catch (err) {
+        console.warn('hashes.trxId index build skipped:', err.message);
+    }
+
     console.log('-------------------------------------------------------');
     console.log('TerraCore unified process starting...');
     console.log('-------------------------------------------------------');
