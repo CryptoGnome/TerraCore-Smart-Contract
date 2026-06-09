@@ -42,6 +42,22 @@ async function equipItem(username, item_number) {
                     return;
                 }
 
+                // Newly-registered players are seeded with items: {} (registration) and have no
+                // per-type slot until they equip something. Without this guard, reading
+                // user.items[item.type].item_equipped throws and the catch silently swallows it —
+                // the equip no-ops forever. Seed the empty slot so the equip can proceed.
+                if (!user.items || typeof user.items !== 'object') {
+                    user.items = {};
+                }
+                if (!user.items[item.type]) {
+                    user.items[item.type] = {
+                        item_number: null,
+                        item_id: null,
+                        item_equipped: false,
+                        attributes: { damage: 0, defense: 0, engineering: 0, dodge: 0, crit: 0, luck: 0 }
+                    };
+                }
+
                 if (user.items[item.type].item_equipped) {
                     console.log(`User: ${username} already has item equipped, unequipping item: ${user.items[item.type].item_number}`);
                     await unequipItem(username, user.items[item.type].item_number);
