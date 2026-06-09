@@ -49,7 +49,7 @@ async function listItem(_item, seller) {
                     webhook4('Relics Listing Updated', relic.type, relic.market.amount.toString(), relic.market.price.toString(), 'Update Listing', relic.market.seller);
                 } else {
                     relic.market.listed = true;
-                    relic.market.amount = _item.amount;
+                    relic.market.amount = Math.min(_item.amount, relic.amount);
                     relic.market.price = _item.price;
                     relic.market.seller = seller;
                     relic.market.created = new Date().getTime();
@@ -77,7 +77,7 @@ async function listItem(_item, seller) {
                     webhook4('Consumables Listing Updated', consumable.type, consumable.market.amount.toString(), consumable.market.price.toString(), 'Update Listing', consumable.market.seller);
                 } else {
                     consumable.market.listed = true;
-                    consumable.market.amount = _item.amount;
+                    consumable.market.amount = Math.min(_item.amount, consumable.amount);
                     consumable.market.price = _item.price;
                     consumable.market.seller = seller;
                     consumable.market.created = new Date().getTime();
@@ -232,6 +232,12 @@ async function purchaseItem(memo, price, buyer) {
 
             if (memo.amount > item.market.amount) {
                 refundReason = 'Amount is greater than listed';
+                await refundBuyer(refundReason);
+                return;
+            }
+
+            if (memo.amount > item.amount) {
+                refundReason = `Seller no longer holds enough ${collectionName}`;
                 await refundBuyer(refundReason);
                 return;
             }
