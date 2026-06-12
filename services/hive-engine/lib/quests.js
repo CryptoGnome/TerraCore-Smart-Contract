@@ -55,15 +55,10 @@ async function startQuest(username, questType, tier, paidAmount) {
     try {
         const db = ctx.db;
 
-        // Beta gate: only allowed users can start quests
+        // price_feed holds quest_cost_multiplier — required for payment validation below
         const priceFeed = await db.collection('price_feed').findOne({ date: 'global' });
         if (!priceFeed) {
             console.log(`[HE] quest-start: price_feed missing, rejecting ${username}`);
-            return false;
-        }
-        const betaUsers = Array.isArray(priceFeed.quest_beta_users) ? priceFeed.quest_beta_users : [];
-        if (!betaUsers.includes(username)) {
-            console.log(`[HE] quest-start: ${username} not in beta`);
             return false;
         }
 
