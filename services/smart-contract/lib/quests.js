@@ -4,6 +4,11 @@ const ctx = require('../context');
 const { createSeed, rollDice } = require('../../../shared/rng');
 const { webhook3 } = require('./webhooks');
 const { logError } = require('../../../shared/error-logger');
+const {
+    getLootTable, weightedDraw, drawAmount, getAffinityBonus,
+    computeEffectiveRoll, computeDrawCount, computeInvestmentFactor, DEFAULT_INVESTMENT,
+    JACKPOT_CHANCE, RARITY_BUMP, r2,
+} = require('./quest-loot');
 
 const TIER_STAT_REQ      = { 1: 10,  2: 50,  3: 100, 4: 200, 5: 500 };
 const TIER_STAT_REQ_ITEM = { 1: 2,   2: 5,   3: 12,  4: 20,  5: 40  }; // luck/dodge — item-only stats
@@ -14,81 +19,6 @@ const ITEM_ONLY_STATS = new Set(['luck', 'dodge']);
 
 const RARITY_BONUS = { common: 5, uncommon: 10, rare: 20, epic: 35, legendary: 50 };
 const LEVEL_SCALE  = { common: 0.5, uncommon: 0.8, rare: 1.2, epic: 1.8, legendary: 2.5 };
-
-// Rarity weights per quest type. Tier shift applied at runtime.
-// Fortune has only a modest edge on rarity — its advantage is in AMOUNT variance.
-const BASE_LOOT_PROFILES = {
-    combat:  [{ r: 'legendary', w: 1  }, { r: 'epic', w: 5  }, { r: 'rare', w: 20 }, { r: 'uncommon', w: 38 }, { r: 'common', w: 36 }],
-    salvage: [{ r: 'legendary', w: 1  }, { r: 'epic', w: 3  }, { r: 'rare', w: 12 }, { r: 'uncommon', w: 43 }, { r: 'common', w: 41 }],
-    stealth: [{ r: 'legendary', w: 1  }, { r: 'epic', w: 5  }, { r: 'rare', w: 18 }, { r: 'uncommon', w: 39 }, { r: 'common', w: 37 }],
-    fortune: [{ r: 'legendary', w: 2  }, { r: 'epic', w: 7  }, { r: 'rare', w: 20 }, { r: 'uncommon', w: 36 }, { r: 'common', w: 35 }],
-    defense: [{ r: 'legendary', w: 1  }, { r: 'epic', w: 4  }, { r: 'rare', w: 15 }, { r: 'uncommon', w: 41 }, { r: 'common', w: 39 }],
-};
-
-// Amount range per relic rarity — fractional, Diablo-style random quantity per draw.
-// Tier scale (tapered): T1×0.60, T2×0.85, T3×1.10, T4×1.35, T5×1.60
-// Per-draw variance: 0.20–1.80× (avg=1.0) applied to ALL quest types (was fortune-only).
-// Wider AMOUNT_BASE ranges preserve identical averages while creating Diablo-style loot swings.
-const AMOUNT_BASE = {
-    common:    { min: 0.01, max: 1.49 },  // avg 0.75 — unchanged
-    uncommon:  { min: 0.01, max: 1.01 },  // avg 0.51 — unchanged
-    rare:      { min: 0.01, max: 0.60 },  // avg 0.305 — unchanged
-    epic:      { min: 0.01, max: 0.37 },  // avg 0.19 — unchanged
-    legendary: { min: 0.01, max: 0.53 },  // avg 0.27 — unchanged
-};
-
-// 2% per-draw jackpot: bumps rarity one tier + 3× amount. Pure RNG, uses a separate seed.
-const JACKPOT_CHANCE = 0.02;
-const RARITY_BUMP = { common: 'uncommon', uncommon: 'rare', rare: 'epic', epic: 'legendary', legendary: 'legendary' };
-
-// Affinity bonus: item's primary stat attribute contributes 0–1 extra draw.
-// Raw = attribute × 4, capped at 1.0. Split into floor (guaranteed) + fractional (probabilistic).
-// Cap is critical — damage/defense attrs are stored at 10× scale (range 6–60), luck/dodge
-// are 1× scale (range 0.6–6). Without the cap, a weapon with damage_attr=9.6 would give
-// 38 bonus draws, completely breaking rewards.
-// Examples: luck 0.1 → raw 0.4 → 0 draws + 40% chance of 1
-//           luck 0.5 → raw 2.0 → capped at 1 guaranteed draw
-//           damage 9.6 → raw 38.4 → capped at 1 guaranteed draw
-function getAffinityBonus(itemAttributeValue) {
-    if (!itemAttributeValue || itemAttributeValue <= 0) return 0;
-    return Math.min(itemAttributeValue * 4, 1.0);
-}
-
-function getLootTable(questType, tier) {
-    const base = BASE_LOOT_PROFILES[questType] || BASE_LOOT_PROFILES.combat;
-    const shift = (tier - 1) * 2;
-    return base.map((entry, i) => ({
-        rarity: entry.r,
-        w: Math.max(1, i === 0 ? entry.w + shift * 2 : i === 1 ? entry.w + shift : i >= 3 ? entry.w - shift : entry.w),
-    }));
-}
-
-function weightedDraw(rng, table) {
-    const total = table.reduce((s, e) => s + e.w, 0);
-    let roll = rng() * total;
-    for (const entry of table) {
-        roll -= entry.w;
-        if (roll <= 0) return entry.rarity;
-    }
-    return table[table.length - 1].rarity;
-}
-
-// Roll a seeded fractional relic amount for one draw.
-// rng has already advanced once (for the rarity draw), so subsequent calls continue the same seed sequence.
-function drawAmount(rng, rarity, tier, questType) {
-    // Inverse scale: higher tiers give FEWER relics per draw but FAR better rarity.
-    // T1=0.70 (most relics/draw, all common/uncommon) → T5=0.32 (fewest/draw, 15.7% legendary).
-    // This keeps ALL quest tiers below the boss-miss ceiling (3.28 avg relics).
-    // T5/T1 legendary ratio ≈ 20× — quality, not quantity, is the T5 incentive.
-    const TIER_SCALE = { 1: 0.70, 2: 0.58, 3: 0.48, 4: 0.40, 5: 0.32 };
-    const scale = TIER_SCALE[tier] || 0.70;
-    const base  = AMOUNT_BASE[rarity];
-    const raw   = base.min + rng() * (base.max - base.min);
-    const fortuneVariance = 0.20 + rng() * 1.60; // all quest types, avg=1.0, range 0.20–1.80
-    return Math.round(raw * scale * fortuneVariance * 100) / 100;
-}
-
-function r2(n) { return Math.round(n * 100) / 100; }  // round to 2dp, prevent float drift
 
 async function issue(username, type, amount) {
     try {
@@ -137,28 +67,18 @@ async function collectQuest(username, questId, blockId, trxId) {
         // Item rarity/level now drives direct draw bonuses, not roll inflation.
         const seed      = createSeed(blockId, trxId, username);
         const baseRoll  = rollDice(100, seed);
-        const statMod   = Math.max(0, Math.min(
-            (quest.effective_primary_stat - statReq) / (statReq * 4), 0.75
-        ));
-        const secBonus  = quest.secondary_stat_value != null
-            ? Math.min((quest.secondary_stat_value / Math.max(statReq, 1)) * 8, 8) : 0;
         // effectiveRoll: stat skill only (item gives draw count bonus separately below)
-        const effectiveRoll = baseRoll * (1 + statMod) + secBonus;
+        const effectiveRoll = computeEffectiveRoll(
+            baseRoll, quest.effective_primary_stat, statReq, quest.secondary_stat_value
+        );
 
         // ── Draw count ──────────────────────────────────────────────────────────
         // effectiveRoll range: 0–183 (100 × 1.75 + 8). Brackets tuned accordingly.
         const baseRolls = quest.base_rolls || 2;
-        let drawCount;
-        let guaranteedLegendary = false;
-        let shiftRareUp = false;
-
-        if      (effectiveRoll <  35) { drawCount = Math.max(1, Math.floor(baseRolls * 0.50)); }
-        else if (effectiveRoll <  65) { drawCount = baseRolls; }
-        else if (effectiveRoll < 100) { drawCount = Math.ceil(baseRolls * 1.50); }
-        else if (effectiveRoll < 130) { drawCount = baseRolls * 2; }
-        else if (effectiveRoll < 155) { drawCount = Math.ceil(baseRolls * 2.5); shiftRareUp = true; }
-        else if (effectiveRoll < 175) { drawCount = baseRolls * 3; }
-        else                          { drawCount = baseRolls * 3; guaranteedLegendary = true; }
+        const drawInfo = computeDrawCount(effectiveRoll, baseRolls);
+        const guaranteedLegendary = drawInfo.guaranteedLegendary;
+        const shiftRareUp         = drawInfo.shiftRareUp;
+        let drawCount             = drawInfo.drawCount;
 
         // Item draw bonus: two independent components.
         // 1. Rarity base: rare/epic/legendary grant +1 guaranteed draw.
@@ -217,6 +137,15 @@ async function collectQuest(username, questId, blockId, trxId) {
             relics.legendary = r2((relics.legendary || 0) + legAmt);
         }
 
+        // ── Gear-based investment factor (anti-farm) ──────────
+        // Scales the relics awarded by the gear equipped in this quest's slot (snapshotted at
+        // start). A bare account earns the floor; rarer + higher-forge-level gear ramps to full —
+        // so a perpetually-ungeared farm account contributes like the low-investment account it is.
+        const invFactor = computeInvestmentFactor(quest.equipped_item_rarity, quest.equipped_item_level, DEFAULT_INVESTMENT);
+        if (invFactor < 1) {
+            for (const k of Object.keys(relics)) relics[k] = r2(relics[k] * invFactor);
+        }
+
         // ── Issue relics ──────────────────────────────────────
         for (const [rarity, amount] of Object.entries(relics)) {
             if (amount > 0) await issue(username, rarity + '_relics', amount);
@@ -255,7 +184,7 @@ async function collectQuest(username, questId, blockId, trxId) {
             .join(', ');
         webhook3(quest, username, effectiveRoll, drawCount, relics, quest.scrap_paid);
 
-        console.log(`[SC] quest-collect: ${username} "${quest.name}" T${tier} — roll=${effectiveRoll.toFixed(1)} draws=${drawCount} relics: ${relicSummary}`);
+        console.log(`[SC] quest-collect: ${username} "${quest.name}" T${tier} — roll=${effectiveRoll.toFixed(1)} draws=${drawCount} inv=${invFactor.toFixed(2)} relics: ${relicSummary}`);
         return true;
     } catch (err) {
         if (err instanceof MongoTopologyClosedError) {

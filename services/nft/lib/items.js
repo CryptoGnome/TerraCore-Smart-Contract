@@ -2,6 +2,7 @@ const { MongoTopologyClosedError } = require('mongodb');
 const ctx = require('../context');
 const { webhook2 } = require('./webhooks');
 const { mintFLUX } = require('./economy');
+const { salvageValue } = require('./crate-loot');
 
 function handleMongoError(err) {
     if (err instanceof MongoTopologyClosedError) {
@@ -173,7 +174,7 @@ async function salvageNFT(username, item_number) {
             return false;
         }
 
-        let value = item.attributes.damage / 2 + item.attributes.defense / 2 + item.attributes.engineering * 5 + item.attributes.dodge * 5 + item.attributes.crit * 5 + item.attributes.luck * 10;
+        let value = salvageValue(item.attributes);
         console.log('Item: ' + item_number + ' has a salvage value of: ' + value);
 
         if (item.salvaged == undefined || item.salvaged == false) {

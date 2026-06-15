@@ -14,7 +14,10 @@ const TIER_STAT_REQ      = { 1: 10, 2: 50,  3: 100, 4: 200, 5: 500 };
 const TIER_STAT_REQ_ITEM = { 1: 2,  2: 5,   3: 12,  4: 20,  5: 40  };
 const ITEM_ONLY_STATS    = new Set(['luck', 'dodge']);
 
-const TIER_BASE_COST  = { 1: 10,  2: 50,  3: 235, 4: 985, 5: 4010 };
+// T1/T2 raised (10→20, 50→100) as part of the low-tier anti-farm rebalance: low quests were a
+// ~100× cheaper SCRAP→FLUX path than T5. NOTE: the frontend must send the new amount and the API
+// version must be bumped in lockstep, or quest starts will be rejected as underpaid.
+const TIER_BASE_COST  = { 1: 20,  2: 100, 3: 235, 4: 985, 5: 4010 };
 const TIER_DURATION   = { 1: 1,   2: 4,   3: 12,  4: 24,  5: 48  };
 const TIER_BASE_ROLLS = { 1: 2,   2: 3,   3: 4,   4: 6,   5: 10  };
 

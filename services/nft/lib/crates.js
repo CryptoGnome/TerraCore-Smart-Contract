@@ -3,6 +3,7 @@ var seedrandom = require('seedrandom');
 const ctx = require('../context');
 const { webhook3 } = require('./webhooks');
 const { createSeed, generateRandomNumber } = require('../../../shared/rng');
+const { rollItemRarity, rollItemAttributes } = require('./crate-loot');
 
 async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
     try {
@@ -21,34 +22,11 @@ async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
 
         let type = types[Math.floor(rng() * types.length)];
 
-        var rarity = 'common';
-        if (_rarity == 'common') {
-            if (roll <= 90000)       rarity = 'common';
-            else if (roll <= 99000)  rarity = 'uncommon';
-            else if (roll <= 99750)  rarity = 'rare';
-            else if (roll <= 99950)  rarity = 'epic';
-            else                     rarity = 'legendary';
-        } else if (_rarity == 'uncommon') {
-            if (roll <= 95000)       rarity = 'uncommon';
-            else if (roll <= 99000)  rarity = 'rare';
-            else if (roll <= 99900)  rarity = 'epic';
-            else                     rarity = 'legendary';
-        } else if (_rarity == 'rare') {
-            if (roll < 95000)        rarity = 'rare';
-            else if (roll < 99000)   rarity = 'epic';
-            else                     rarity = 'legendary';
-        } else if (_rarity == 'epic') {
-            if (roll < 98000)        rarity = 'epic';
-            else                     rarity = 'legendary';
-        } else if (_rarity == 'legendary') {
-            rarity = 'legendary';
-        }
+        var rarity = rollItemRarity(_rarity, roll);
 
         let range = ranges[types.indexOf(type)];
         let item_id = Math.floor(rng() * (range[1] - range[0] + 1)) + range[0];
         let find = await collection.findOne({ id: item_id });
-
-        var attributes = ["damage", "defense", "engineering", "dodge", "crit", "luck"];
 
         if (find != null) {
             collection = ctx.db.collection('items');
@@ -72,83 +50,10 @@ async function open_crate(owner, _rarity, blockId, trxId, hash, depth = 0) {
             item.equiped = false;
             item.burnt = false;
 
-            let rarity_index = 1;
-            if (rarity == 'uncommon') {
-                rarity_index = 2;
-            } else if (rarity == 'rare') {
-                rarity_index = 3;
-            } else if (rarity == 'epic') {
-                let roll = Math.floor(rng() * 100) + 1;
-                rarity_index = (roll <= 50) ? 4 : 5;
-            } else if (rarity == 'legendary') {
-                rarity_index = 6;
-            }
-
-            var attributes_chosen = [];
-            let att_count = 0;
-            for (var i = 0; i < rarity_index; i++) {
-                if (i == 0) {
-                    if (type == 'weapon') {
-                        attributes_chosen.push('damage');
-                        attributes.splice(0, 1);
-                    } else if (type == 'armor') {
-                        attributes_chosen.push('defense');
-                        attributes.splice(1, 1);
-                    } else if (type == 'ship') {
-                        let roll = Math.floor(rng() * attributes.length);
-                        attributes_chosen.push(attributes[roll]);
-                        attributes.splice(roll, 1);
-                    } else if (type == 'special') {
-                        let roll = Math.floor(rng() * attributes.length);
-                        attributes_chosen.push(attributes[roll]);
-                        attributes.splice(roll, 1);
-                    } else if (type == 'avatar') {
-                        let roll = Math.floor(rng() * attributes.length);
-                        attributes_chosen.push(attributes[roll]);
-                        attributes.splice(roll, 1);
-                    }
-                } else {
-                    var roll = Math.floor(rng() * attributes.length);
-                    attributes_chosen.push(attributes[roll]);
-                    attributes.splice(roll, 1);
-                }
-            }
-
-            let attribute_list = new Object();
-            for (var i = 0; i < attributes_chosen.length; i++) {
-                if (attributes_chosen[i] == 'damage') {
-                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
-                    attribute_list.damage = (roll * 10);
-                    att_count += 1;
-                } else if (attributes_chosen[i] == 'defense') {
-                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
-                    attribute_list.defense = (roll * 10);
-                    att_count += 1;
-                } else if (attributes_chosen[i] == 'engineering') {
-                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
-                    attribute_list.engineering = roll;
-                    att_count += 1;
-                } else if (attributes_chosen[i] == 'dodge') {
-                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
-                    attribute_list.dodge = roll;
-                    att_count += 1;
-                } else if (attributes_chosen[i] == 'crit') {
-                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
-                    attribute_list.crit = roll;
-                    att_count += 1;
-                } else if (attributes_chosen[i] == 'luck') {
-                    let roll = rng() * (rarity_index - 0.10 * rarity_index) + 0.10 * rarity_index;
-                    attribute_list.luck = roll;
-                    att_count += 1;
-                }
-            }
-
-            if (attribute_list.damage == null)      attribute_list.damage = 0;
-            if (attribute_list.defense == null)     attribute_list.defense = 0;
-            if (attribute_list.engineering == null) attribute_list.engineering = 0;
-            if (attribute_list.dodge == null)       attribute_list.dodge = 0;
-            if (attribute_list.crit == null)        attribute_list.crit = 0;
-            if (attribute_list.luck == null)        attribute_list.luck = 0;
+            const itemAttrs    = rollItemAttributes(type, rarity, rng);
+            const rarity_index = itemAttrs.rarity_index;
+            const attribute_list = itemAttrs.attributes;
+            const att_count    = itemAttrs.att_count;
 
             if (att_count < rarity_index) {
                 console.log(rarity + ' ||  Attributes: ' + JSON.stringify(attribute_list) + '                    ||  Not enough attributes, rerolling');
