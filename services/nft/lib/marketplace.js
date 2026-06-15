@@ -220,6 +220,18 @@ async function purchaseItem(memo, price, buyer) {
                 return;
             }
 
+            // Reject non-positive / non-numeric purchase quantities. A negative or NaN memo.amount
+            // slips past the comparison guards below and INFLATES the seller's balance via the
+            // `$inc: { amount: -memo.amount }` debit — a value-minting exploit. Coerce once, then use
+            // the sanitized number everywhere downstream.
+            const qty = Number(memo.amount);
+            if (!Number.isFinite(qty) || qty <= 0) {
+                refundReason = `Invalid ${collectionName} purchase amount`;
+                await refundBuyer(refundReason);
+                return;
+            }
+            memo.amount = qty;
+
             let item_price = parseFloat(item.market.price.split(' ')[0]);
             let amount = parseFloat(price.split(' ')[0]);
             let _total = (item_price * memo.amount).toFixed(3);
@@ -293,11 +305,17 @@ async function purchaseItem(memo, price, buyer) {
             let collection = ctx.db.collection(memo.type);
             let check = await collection.findOne({ item_number: parseInt(memo.item_number) });
             if (check) {
-                if (check.market.listed && parseFloat(check.market.price) === parseFloat(price) && check.market.seller == memo.seller && check.owner == memo.seller && !check.equiped) {
+                if (check.lastTransfer && Date.now() - check.lastTransfer < 86400000) {
+                    // Same 24h cooldown transferItem enforces — now applied to marketplace sales too,
+                    // so an item's ownership can't be bounced between accounts faster than once/24h.
+                    // This was the gap that let one gear kit be rotated across many alts to fake the
+                    // quest gear-investment factor (which is snapshotted at quest start).
+                    refundReason = 'Item is on a 24h transfer cooldown and cannot be bought yet';
+                } else if (check.market.listed && parseFloat(check.market.price) === parseFloat(price) && check.market.seller == memo.seller && check.owner == memo.seller && !check.equiped) {
                     try {
                         const updateResult = await collection.updateOne(
                             { item_number: check.item_number, 'market.listed': true, owner: memo.seller },
-                            { $set: { owner: buyer, market: { listed: false, seller: null, price: 0, sold: Date.now() } } }
+                            { $set: { owner: buyer, lastTransfer: Date.now(), market: { listed: false, seller: null, price: 0, sold: Date.now() } } }
                         );
                         if (updateResult.modifiedCount === 0) {
                             refundReason = 'Item no longer available — concurrent purchase';
