@@ -261,9 +261,9 @@ function reportScenario(name, cfg, iters, rng) {
 }
 
 // ── Scenarios ──────────────────────────────────────────────────────────────────────────────────
-// The shipped rebalance now lives in the production DEFAULTS of quest-loot.js (A2 low-tier rarity
-// collapse) and crate-loot.js (tightened crate ladders), so `production` just uses them — plus the
-// gear investment factor (applied by collectQuest) and the T1/T2 cost bump (in TIER_BASE_COST).
+// The shipped rebalance lives in the production DEFAULTS of quest-loot.js (A2 low-tier rarity
+// collapse); crate-loot.js ladders are UNCHANGED from the original, so `production` just uses them —
+// plus the gear investment factor (applied by collectQuest) and the T1/T2 cost bump (TIER_BASE_COST).
 // `baseline` reconstructs the PRE-rebalance economy via explicit cfg overrides, for comparison.
 const ORIGINAL_LADDERS = {
     common:    [{ max: 90000, r: 'common' },   { max: 99000, r: 'uncommon' }, { max: 99750, r: 'rare' }, { max: 99950, r: 'epic' }, { max: Infinity, r: 'legendary' }],
@@ -293,8 +293,8 @@ function verifyParity() {
         else if (cr == 'legendary') { rar = 'legendary'; }
         return rar;
     }
-    // The shipped DEFAULT_LADDERS are intentionally tightened, so test the extracted function's
-    // faithfulness by feeding it the ORIGINAL ladders explicitly — it must reproduce the old if/else.
+    // DEFAULT_LADDERS equals the original odds (Lever C was dropped), so this confirms the extracted
+    // function reproduces the old inline if/else when fed the original ladders explicitly.
     let mism = 0;
     for (const cr of RARITIES) for (let roll = 0; roll < 100000; roll++) if (CL.rollItemRarity(cr, roll, { ladders: ORIGINAL_LADDERS }) !== ref(cr, roll)) mism++;
     console.log('  ' + (mism === 0 ? 'OK (500k cases identical, given original ladders)' : 'FAIL: ' + mism + ' mismatches'));

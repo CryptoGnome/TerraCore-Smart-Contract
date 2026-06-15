@@ -98,6 +98,7 @@ function weightedDraw(rng, table) {
     const total = table.reduce((s, e) => s + e.w, 0);
     let roll = rng() * total;
     for (const entry of table) {
+        if (entry.w <= 0) continue;   // never select a zero-weight rarity (e.g. legendary at T1 under LOW_TIER_RARITY_MULT)
         roll -= entry.w;
         if (roll <= 0) return entry.rarity;
     }
