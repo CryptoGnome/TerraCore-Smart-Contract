@@ -3,6 +3,7 @@ const ctx = require('../context');
 const { open_crate } = require('./crates');
 const { equipItem, unequipItem } = require('./items');
 const { forgeCrate, useConsumable } = require('./economy');
+const { logError } = require('../../../shared/error-logger');
 
 async function sendTransaction(username, amount, type) {
     try {
@@ -21,26 +22,44 @@ async function sendTransaction(username, amount, type) {
 async function sendTransactions() {
     try {
         let collection = ctx.db.collection('market-transactions');
-        let transactions = await collection.find({}).toArray();
+        // Skip dead-lettered rows so a permanently-failing payout can't loop forever.
+        let transactions = await collection.find({ failed: { $ne: true } }).sort({ time: 1 }).toArray();
 
         for (let i = 0; i < transactions.length; i++) {
             ctx.lastCheck = Date.now();
-            // Delete by _id before broadcasting to prevent double-sends if the process restarts mid-loop
-            const deleted = await collection.findOneAndDelete({ _id: transactions[i]._id });
-            if (!deleted.value) continue; // already processed by a concurrent cycle
+            const tx = transactions[i];
 
-            const xfer = new Object();
-            xfer.from = "terracore.market";
-            xfer.to = deleted.value.username;
-            xfer.amount = deleted.value.amount;
-            xfer.memo = deleted.value.type;
-            await ctx.hive.broadcast.transfer(ctx.wif, xfer.from, xfer.to, xfer.amount, xfer.memo, function (err, result) {
-                if (err) {
-                    console.log(err);
-                } else {
-                    console.log(result);
+            try {
+                // Promise form (transferAsync) — genuinely awaited, unlike the callback form.
+                // This makes payouts broadcast one at a time (no same-block burst that the node
+                // would reject) and lets us catch a failure instead of losing it to a dropped callback.
+                await ctx.hive.broadcast.transferAsync(ctx.wif, 'terracore.market', tx.username, tx.amount, tx.type);
+                // Broadcast confirmed — only now is it safe to remove the row from the queue.
+                await collection.deleteOne({ _id: tx._id });
+            } catch (err) {
+                const message = (err && err.message) ? err.message : String(err);
+                // A duplicate-transaction rejection means this exact transfer already landed
+                // on-chain (e.g. response timed out after the tx was accepted, or a crash after
+                // broadcast but before delete). Treat it as sent so the recipient isn't paid twice.
+                // The detail is often nested below err.message, so scan the serialized error too.
+                let haystack = message;
+                try { haystack += ' ' + JSON.stringify(err); } catch (_) { /* non-serializable error */ }
+                if (/duplicate.{0,2}transaction/i.test(haystack)) {
+                    await collection.deleteOne({ _id: tx._id });
+                    continue;
                 }
-            });
+                const attempts = (tx.attempts || 0) + 1;
+                if (attempts >= 5) {
+                    // Poison row (bad recipient, unfundable currency, ...): stop retrying and
+                    // surface the stuck funds for manual review instead of spamming forever.
+                    await collection.updateOne({ _id: tx._id }, { $set: { failed: true, attempts: attempts, lastError: message } });
+                    logError('NFT_PAYOUT_DEADLETTER', err, { fn: 'sendTransactions', service: 'NFT', username: tx.username, extra: { amount: tx.amount, memo: tx.type, attempts: attempts } });
+                } else {
+                    // Leave the row in the queue — the next cycle retries it.
+                    await collection.updateOne({ _id: tx._id }, { $set: { attempts: attempts, lastError: message } });
+                    logError('NFT_PAYOUT_BROADCAST_FAIL', err, { fn: 'sendTransactions', service: 'NFT', username: tx.username, extra: { amount: tx.amount, memo: tx.type, attempt: attempts } });
+                }
+            }
         }
         return true;
     } catch (err) {
@@ -48,7 +67,7 @@ async function sendTransactions() {
             console.log('MongoDB connection closed');
             process.exit(1);
         } else {
-            console.log(err);
+            logError('NFT_QUEUE_TX_FAIL', err, { fn: 'sendTransactions', service: 'NFT' });
             return true;
         }
     }

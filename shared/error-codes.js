@@ -39,6 +39,9 @@ const CODES = {
     NFT_QUEUE_TX_FAIL:         { description: 'NFT sendTransactions() threw unexpectedly', severity: SEVERITY.ERROR },
     NFT_CRATE_OPEN_FAIL:       { description: 'open_crate() threw an unexpected error',    severity: SEVERITY.ERROR },
     NFT_MARKETPLACE_FAIL:      { description: 'Marketplace operation failed',              severity: SEVERITY.ERROR },
+    NFT_MEMO_PARSE_FAIL:       { description: 'Failed to parse marketplace transfer memo', severity: SEVERITY.WARN  },
+    NFT_PAYOUT_BROADCAST_FAIL: { description: 'Marketplace payout/refund broadcast failed (will retry)', severity: SEVERITY.ERROR },
+    NFT_PAYOUT_DEADLETTER:     { description: 'Marketplace payout dead-lettered after max retries', severity: SEVERITY.ERROR },
 
     // Leaderboard Rewards
     LB_CYCLE_FAIL:             { description: 'runCycle() threw after all retries',        severity: SEVERITY.ERROR },

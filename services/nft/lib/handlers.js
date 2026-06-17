@@ -1,8 +1,13 @@
 const ctx = require('../context');
 const { purchaseItem, listItem, cancelItem, transferItem } = require('./marketplace');
-const { queOpenCrates, queEquip, queCombine, queUse } = require('./queue');
+const { queOpenCrates, queEquip, queCombine, queUse, sendTransaction } = require('./queue');
 const { salvageNFT } = require('./items');
 const { logError } = require('../../../shared/error-logger');
+
+// Accounts allowed to send HIVE to terracore.market without it being bounced back —
+// e.g. an intentional float top-up by an operator. Everything else that isn't a valid
+// purchase is refunded to the sender.
+const REFUND_WHITELIST = ['terracore'];
 
 function extractUser(op) {
     const auths = Array.isArray(op.required_auths) ? op.required_auths : [];
@@ -12,14 +17,32 @@ function extractUser(op) {
 
 async function handleOperation(operation, blockId, trxId, hash) {
     if (operation[0] === 'transfer' && operation[1].to == 'terracore.market') {
+        const from = operation[1].from;
+        const amount = operation[1].amount;
+
+        // Refund HIVE that doesn't result in a successful purchase, so it's never stranded
+        // in the market account. Valid-purchase failures are refunded inside purchaseItem;
+        // this covers everything that never reaches it (bad memo / wrong action).
+        const refundStray = async (reason) => {
+            if (REFUND_WHITELIST.includes(from)) return;
+            console.log(`[NFT] refund stray deposit from ${from} (${amount}): ${reason}`);
+            await sendTransaction(from, amount, `Refund: ${reason}`);
+        };
+
+        let memo;
         try {
-            var memo = JSON.parse(operation[1].memo);
-            if (memo.action.includes('tm_purchase') && operation[1].to == 'terracore.market') {
-                console.log(`[NFT] purchase: ${operation[1].from} (${operation[1].amount})`);
-                await purchaseItem(memo, operation[1].amount, operation[1].from);
-            }
+            memo = JSON.parse(operation[1].memo);
         } catch (err) {
-            logError('NFT_MEMO_PARSE_FAIL', err, { fn: 'handleOperation', from: operation[1].from, service: 'NFT' });
+            logError('NFT_MEMO_PARSE_FAIL', err, { fn: 'handleOperation', from: from, service: 'NFT', extra: { amount: amount } });
+            await refundStray('Invalid purchase memo');
+            return;
+        }
+
+        if (memo && typeof memo.action === 'string' && memo.action.includes('tm_purchase')) {
+            console.log(`[NFT] purchase: ${from} (${amount})`);
+            await purchaseItem(memo, amount, from);
+        } else {
+            await refundStray('Unrecognized marketplace memo');
         }
     }
 
