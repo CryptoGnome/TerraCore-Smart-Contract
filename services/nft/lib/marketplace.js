@@ -3,6 +3,12 @@ const ctx = require('../context');
 const { webhook, webhook4 } = require('./webhooks');
 const { sendTransaction } = require('./queue');
 
+// A listing's full value (unit price * amount) must reach the 0.05 HIVE per-transaction
+// floor, otherwise it can never be purchased — the buy path rejects anything below 0.05.
+// The frontend enforces this too, but the chain is the source of truth: reject sub-floor
+// listings here so a bot or hand-crafted custom_json can't recreate un-buyable dust.
+const MIN_LISTING_HIVE = 0.05;
+
 async function marketplaceLog(_action, _id, _item_number, _buyer, _seller, _price, marketplace, rarity, qty) {
     try {
         let collection = ctx.db.collection('marketplace-logs');
@@ -36,6 +42,13 @@ async function listItem(_item, seller) {
         if (_item.type.includes('relics')) {
             let relic = await ctx.db.collection('relics').findOne({ username: seller, type: _item.type, amount: { $gt: 0 } });
             if (relic) {
+                // Resulting listed amount across both paths: capped sum if already listed, else the new amount.
+                const baseAmount = relic.market.listed == true ? relic.market.amount : 0;
+                const prospectiveAmount = Math.min(baseAmount + _item.amount, relic.amount);
+                if ((parseFloat(_item.price) || 0) * prospectiveAmount < MIN_LISTING_HIVE) {
+                    console.log(`Relic listing below ${MIN_LISTING_HIVE} HIVE floor (${_item.price} x ${prospectiveAmount}), rejecting`);
+                    return;
+                }
                 if (relic.market.listed == true) {
                     let amount = relic.market.amount;
                     if (amount + _item.amount > relic.amount) {
@@ -64,6 +77,13 @@ async function listItem(_item, seller) {
         } else if (_item.type.includes('consumable')) {
             let consumable = await ctx.db.collection('consumables').findOne({ username: seller, type: _item.type, amount: { $gt: 0 } });
             if (consumable) {
+                // Resulting listed amount across both paths: capped sum if already listed, else the new amount.
+                const baseAmount = consumable.market.listed == true ? consumable.market.amount : 0;
+                const prospectiveAmount = Math.min(baseAmount + _item.amount, consumable.amount);
+                if ((parseFloat(_item.price) || 0) * prospectiveAmount < MIN_LISTING_HIVE) {
+                    console.log(`Consumable listing below ${MIN_LISTING_HIVE} HIVE floor (${_item.price} x ${prospectiveAmount}), rejecting`);
+                    return;
+                }
                 if (consumable.market.listed == true) {
                     let amount = consumable.market.amount;
                     if (amount + _item.amount > consumable.amount) {
@@ -93,6 +113,11 @@ async function listItem(_item, seller) {
             const VALID_ITEM_COLLECTIONS = ['items'];
             if (!VALID_ITEM_COLLECTIONS.includes(_item.type)) {
                 console.warn(`[NFT] listItem rejected: invalid type '${_item.type}' from ${seller}`);
+                return;
+            }
+            // Single-unit items: price is the full value, so it must clear the floor on its own.
+            if ((parseFloat(_item.price) || 0) < MIN_LISTING_HIVE) {
+                console.log(`Item listing below ${MIN_LISTING_HIVE} HIVE floor (${_item.price}), rejecting`);
                 return;
             }
             let collection = ctx.db.collection(_item.type);
