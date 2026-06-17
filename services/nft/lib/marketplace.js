@@ -276,18 +276,10 @@ async function purchaseItem(memo, price, buyer) {
                 refundNeeded = false;
 
                 let sellerAmount = amount * 0.95;
-                let marketplaceAmount = amount * 0.025;
-                let terracoreAmount = amount * 0.025;
+                let feeAmount = amount * 0.05;
 
                 await sendTransaction(memo.seller, sellerAmount.toFixed(3) + ' HIVE', `${collectionName.charAt(0).toUpperCase() + collectionName.slice(1)} Sale: ${item.type} to ${buyer}`);
-
-                if (memo.marketplace != 'terracore') {
-                    await sendTransaction('asgarth', marketplaceAmount.toFixed(3) + ' HIVE', `Terracore Marketplace Fee for Sale of ${item.type} to ${buyer}`);
-                    await sendTransaction('crypt0gnome', terracoreAmount.toFixed(3) + ' HIVE', `Terracore Marketplace Fee for Sale of ${item.type} to ${buyer}`);
-                } else {
-                    var total = marketplaceAmount + terracoreAmount;
-                    await sendTransaction('crypt0gnome', total.toFixed(3) + ' HIVE', `Terracore Marketplace Fee for Sale of ${item.type} to ${buyer}`);
-                }
+                await sendTransaction('terracore', feeAmount.toFixed(3) + ' HIVE', `Marketplace fee (Sale of ${item.type} to ${buyer})`);
 
                 webhook4(`${collectionName.charAt(0).toUpperCase() + collectionName.slice(1)} Purchased`, item.type, memo.amount.toString(), item_price.toString(), buyer, memo.seller);
 
@@ -322,19 +314,11 @@ async function purchaseItem(memo, price, buyer) {
                         } else {
                             let amount = parseFloat(price.split(' ')[0]);
                             let seller_amount = amount * 0.95;
-                            let marketplace_amount = amount * 0.025;
-                            let terracore_amount = amount * 0.025;
+                            let fee_amount = amount * 0.05;
 
                             await sendTransaction(memo.seller, seller_amount.toFixed(3) + ' HIVE', `Marketplace Sale of ${check.name} #${check.item_number} to ${buyer}`);
                             await marketplaceLog('purchase', check.id, check.item_number, buyer, memo.seller, price, memo.marketplace, check.rarity, 1);
-
-                            if (memo.marketplace != 'terracore') {
-                                await sendTransaction('asgarth', marketplace_amount.toFixed(3) + ' HIVE', `3rd Party Marketplace Fee for Sale of ${check.name} #${check.item_number} to ${buyer}`);
-                                await sendTransaction('crypt0gnome', terracore_amount.toFixed(3) + ' HIVE', `Terracore Marketplace Fee for Sale of ${check.name} #${check.item_number} to ${buyer}`);
-                            } else {
-                                var total = marketplace_amount + terracore_amount;
-                                await sendTransaction('crypt0gnome', total.toFixed(3) + ' HIVE', `Terracore Marketplace Fee for Sale of ${check.name} #${check.item_number} to ${buyer}`);
-                            }
+                            await sendTransaction('terracore', fee_amount.toFixed(3) + ' HIVE', `Marketplace fee (Sale of ${check.name} #${check.item_number} to ${buyer})`);
 
                             refundNeeded = false;
                             webhook('Item Purchased', `Item # ${check.item_number}  ${check.name} was purchased by ${buyer} for ${price}`, check.rarity, check.attributes, '#81fc8d', check.id);
