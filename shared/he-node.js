@@ -62,33 +62,56 @@ async function updateNodesFromBeacon() {
     }
 }
 
-function fetchWithTimeout(url, timeout = 3500) {
+function fetchWithTimeout(url, timeout = 3500, options = undefined) {
     return Promise.race([
-        fetch(url),
+        fetch(url, options),
         new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Timeout')), timeout)
         )
     ]);
 }
 
+// A node can answer HTTP quickly while its chain data is frozen (enginerpc.com did exactly
+// this on 2026-07-04 and stalled the HE stream for hours). So the health check must hit the
+// RPC and verify the latest block is recent, not just that the host responds.
+const MAX_BLOCK_AGE_MS = 5 * 60 * 1000;
+
 function checkNode(node) {
     return new Promise((resolve) => {
         const start = Date.now();
-        fetchWithTimeout(node)
-            .then(response => {
+        const rpcUrl = node.replace(/\/+$/, '') + '/blockchain';
+        fetchWithTimeout(rpcUrl, 3500, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getLatestBlockInfo' })
+        })
+            .then(async response => {
                 const duration = Date.now() - start;
-                if (response.ok) {
-                    resolve({ node, duration, status: 'Success' });
-                } else {
-                    resolve({ node, duration, status: 'Failed: Response not OK' });
+                if (!response.ok) {
+                    return resolve({ node, duration, status: 'Failed: Response not OK' });
                 }
+                const data = await response.json();
+                const ts = data && data.result && data.result.timestamp;
+                if (!ts) {
+                    return resolve({ node, duration, status: 'Failed: No latest block info' });
+                }
+                // HE block timestamps are UTC without a timezone suffix
+                const blockAge = Date.now() - new Date(ts + 'Z').getTime();
+                if (blockAge > MAX_BLOCK_AGE_MS) {
+                    return resolve({ node, duration, status: `Failed: Stale chain (latest block ${Math.round(blockAge / 60000)}min old)` });
+                }
+                resolve({ node, duration, status: 'Success' });
             })
             .catch(error => resolve({ node, duration: Date.now() - start, status: 'Failed: ' + error.message }));
     });
 }
 
 async function findNode() {
-    updateNodesFromBeacon().catch(() => {});
+    // Await the beacon refresh so the first selection after a restart tests the current
+    // healthy list, not the hardcoded fallback order. (Internally debounced to 30 min and
+    // capped at 5s; it never throws.) Without this, every restart deterministically re-picked
+    // the same fallback node — a crash loop if that node is bad.
+    await updateNodesFromBeacon();
 
     const nodesToTest = nodes.slice(0, 5);
     const promises = nodesToTest.map(node => checkNode(node));
