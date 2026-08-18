@@ -564,14 +564,16 @@ function pickTemplate(rng, templates, usedIds) {
     return available[Math.floor(rng() * available.length)];
 }
 
-async function generateQuestBoard() {
+// `quiet` suppresses the already-current line for the 30s board watcher, which would otherwise
+// add ~2,880 lines a day and shorten the retained log window.
+async function generateQuestBoard(quiet = false) {
     try {
         const db = ctx.client.db('terracore');
         const todayDate = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
 
         const existing = await db.collection('quest-board').findOne({});
         if (existing && existing.date === todayDate) {
-            console.log('[QuestBoard] Board is current for ' + todayDate + ', skipping generation');
+            if (!quiet) console.log('[QuestBoard] Board is current for ' + todayDate + ', skipping generation');
             return;
         }
 
@@ -636,17 +638,24 @@ async function generateQuestBoard() {
             });
         }
 
-        // Bonus 6th slot: 10% legendary, 90% weighted random
+        // Bonus 6th slot: 10% legendary, 90% weighted random.
+        // It must not repeat a quest_type+tier already on the board. The smart contract's slot
+        // lock is keyed { username, board_date, quest_type, tier }, so a duplicate pair is
+        // unstartable — and the client cannot tell the two cards apart, showing one quest's
+        // timer on both. Excluding used pairs here is the root fix for both.
+        const usedSlotKeys = new Set(slots.map(s => `${s.quest_type}-${s.tier}`));
+        const bonusEligible = allTemplates.filter(t => !usedSlotKeys.has(`${t.quest_type}-${t.tier}`));
+
         const legendaryRoll = rng();
         let bonusTemplate = null;
         if (legendaryRoll < 0.10) {
-            const legendaries = allTemplates.filter(t => t.legendary === true && !usedIds.has(String(t._id)));
+            const legendaries = bonusEligible.filter(t => t.legendary === true && !usedIds.has(String(t._id)));
             if (legendaries.length > 0) {
                 bonusTemplate = legendaries[Math.floor(rng() * legendaries.length)];
             }
         }
         if (!bonusTemplate) {
-            bonusTemplate = pickTemplate(rng, allTemplates, usedIds);
+            bonusTemplate = pickTemplate(rng, bonusEligible, usedIds);
         }
         if (bonusTemplate) {
             usedIds.add(String(bonusTemplate._id));
@@ -714,4 +723,4 @@ async function runCycle() {
     await cleanupExpiredQuests();
 }
 
-module.exports = { runCycle };
+module.exports = { runCycle, generateQuestBoard };
