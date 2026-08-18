@@ -20,8 +20,10 @@
   "homepage": "https://github.com/CryptoGnome/TerraCore-Smart-Contract#readme",
   "pnpm": {
     "overrides": {
-      "axios": "^1.15.2",
-      "ws": "^8.20.1"
+      "axios": "^1.18.0",
+      "ws": "^8.21.0",
+      "form-data@3": "^3.0.5",
+      "ip-address": "^10.3.1"
     }
   },
   "dependencies": {
