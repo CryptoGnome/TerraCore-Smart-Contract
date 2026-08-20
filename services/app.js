@@ -54,7 +54,12 @@ function changeL1Node() {
     return l1NodeChangePromise;
 }
 
+// Consecutive failed polls. A lone 502/429 recovers on the very next 3s tick and is not
+// worth a Discord alert; a run of them means rotation isn't helping and someone should look.
+let l1ConsecutivePollErrors = 0;
+
 async function handleL1NodeError(err, context) {
+    l1ConsecutivePollErrors++;
     const currentNode = getL1Node();
     // Rate-limit responses won't recover by retrying the same node — disable it now
     // so the next poll routes through findL1Node to a different endpoint.
@@ -66,7 +71,7 @@ async function handleL1NodeError(err, context) {
     }
     // Await rotation so the next poll can't fire against the disabled URL.
     if (isL1NodeDisabled(currentNode)) await changeL1Node();
-    logError('SYS_L1_STREAM_ERR', err, { fn: context, service: 'SYS' });
+    logError('SYS_L1_STREAM_ERR', err, { fn: context, service: 'SYS' }, l1ConsecutivePollErrors >= 3 ? 'ERROR' : null);
 }
 
 // Self-paced L1 block poller. hive-js's built-in streamBlock polls
@@ -84,6 +89,7 @@ async function startL1Stream() {
         try {
             const props = await hive.api.getDynamicGlobalPropertiesAsync();
             recordL1Success(getL1Node());
+            l1ConsecutivePollErrors = 0;
             globalCtx.lastL1Event = Date.now();
             const head = props.head_block_number;
 
@@ -203,6 +209,7 @@ async function main() {
     nftCtx.hook2  = new Webhook(process.env.NFT_DISCORD_WEBHOOK2);
     nftCtx.hook3  = new Webhook(process.env.NFT_DISCORD_WEBHOOK3);
     nftCtx.hook4  = new Webhook(process.env.NFT_DISCORD_WEBHOOK4);
+    nftCtx.changeNode = changeL1Node;
 
     // Wire Hive Engine context
     heCtx.db          = db;

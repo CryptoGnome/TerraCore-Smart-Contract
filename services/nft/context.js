@@ -8,7 +8,8 @@ const ctx = {
     hook2: null,
     hook3: null,
     hook4: null,
-    lastCheck: Date.now()
+    lastCheck: Date.now(),
+    changeNode: null    // set by app.js after startup
 };
 
 module.exports = ctx;

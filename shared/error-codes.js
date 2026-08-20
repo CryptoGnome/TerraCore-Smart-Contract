@@ -13,6 +13,10 @@ const CODES = {
     SYS_STARTUP_FAIL:         { description: 'Fatal error during process startup',         severity: SEVERITY.FATAL },
     SYS_HE_NODE_ALL_FAILED:   { description: 'All Hive Engine nodes failed connectivity',  severity: SEVERITY.ERROR },
     SYS_BEACON_UPDATE_FAIL:   { description: 'HE beacon node list update failed',          severity: SEVERITY.WARN  },
+    // A lone 502/429 from one RPC node self-heals on the next 3s poll, so the catalog
+    // default is WARN (console + error-log, no Discord). services/app.js overrides to
+    // ERROR once the poller has failed repeatedly, which means rotation isn't helping.
+    SYS_L1_STREAM_ERR:        { description: 'Hive L1 poll failed against current node',  severity: SEVERITY.WARN  },
 
     // Smart Contract service
     SC_BATTLE_SCRAP_NAN:       { description: 'scrapToSteal computed as NaN in battle()',  severity: SEVERITY.ERROR },
@@ -42,6 +46,7 @@ const CODES = {
     NFT_MEMO_PARSE_FAIL:       { description: 'Failed to parse marketplace transfer memo', severity: SEVERITY.WARN  },
     NFT_PAYOUT_BROADCAST_FAIL: { description: 'Marketplace payout/refund broadcast failed (will retry)', severity: SEVERITY.ERROR },
     NFT_PAYOUT_DEADLETTER:     { description: 'Marketplace payout dead-lettered after max retries', severity: SEVERITY.ERROR },
+    NFT_PAYOUT_NODE_THROTTLED: { description: 'Marketplace payout deferred — RPC node throttled',  severity: SEVERITY.WARN  },
 
     // Leaderboard Rewards
     LB_CYCLE_FAIL:             { description: 'runCycle() threw after all retries',        severity: SEVERITY.ERROR },
